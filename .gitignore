@@ -1,0 +1,19 @@
+local-data/
+.env
+dh2-cinematic-builder-prototype.zip
+scripts/__pycache__/
+node_modules/
+tmp-server.*.log
+
+# Private sourcebook extracts and locally supplied media are never committed to
+# the public player-edition repository. The hosted build uses redacted data and
+# atmospheric CSS fallbacks.
+src/armoury-data.js
+src/talent-data.js
+public/data/
+public/assets/choices/
+public/assets/stages/
+public/assets/audio/
+public/assets/rhodin-iv.webp
+public/assets/imperial-guard.webp
+public/assets/assassin.webp
