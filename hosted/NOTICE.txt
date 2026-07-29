@@ -2,3 +2,5 @@ Unofficial Dark Heresy Second Edition game aid.
 Dark Heresy and Warhammer 40,000 are properties of their respective rights holders.
 Universe by Games Workshop; Dark Heresy Second Edition published by Fantasy Flight Games.
 The hosted player edition omits private sourcebook extracts, illustrations, and locally supplied music.
+Players may select their own sourcebook PDFs; those files and the resulting rules index stay in that browser and are never uploaded by the application.
+PDF reading is provided by PDF.js under the Apache License 2.0; see vendor-licenses/pdfjs-LICENSE.txt.

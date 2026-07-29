@@ -3,6 +3,12 @@ import { armoury } from "./armoury-data.js?v=0.7.0";
 import { talentCatalogue } from "./talent-data.js?v=0.8.0";
 import { contextualRuleTerms, coreRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.2.0";
 import {
+  buildSourcebookLibrary,
+  clearStoredSourcebookLibrary,
+  loadStoredSourcebookLibrary,
+  sourcebookRequirements,
+} from "./sourcebook-library.js?v=0.1.0";
+import {
   clearCampaignConnection,
   cloudIsConfigured,
   connectToCampaign,
@@ -352,6 +358,8 @@ let textScale = Math.min(1.5, Math.max(0.85, Number(localStorage.getItem("dh2-te
 let pendingFocusSelector = "";
 let compendiumData = null;
 let compendiumLoadError = "";
+let compendiumImporting = false;
+let compendiumImportProgress = "";
 let compendiumSearchTimer;
 let compendiumWordFrequency = new Map();
 let compendiumSearchIndex = [];
@@ -1588,20 +1596,38 @@ function rosterProgress(record) {
 async function loadCompendium() {
   if (compendiumData || compendiumLoadError) return;
   if (hostedEdition) {
-    compendiumLoadError = "The complete sourcebook library remains in the local GM edition. Character creation and shared campaign records remain available here.";
+    try {
+      const stored = await loadStoredSourcebookLibrary();
+      if (stored?.books?.length) {
+        activateCompendium(stored);
+      } else {
+        compendiumLoadError = "Connect your four sourcebooks to build this browser’s private rules library. The files and extracted index stay on this device.";
+      }
+    } catch (error) {
+      compendiumLoadError = error.message || "This browser’s private rules library could not be opened.";
+    }
     if (appView === "compendium") renderCompendium();
     return;
   }
   try {
     const response = await fetch(new URL("../public/data/dh2-compendium.json?v=0.1.0", import.meta.url));
     if (!response.ok) throw new Error(`Rules library returned ${response.status}`);
-    compendiumData = await response.json();
-    compendiumWordFrequency = buildCompendiumWordFrequency();
-    compendiumSearchIndex = buildCompendiumSearchIndex();
+    activateCompendium(await response.json());
   } catch (error) {
     compendiumLoadError = error.message || "The local rules library could not be loaded.";
   }
   if (appView === "compendium") renderCompendium();
+}
+
+function activateCompendium(payload) {
+  compendiumData = payload;
+  compendiumLoadError = "";
+  compendiumImporting = false;
+  compendiumImportProgress = "";
+  compendiumChapterHtmlCache.clear();
+  collapsedWordCache.clear();
+  compendiumWordFrequency = buildCompendiumWordFrequency();
+  compendiumSearchIndex = buildCompendiumSearchIndex();
 }
 
 function compendiumBooks() {
@@ -2156,6 +2182,33 @@ function renderCompendiumSidebarBody(selection, chapterPages, matches = compendi
     </details>`;
 }
 
+function renderSourcebookConnection() {
+  const requirements = sourcebookRequirements();
+  return `
+    <div class="sourcebook-connect" role="status" aria-live="polite">
+      <div class="sourcebook-connect-copy">
+        <p class="eyebrow">Device-local reference</p>
+        <strong>${compendiumImporting ? "Indexing sourcebooks" : "Connect Sourcebooks"}</strong>
+        <p>${compendiumImporting
+          ? escapeHtmlAttribute(compendiumImportProgress || "Preparing the selected files…")
+          : escapeHtmlAttribute(compendiumLoadError || "Select the four sourcebooks to recreate the complete rules library in this browser.")}</p>
+      </div>
+      ${compendiumImporting ? `
+        <div class="sourcebook-progress" aria-hidden="true"><span></span></div>
+        <p class="sourcebook-privacy">Keep this tab open. Indexing all four books can take several minutes.</p>
+      ` : `
+        <ol class="sourcebook-requirements">
+          ${requirements.map((book) => `<li><span>${escapeHtmlAttribute(book.shortTitle)}</span><small>${book.expectedPages} PDF pages</small></li>`).join("")}
+        </ol>
+        <div class="sourcebook-actions">
+          <button class="primary-button" id="connect-sourcebooks" type="button">Select Four PDFs</button>
+          <button class="compact-button" id="import-rules-index" type="button">Import Local Index</button>
+        </div>
+        <p class="sourcebook-privacy">Processing and storage happen only in this browser. Sourcebook files and extracted text are not sent to GitHub, Supabase, or other players.</p>
+      `}
+    </div>`;
+}
+
 function renderCompendium() {
   const books = compendiumBooks();
   const catalog = compendiumChapterCatalog();
@@ -2174,6 +2227,7 @@ function renderCompendium() {
         <div class="sigil" aria-hidden="true"><span></span></div>
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
         <button class="roster-button" id="return-to-roster" type="button">Acolyte Archive</button>
+        ${hostedEdition && compendiumData ? `<button class="compact-button sourcebook-control" id="replace-sourcebooks" type="button">Manage Sourcebooks</button>` : ""}
         <label class="text-size-control" title="Interface text size">
           <span aria-hidden="true">TEXT</span>
           <input id="text-size" type="range" min="85" max="150" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" />
@@ -2185,7 +2239,9 @@ function renderCompendium() {
           <div><p class="eyebrow">Inquisitorial Reference</p><h1>Rules Compendium</h1></div>
         </div>
         ${!compendiumData ? `
-          <div class="compendium-loading" role="status">${compendiumLoadError ? `<strong>Library unavailable</strong><span>${escapeHtmlAttribute(compendiumLoadError)}</span>` : `<strong>Opening the sealed archive...</strong><span>Loading four local sourcebooks.</span>`}</div>
+          ${hostedEdition
+            ? renderSourcebookConnection()
+            : `<div class="compendium-loading" role="status">${compendiumLoadError ? `<strong>Library unavailable</strong><span>${escapeHtmlAttribute(compendiumLoadError)}</span>` : `<strong>Opening the sealed archive...</strong><span>Loading four local sourcebooks.</span>`}</div>`}
         ` : `
           <div class="compendium-toolbar simplified">
             <label><span>Search the library</span><input id="compendium-search" type="search" value="${escapeHtmlAttribute(compendiumState.query)}" placeholder="Search a rule, talent, weapon, or concept..." autocomplete="off" /></label>
@@ -2217,7 +2273,11 @@ function renderCompendium() {
           </div>
         `}
       </section>
-      <footer class="roster-footer"><span>Rules Compendium</span><span>Source text belongs to its respective rights holders &middot; Do not redistribute</span></footer>
+      <footer class="roster-footer"><span>Rules Compendium</span><span>${hostedEdition ? "Sourcebook index stored only on this device" : "Source text belongs to its respective rights holders · Do not redistribute"}</span></footer>
+      ${hostedEdition ? `
+        <input id="sourcebook-files" class="visually-hidden" type="file" accept="application/pdf,.pdf" multiple />
+        <input id="sourcebook-index-file" class="visually-hidden" type="file" accept="application/json,.json" />
+      ` : ""}
     </main>`;
 
   wireCompendiumEvents();
@@ -2315,6 +2375,30 @@ function wireCompendiumSidebarEvents() {
   });
 }
 
+async function connectSourcebookFiles(files) {
+  if (!files?.length || compendiumImporting) return;
+  compendiumImporting = true;
+  compendiumLoadError = "";
+  compendiumImportProgress = "Preparing the selected files…";
+  renderCompendium();
+  try {
+    const library = await buildSourcebookLibrary(files, ({ message }) => {
+      compendiumImportProgress = message || compendiumImportProgress;
+      const progress = document.querySelector(".sourcebook-connect-copy > p:last-child");
+      if (progress) progress.textContent = compendiumImportProgress;
+    });
+    activateCompendium(library);
+    renderCompendium();
+    resetCompendiumReader();
+  } catch (error) {
+    compendiumData = null;
+    compendiumImporting = false;
+    compendiumImportProgress = "";
+    compendiumLoadError = error.message || "The selected sourcebooks could not be indexed.";
+    renderCompendium();
+  }
+}
+
 function wireCompendiumEvents() {
   document.querySelector("#return-to-roster")?.addEventListener("click", () => {
     appView = "roster";
@@ -2326,6 +2410,32 @@ function wireCompendiumEvents() {
     localStorage.setItem("dh2-text-scale", String(textScale));
     document.querySelector("#text-size-value").textContent = `${Math.round(textScale * 100)}%`;
     applyTextScale();
+  });
+  document.querySelector("#connect-sourcebooks")?.addEventListener("click", () => {
+    document.querySelector("#sourcebook-files")?.click();
+  });
+  document.querySelector("#import-rules-index")?.addEventListener("click", () => {
+    document.querySelector("#sourcebook-index-file")?.click();
+  });
+  document.querySelector("#replace-sourcebooks")?.addEventListener("click", async () => {
+    if (!confirm("Disconnect the sourcebook index from this browser? Character and campaign data will not be affected.")) return;
+    await clearStoredSourcebookLibrary();
+    compendiumData = null;
+    compendiumLoadError = "Connect your four sourcebooks to rebuild this browser’s private rules library.";
+    compendiumSearchIndex = [];
+    compendiumWordFrequency = new Map();
+    compendiumChapterHtmlCache.clear();
+    renderCompendium();
+  });
+  document.querySelector("#sourcebook-files")?.addEventListener("change", async (event) => {
+    const files = [...(event.target.files || [])];
+    event.target.value = "";
+    await connectSourcebookFiles(files);
+  });
+  document.querySelector("#sourcebook-index-file")?.addEventListener("change", async (event) => {
+    const files = [...(event.target.files || [])];
+    event.target.value = "";
+    await connectSourcebookFiles(files);
   });
   document.querySelector("#compendium-search")?.addEventListener("input", (event) => {
     window.clearTimeout(compendiumSearchTimer);

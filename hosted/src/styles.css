@@ -792,6 +792,106 @@ dialog > p:not(.eyebrow) { color: #b8b4aa; line-height: 1.7; }
 .compendium-loading,.compendium-empty { align-self: center; display: grid; justify-items: center; gap: 6px; border: 1px solid var(--line); padding: 42px; background: rgba(5,8,8,.82); text-align: center; }
 .compendium-loading strong,.compendium-empty h2 { margin: 0; color: #f0d19a; font: 600 27px "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .compendium-loading span,.compendium-empty p { color: #aaa69d; }
+.visually-hidden {
+  position: fixed !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+}
+.sourcebook-connect {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(300px, 1.2fr);
+  align-items: center;
+  gap: clamp(22px, 4vw, 68px);
+  width: min(1120px, 100%);
+  margin: clamp(24px, 5vh, 64px) auto;
+  border: 1px solid rgba(225, 187, 118, .28);
+  padding: clamp(24px, 4vw, 52px);
+  background:
+    linear-gradient(115deg, rgba(34, 29, 20, .92), rgba(5, 9, 8, .96)),
+    repeating-linear-gradient(90deg, transparent 0 70px, rgba(255, 255, 255, .015) 70px 71px);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .42);
+}
+.sourcebook-connect-copy strong {
+  display: block;
+  margin: 3px 0 10px;
+  color: #fff0d0;
+  font: 600 clamp(32px, 4vw, 58px)/.95 "Barlow Condensed", sans-serif;
+  letter-spacing: .015em;
+  text-transform: uppercase;
+}
+.sourcebook-connect-copy p:last-child {
+  max-width: 620px;
+  margin: 0;
+  color: #d2cec5;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.sourcebook-requirements {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sourcebook-requirements li {
+  display: grid;
+  gap: 2px;
+  min-height: 72px;
+  border: 1px solid rgba(225, 187, 118, .2);
+  padding: 13px 14px;
+  background: rgba(2, 6, 5, .55);
+}
+.sourcebook-requirements span {
+  color: #f0d3a1;
+  font: 700 14px "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+}
+.sourcebook-requirements small {
+  color: #918c83;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.sourcebook-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  grid-column: 2;
+}
+.sourcebook-actions .primary-button,
+.sourcebook-actions .compact-button {
+  min-height: 46px;
+}
+.sourcebook-privacy {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #9f9a91;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.sourcebook-progress {
+  position: relative;
+  grid-column: 2;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(225, 187, 118, .3);
+  background: #050807;
+}
+.sourcebook-progress span {
+  position: absolute;
+  inset: 0 auto 0 -36%;
+  width: 36%;
+  background: linear-gradient(90deg, transparent, #e1b263, transparent);
+  animation: sourcebook-scan 1.35s linear infinite;
+}
+.sourcebook-control { margin-left: auto; }
+@keyframes sourcebook-scan {
+  to { transform: translateX(380%); }
+}
 
 .compendium-toolbar.simplified {
   display: block;
@@ -1682,6 +1782,23 @@ dialog > p:not(.eyebrow) { color: #b8b4aa; line-height: 1.7; }
 
 @media (max-width: 720px) {
   .shared-campaign-grid { grid-template-columns:1fr; }
+  .sourcebook-connect {
+    display: block;
+    margin: 18px auto 30px;
+    padding: 22px 16px;
+  }
+  .sourcebook-requirements {
+    grid-template-columns: 1fr;
+    margin-top: 20px;
+  }
+  .sourcebook-actions {
+    display: grid;
+    margin-top: 14px;
+  }
+  .sourcebook-actions button { width: 100%; }
+  .sourcebook-privacy { margin-top: 15px; }
+  .sourcebook-progress { margin-top: 20px; }
+  .sourcebook-control { margin-left: 0; }
   .compendium-layout.book-layout {
     display: block;
     overflow: visible;

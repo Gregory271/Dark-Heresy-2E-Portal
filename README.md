@@ -81,13 +81,21 @@ text and cropped illustrations must not be published or redistributed.
 
 The GitHub Pages workflow publishes the generated `hosted/` edition. It keeps
 character creation, Foundry export, shared Supabase campaigns, accessibility
-features, and the original interface, while omitting private sourcebook
-extracts, sourcebook illustrations, and locally supplied music. Those materials
-remain available only in the local GM edition.
+features, and the complete compendium interface. Full sourcebook files, their
+extracted text, sourcebook illustrations, and locally supplied music are not
+committed to the public repository.
+
+On the hosted site, **Connect Sourcebooks** lets each player select the Core
+Rulebook and all three Enemies PDFs from their own computer. PDF.js creates the
+same searchable chapter-and-page data structure in the browser and saves it in
+IndexedDB. The PDFs and extracted index never enter Supabase, GitHub, campaign
+records, or another player's browser. A previously generated local index can
+also be selected for recovery on the same user's devices.
 
 Run `npm run build:hosted` after changing the local application. The generated
 edition contains redacted equipment and talent records with source references
-instead of copied descriptions.
+instead of copied descriptions; the connected sourcebook library supplies the
+full rules-reading experience.
 
 The checked-in browser build needs no `node_modules` directory. Developers can
 regenerate `public/data/dh2-compendium.json` with
