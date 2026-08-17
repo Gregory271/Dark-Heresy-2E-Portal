@@ -217,7 +217,35 @@ export const coreRuleTerms = [
   },
 ];
 
-export const ruleTermsById = Object.fromEntries(coreRuleTerms.map((entry) => [entry.id, entry]));
+export const characteristicRuleTerms = [
+  { id: "characteristic-weapon-skill", term: "Weapon Skill", aliases: ["WS"], category: "Characteristic", summary: "Measures competence in close-quarters combat and governs melee attack Tests.", book: "Core Rulebook", page: "21" },
+  { id: "characteristic-ballistic-skill", term: "Ballistic Skill", aliases: ["BS"], category: "Characteristic", summary: "Measures accuracy with ranged weapons and governs ranged attack Tests.", book: "Core Rulebook", page: "21" },
+  { id: "characteristic-strength", term: "Strength", aliases: [], category: "Characteristic", summary: "Measures physical power, including lifting, breaking objects, and the force behind melee attacks.", book: "Core Rulebook", page: "21" },
+  { id: "characteristic-toughness", term: "Toughness", aliases: [], category: "Characteristic", summary: "Measures health, stamina, and resistance; its bonus helps reduce Damage.", book: "Core Rulebook", page: "21" },
+  { id: "characteristic-agility", term: "Agility", aliases: [], category: "Characteristic", summary: "Measures quickness, reflexes, balance, movement, and many forms of evasion.", book: "Core Rulebook", page: "21" },
+  { id: "characteristic-intelligence", term: "Intelligence", aliases: [], category: "Characteristic", summary: "Measures reasoning, memory, technical understanding, and the ability to correlate information.", book: "Core Rulebook", page: "21" },
+  { id: "characteristic-perception", term: "Perception", aliases: [], category: "Characteristic", summary: "Measures awareness and the sharpness of the character's senses.", book: "Core Rulebook", page: "21" },
+  { id: "characteristic-willpower", term: "Willpower", aliases: ["WP"], category: "Characteristic", summary: "Measures mental strength and resilience, including resisting fear and wielding psychic powers.", book: "Core Rulebook", page: "21" },
+  { id: "characteristic-fellowship", term: "Fellowship", aliases: [], category: "Characteristic", summary: "Measures persuasiveness, leadership, and force of personality.", book: "Core Rulebook", page: "22" },
+  { id: "characteristic-influence", term: "Influence", aliases: [], category: "Characteristic", summary: "Measures reputation, connections, and resources, and is central to obtaining goods and aid.", book: "Core Rulebook", page: "22" },
+];
+
+export const aptitudeRuleTerms = [
+  { id: "aptitude-general", term: "General", aliases: [], category: "Aptitude", summary: "A broad aptitude paired with many common skills and talents when calculating XP costs.", book: "Core Rulebook", page: "78" },
+  { id: "aptitude-defence", term: "Defence", aliases: [], category: "Aptitude", summary: "An aptitude associated with avoiding, resisting, and surviving harm.", book: "Core Rulebook", page: "78" },
+  { id: "aptitude-fieldcraft", term: "Fieldcraft", aliases: [], category: "Aptitude", summary: "An aptitude associated with awareness, navigation, survival, and operating in the field.", book: "Core Rulebook", page: "78" },
+  { id: "aptitude-finesse", term: "Finesse", aliases: [], category: "Aptitude", summary: "An aptitude associated with precision, agility, and carefully placed attacks.", book: "Core Rulebook", page: "78" },
+  { id: "aptitude-knowledge", term: "Knowledge", aliases: [], category: "Aptitude", summary: "An aptitude associated with learning, lore, investigation, and reasoned analysis.", book: "Core Rulebook", page: "78" },
+  { id: "aptitude-leadership", term: "Leadership", aliases: [], category: "Aptitude", summary: "An aptitude associated with command, coordination, and directing others.", book: "Core Rulebook", page: "78" },
+  { id: "aptitude-offence", term: "Offence", aliases: [], category: "Aptitude", summary: "An aptitude associated with aggressive combat techniques and inflicting harm.", book: "Core Rulebook", page: "78" },
+  { id: "aptitude-psyker", term: "Psyker", aliases: [], category: "Aptitude", summary: "An aptitude used for psychic powers, Psy Rating, and many Warp-related advances.", book: "Core Rulebook", page: "78" },
+  { id: "aptitude-social", term: "Social", aliases: [], category: "Aptitude", summary: "An aptitude associated with persuasion, deception, interrogation, and social influence.", book: "Core Rulebook", page: "78" },
+  { id: "aptitude-tech", term: "Tech", aliases: [], category: "Aptitude", summary: "An aptitude associated with machinery, security systems, cybernetics, and technical work.", book: "Core Rulebook", page: "78" },
+];
+
+export const creatorRuleTerms = [...coreRuleTerms, ...characteristicRuleTerms, ...aptitudeRuleTerms];
+
+export const ruleTermsById = Object.fromEntries(creatorRuleTerms.map((entry) => [entry.id, entry]));
 
 export const contextualRuleTerms = [
   { term: "Aim", aliases: [], category: "Action", summary: "A combat action that grants a bonus to the character's next attack against the chosen target.", book: "Core Rulebook", page: "219" },

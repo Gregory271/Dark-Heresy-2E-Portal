@@ -89,6 +89,89 @@ function normalizeLine(value) {
     .trim();
 }
 
+function compactText(value) {
+  return normalizeLine(value).toLocaleLowerCase().replace(/[^a-z0-9+%–—-]+/g, "");
+}
+
+function prefixLengthForCompactCharacters(value, count) {
+  if (count <= 0) return 0;
+  let consumed = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    if (/[a-z0-9+%–—-]/i.test(value[index])) consumed += 1;
+    if (consumed >= count) return index + 1;
+  }
+  return value.length;
+}
+
+function textOverlap(left, right) {
+  const leftCompact = compactText(left);
+  const rightCompact = compactText(right);
+  const maximum = Math.min(leftCompact.length, rightCompact.length);
+  for (let size = maximum; size > 0; size -= 1) {
+    if (leftCompact.slice(-size) === rightCompact.slice(0, size)) return size;
+  }
+  return 0;
+}
+
+function lineItemScore(item) {
+  const text = normalizeLine(item.str);
+  const compact = compactText(text);
+  const punctuation = (text.match(/[’'“”"():;,.!?–—-]/g) || []).length;
+  return compact.length * 10 + punctuation * 2 - (text.match(/\s/g) || []).length;
+}
+
+function mergeLineItems(rawItems) {
+  const sorted = rawItems
+    .filter((item) => normalizeLine(item.str))
+    .sort((a, b) => a.x - b.x || lineItemScore(b) - lineItemScore(a));
+  const items = [];
+  for (const item of sorted) {
+    const sameStart = items.findIndex((entry) => Math.abs(entry.x - item.x) <= 0.75);
+    if (sameStart >= 0) {
+      const existing = items[sameStart];
+      const existingCompact = compactText(existing.str);
+      const itemCompact = compactText(item.str);
+      if (
+        existingCompact === itemCompact
+        || Math.abs(existing.width - item.width) <= 1
+        || Math.min(existing.width, item.width) / Math.max(existing.width, item.width) >= 0.82
+      ) {
+        if (lineItemScore(item) > lineItemScore(existing)) items[sameStart] = item;
+        continue;
+      }
+    }
+    items.push(item);
+  }
+  items.sort((a, b) => a.x - b.x || lineItemScore(b) - lineItemScore(a));
+
+  let output = "";
+  let coverageEnd = Number.NEGATIVE_INFINITY;
+  for (const item of items) {
+    const text = normalizeLine(item.str);
+    const itemEnd = item.x + item.width;
+    if (!output) {
+      output = text;
+      coverageEnd = itemEnd;
+      continue;
+    }
+    const compactOutput = compactText(output);
+    const compactItem = compactText(text);
+    if (compactItem && compactOutput.includes(compactItem) && itemEnd <= coverageEnd + 1.5) continue;
+
+    const overlap = textOverlap(output, text);
+    if (overlap) {
+      output += text.slice(prefixLengthForCompactCharacters(text, overlap)).trimStart();
+    } else if (item.x <= coverageEnd + 2) {
+      if (itemEnd <= coverageEnd + 1.5) continue;
+      output += text.trimStart();
+    } else {
+      output += ` ${text}`;
+    }
+    coverageEnd = Math.max(coverageEnd, itemEnd);
+  }
+  return normalizeLine(output);
+}
+
 function groupColumnLines(items) {
   const lines = [];
   for (const item of items.sort((a, b) => b.y - a.y || a.x - b.x)) {
@@ -101,23 +184,31 @@ function groupColumnLines(items) {
   }
   return lines
     .sort((a, b) => b.y - a.y)
-    .map((line) => normalizeLine(
-      line.items
-        .sort((a, b) => a.x - b.x)
-        .map((item) => item.str)
-        .join(" "),
-    ))
+    .map((line) => mergeLineItems(line.items))
     .filter(Boolean);
 }
 
 function cleanExtractedLines(lines) {
   const seen = new Set();
-  return lines.filter((line) => {
+  return lines.map((line) => line
+    .replace(/^DIFFI?F?\s*CULTY\s+TESE?\s*T\s+MODIFIER$/i, "DIFFICULTY TEST MODIFIER")
+    .replace(/^Rout\w*\s+ine(\s+[+-]\d+)?$/i, (_, modifier = "") => `Routine${modifier}`)
+    .replace(/^Challeng\w*\s+ing(\s+[+-]\d+)?$/i, (_, modifier = "") => `Challenging${modifier}`)
+    .replace(/^Diffic\w*\s+ult(\s+[–-]\d+)?$/i, (_, modifier = "") => `Difficult${modifier}`)
+    .replace(/^H\s+rd(\s+[–-]\d+)?$/i, (_, modifier = "") => `Hard${modifier}`)
+    .replace(/([+-]\d)\+\s*0\b/g, (_, prefix) => `${prefix}0`)
+  ).filter((line) => {
     if (!line || /^\d{1,3}$/.test(line)) return false;
     if (/^(?:\d+\s+)?CHAPTER\s+[IVXLCDM]+(?::.*)?$/i.test(line)) return false;
     if (/\(cid:\d+\)/i.test(line)) return false;
     if (/(.{1,4})\1{4,}/i.test(line)) return false;
     if (/\b[A-Za-z]{42,}\b/.test(line)) return false;
+    const letters = (line.match(/[A-Za-z]/g) || []).length;
+    const spaces = (line.match(/\s/g) || []).length;
+    const repeatedLetters = [...line.matchAll(/([A-Za-z])\1+/g)]
+      .reduce((total, match) => total + match[0].length - 1, 0);
+    if (line.length >= 65 && spaces / line.length < 0.045) return false;
+    if (letters >= 55 && repeatedLetters / letters > 0.055 && spaces / line.length < 0.13) return false;
     const key = line.toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     if (line.length > 45 && seen.has(key)) return false;
     if (line.length > 45) seen.add(key);

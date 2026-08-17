@@ -1,13 +1,13 @@
-import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.9.0";
-import { armoury } from "./armoury-data.js?v=0.7.0";
-import { talentCatalogue } from "./talent-data.js?v=0.8.0";
-import { contextualRuleTerms, coreRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.2.0";
+import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.0";
+import { armoury } from "./armoury-data.js?v=0.8.0";
+import { talentCatalogue } from "./talent-data.js?v=0.9.0";
+import { characteristicRuleTerms, contextualRuleTerms, coreRuleTerms, creatorRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.4.0";
 import {
   buildSourcebookLibrary,
   clearStoredSourcebookLibrary,
   loadStoredSourcebookLibrary,
   sourcebookRequirements,
-} from "./sourcebook-library.js?v=0.1.0";
+} from "./sourcebook-library.js?v=0.4.0";
 import {
   clearCampaignConnection,
   cloudIsConfigured,
@@ -18,7 +18,7 @@ import {
   saveCloudCharacter,
   savedCampaignConnection,
   subscribeToCloudCharacters,
-} from "./cloud-storage.js?v=0.2.0";
+} from "./cloud-storage.js?v=0.3.0";
 import {
   aptitudeChoices,
   aptitudeMatches,
@@ -30,7 +30,7 @@ import {
   parseCharacteristicModifiers,
   parseFate,
   parseWounds,
-} from "./creation-data.js?v=0.6.0";
+} from "./creation-data.js?v=0.7.0";
 
 const root = document.querySelector("#app");
 const hostedEdition = location.hostname.endsWith("github.io")
@@ -126,6 +126,11 @@ async function repositoryRequest(path = "", options = {}) {
 }
 
 async function initialiseLocalRepository() {
+  if (hostedEdition) {
+    repositoryStatus = "browser-only";
+    localStorage.setItem(libraryStorageKey, JSON.stringify(characterLibrary));
+    return;
+  }
   try {
     const payload = await repositoryRequest();
     const repositoryRecords = Array.isArray(payload.characters) ? payload.characters : [];
@@ -165,6 +170,14 @@ async function initialiseLocalRepository() {
   localStorage.setItem(libraryStorageKey, JSON.stringify(characterLibrary));
 }
 
+function withTimeout(promise, milliseconds, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), milliseconds);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+}
+
 function mergeCloudRecords(records = []) {
   const merged = new Map(characterLibrary.map((record) => [record.id, record]));
   for (const remote of records) {
@@ -179,7 +192,11 @@ function mergeCloudRecords(records = []) {
 async function refreshCloudRepository() {
   if (!savedCampaignConnection()) return;
   try {
-    mergeCloudRecords(await listCloudCharacters());
+    mergeCloudRecords(await withTimeout(
+      listCloudCharacters(),
+      10000,
+      "The shared campaign did not respond within 10 seconds.",
+    ));
     cloudStatus = "connected";
   } catch (error) {
     cloudStatus = "offline";
@@ -231,7 +248,11 @@ function queueRepositorySave(record) {
     clearTimeout(cloudSaveTimers.get(record.id));
     cloudSaveTimers.set(record.id, setTimeout(async () => {
       try {
-        await saveCloudCharacter(record);
+        await withTimeout(
+          saveCloudCharacter(record),
+          12000,
+          "The shared campaign did not respond while saving.",
+        );
         cloudStatus = "connected";
       } catch (error) {
         cloudStatus = "offline";
@@ -254,7 +275,11 @@ async function deleteRepositoryRecord(id) {
     console.warn("Repository delete could not be completed.", error);
   }
   try {
-    await deleteCloudCharacter(id);
+    await withTimeout(
+      deleteCloudCharacter(id),
+      12000,
+      "The shared campaign did not respond while deleting.",
+    );
   } catch (error) {
     console.warn("Shared character delete could not be completed.", error);
   }
@@ -354,7 +379,7 @@ let lockAudioContext;
 let diceBox;
 let diceBoxReady;
 let vfxMode = localStorage.getItem("dh2-vfx-mode") || "low";
-let textScale = Math.min(1.5, Math.max(0.85, Number(localStorage.getItem("dh2-text-scale")) || 1));
+let textScale = Math.min(1.6, Math.max(0.8, Number(localStorage.getItem("dh2-text-scale")) || 1));
 let pendingFocusSelector = "";
 let compendiumData = null;
 let compendiumLoadError = "";
@@ -365,6 +390,7 @@ let compendiumWordFrequency = new Map();
 let compendiumSearchIndex = [];
 const compendiumChapterHtmlCache = new Map();
 const collapsedWordCache = new Map();
+const expandedWordCache = new Map();
 const compendiumState = {
   query: "",
   book: "all",
@@ -382,26 +408,45 @@ function applyTextScale(scope = root) {
 
   const excludedTags = new Set(["SCRIPT", "STYLE", "SVG", "PATH", "CANVAS"]);
   const formTags = new Set(["BUTTON", "INPUT", "TEXTAREA", "SELECT", "OUTPUT"]);
+  const compactTextSelector = [
+    "small",
+    "dt",
+    ".eyebrow",
+    ".choice-source",
+    ".brand span",
+    ".facts dt",
+    ".record span",
+    ".text-size-control",
+    ".volume-control",
+    ".roster-footer",
+    ".compendium-provenance",
+    ".compendium-page-headings",
+  ].join(",");
+  const isPhone = window.matchMedia("(max-width: 640px)").matches;
   [...surface.querySelectorAll("*")]
     .filter((element) => {
       if (excludedTags.has(element.tagName)) return false;
+      if (element.getAttribute("aria-hidden") === "true") return false;
       const hasDirectText = [...element.childNodes].some(
         (node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim(),
       );
       return hasDirectText || formTags.has(element.tagName);
     })
     .forEach((element) => {
-      const baseSize = Number.parseFloat(getComputedStyle(element).fontSize);
-      if (!Number.isFinite(baseSize) || baseSize <= 0) return;
+      const computedSize = Number.parseFloat(getComputedStyle(element).fontSize);
+      if (!Number.isFinite(computedSize) || computedSize <= 0) return;
+      const compact = element.matches(compactTextSelector);
+      const minimumSize = isPhone ? (compact ? 12 : 16) : (compact ? 14 : 18);
+      const baseSize = Math.max(computedSize, minimumSize);
       element.dataset.accessFont = "";
       element.style.fontSize = `${(baseSize * textScale).toFixed(2)}px`;
     });
 
-  document.documentElement.dataset.textSize = textScale >= 1.45
+  document.documentElement.dataset.textSize = textScale >= 1.4
     ? "extra-large"
-    : textScale >= 1.25
+    : textScale >= 1.15
       ? "large"
-    : textScale > 1
+    : textScale >= 0.95
       ? "medium"
       : "normal";
 
@@ -893,12 +938,84 @@ function refreshXpMeter() {
   }
 }
 
+function resetCreationDataFrom(sceneId) {
+  if (sceneId === "homeWorld") {
+    character.rolls = {};
+    character.characteristicReroll = null;
+    character.fate = {};
+    character.wounds = {};
+    character.divination = { statChoices: {} };
+  }
+  character.aptitudeReplacements = [];
+  character.aptitudeSelections = {};
+  character.grantChoices = {};
+  character.acquisitions = [];
+  character.equipment = {
+    inventory: [],
+    equipped: {},
+    selected: null,
+  };
+  character.advances = {
+    characteristics: {},
+    skills: {},
+    talents: [],
+    psychicPowers: [],
+    eliteAdvances: [],
+  };
+  character.talentShopSelected = null;
+  character.talentFilters = { query: "", tier: "All" };
+  character.xp = { starting: 1000 };
+}
+
+function selectCatalogChoice(scene, choiceId) {
+  if (!scene?.catalog || character[scene.id] === choiceId) return false;
+  resetCreationDataFrom(scene.id);
+  character[scene.id] = choiceId;
+  return true;
+}
+
+function randomEntry(entries, excludedId = "") {
+  const eligible = entries.filter((entry) => entry.id !== excludedId);
+  const pool = eligible.length ? eligible : entries;
+  if (!pool.length) return null;
+  if (globalThis.crypto?.getRandomValues) {
+    const random = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(random);
+    return pool[random[0] % pool.length];
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function randomizeCurrentCatalog(scene) {
+  const selected = randomEntry(catalogs[scene.catalog], character[scene.id]);
+  if (!selected || !selectCatalogChoice(scene, selected.id)) return;
+  playMechanicalLock();
+  pendingFocusSelector = "#randomize-stage";
+  save();
+  render();
+}
+
+function randomizeCharacterOrigins() {
+  const confirmed = confirm(
+    "Randomize this character's Home World, Background, and Role? Identity fields remain unchanged. Later mechanical choices are reset, and all dice are still rolled by the player.",
+  );
+  if (!confirmed) return;
+  resetCreationDataFrom("homeWorld");
+  character.homeWorld = randomEntry(catalogs.homeWorlds, character.homeWorld)?.id || character.homeWorld;
+  character.background = randomEntry(catalogs.backgrounds, character.background)?.id || character.background;
+  character.role = randomEntry(catalogs.roles, character.role)?.id || character.role;
+  playMechanicalLock();
+  pendingFocusSelector = "#randomize-character";
+  save();
+  render();
+}
+
 function cycleChoice(direction) {
   const scene = scenes[step];
   if (!scene.catalog) return false;
   const entries = catalogs[scene.catalog];
   const current = entries.findIndex((entry) => entry.id === character[scene.id]);
-  character[scene.id] = entries[(current + direction + entries.length) % entries.length].id;
+  selectCatalogChoice(scene, entries[(current + direction + entries.length) % entries.length].id);
   pendingFocusSelector = direction < 0 ? "#previous-choice" : "#next-choice";
   save();
   render();
@@ -944,6 +1061,11 @@ function renderCatalog(scene, selected) {
           aria-pressed="${entry.id === selected.id}"
           title="${entry.name}"
         ></button>`).join("")}
+    </div>
+    <div class="catalog-randomizers" aria-label="Random character options">
+      <button class="compact-button" id="randomize-stage" type="button">Randomize This Choice</button>
+      <button class="compact-button" id="randomize-character" type="button">Randomize Character</button>
+      <small>Character randomization selects Home World, Background, and Role. Identity and dice remain yours.</small>
     </div>`;
 }
 
@@ -1265,7 +1387,7 @@ function foundryCharacteristicData(characteristicId) {
 function foundrySkillData() {
   const payload = {};
   const specialistIds = new Set(["common-lore", "forbidden-lore", "linguistics", "navigate", "operate", "scholastic-lore", "trade"]);
-  for (const skill of skills.filter((entry) => skillRank(entry.id) > 0)) {
+  for (const skill of skills) {
     const foundryKey = foundryCamelCase(skill.id);
     const rank = skillRank(skill.id);
     const cost = skillXpCost(skill.id);
@@ -1301,6 +1423,26 @@ function foundrySkillData() {
     }
   }
   return payload;
+}
+
+function foundryPsyRating() {
+  if (!hasPsykerAccess()) return 0;
+  return character.background === "astra-telepathica" ? 2 : 1;
+}
+
+function foundrySpecialAbility([source, value]) {
+  const [namePart, ...benefitParts] = String(value || "").split(/\s*(?:·|—|:)\s*/);
+  const name = benefitParts.length && namePart.length <= 80 ? namePart : `${source} Ability`;
+  const benefit = benefitParts.length ? benefitParts.join(" — ") : String(value || "");
+  return {
+    name,
+    type: "specialAbility",
+    system: {
+      description: benefit,
+      benefit,
+    },
+    flags: { dh2CharacterBuilder: { initial: true, source } },
+  };
 }
 
 function foundryEquipmentItem(item) {
@@ -1601,10 +1743,10 @@ async function loadCompendium() {
       if (stored?.books?.length) {
         activateCompendium(stored);
       } else {
-        compendiumLoadError = "Connect your four sourcebooks to build this browser’s private rules library. The files and extracted index stay on this device.";
+        compendiumLoadError = "Connect your four sourcebooks to build this browser’s compendium. The files and extracted index stay on this device.";
       }
     } catch (error) {
-      compendiumLoadError = error.message || "This browser’s private rules library could not be opened.";
+      compendiumLoadError = error.message || "This browser’s compendium could not be opened.";
     }
     if (appView === "compendium") renderCompendium();
     return;
@@ -1626,6 +1768,7 @@ function activateCompendium(payload) {
   compendiumImportProgress = "";
   compendiumChapterHtmlCache.clear();
   collapsedWordCache.clear();
+  expandedWordCache.clear();
   compendiumWordFrequency = buildCompendiumWordFrequency();
   compendiumSearchIndex = buildCompendiumSearchIndex();
 }
@@ -1706,6 +1849,29 @@ function restoreCollapsedSpelling(value) {
   return String(value).replace(/\b[A-Za-z]{4,14}\b/g, restoreCollapsedWord);
 }
 
+function restoreExpandedWord(word) {
+  const lower = word.toLowerCase();
+  if (!/(.)\1/.test(lower)) return word;
+  if (expandedWordCache.has(lower)) {
+    const cached = expandedWordCache.get(lower);
+    return /^[A-Z]/.test(word) ? `${cached[0].toUpperCase()}${cached.slice(1)}` : cached;
+  }
+  const collapsed = lower.replace(/(.)\1+/g, "$1");
+  const originalScore = compendiumWordFrequency.get(lower) || 0;
+  const collapsedScore = compendiumWordFrequency.get(collapsed) || 0;
+  const corrected = collapsed !== lower && collapsedScore >= Math.max(3, originalScore * 1.5)
+    ? collapsed
+    : lower;
+  expandedWordCache.set(lower, corrected);
+  return /^[A-Z]/.test(word) ? `${corrected[0].toUpperCase()}${corrected.slice(1)}` : corrected;
+}
+
+function restoreExpandedSpelling(value) {
+  return String(value)
+    .replace(/\b[A-Za-z]{4,18}\b/g, restoreExpandedWord)
+    .replace(/([,.;:!?])\1+/g, "$1");
+}
+
 function restoreDetachedInitials(value) {
   return String(value).replace(/\b([A-Z])\s+([A-Z][A-Za-z]{2,})\b/g, (match, initial, remainder) => {
     const combined = `${initial}${remainder}`.toLowerCase();
@@ -1719,14 +1885,17 @@ function restoreSplitSmallCapsLines(value) {
   const lines = String(value).split(/\n/);
   const repaired = [];
   for (let index = 0; index < lines.length; index += 1) {
-    const initials = lines[index].trim().match(/^[A-Z](?:\s+[A-Z])*$/)
-      ? lines[index].trim().split(/\s+/)
-      : [];
-    const fragments = String(lines[index + 1] || "").trim().match(/^[A-Z]{2,}(?:\s+[A-Z]{2,})*$/)
+    const initialLine = lines[index].trim().match(/^([A-Z](?:\s+[A-Z])*)(?:\s+\(\s*([A-Z]{1,4})\s*\))?$/);
+    const initials = initialLine ? initialLine[1].split(/\s+/) : [];
+    let fragments = String(lines[index + 1] || "").trim().match(/^[A-Z]{2,}(?:\s+[A-Z]{1,})*$/)
       ? lines[index + 1].trim().split(/\s+/)
       : [];
+    if (initials.length && fragments.length > initials.length && fragments.slice(initials.length).every((part) => part.length <= 3)) {
+      fragments = fragments.slice(0, initials.length);
+    }
     if (initials.length && initials.length === fragments.length) {
-      repaired.push(initials.map((initial, tokenIndex) => `${initial}${fragments[tokenIndex]}`).join(" "));
+      const heading = initials.map((initial, tokenIndex) => `${initial}${fragments[tokenIndex]}`).join(" ");
+      repaired.push(`${heading}${initialLine[2] ? ` (${initialLine[2]})` : ""}`);
       index += 1;
       continue;
     }
@@ -1737,7 +1906,7 @@ function restoreSplitSmallCapsLines(value) {
 
 function normalizeErraticSmallCaps(value) {
   return String(value)
-    .replace(/\b[A-Za-z]{3,}\b/g, (word) => {
+    .replace(/\b[A-Za-z]{4,}\b/g, (word) => {
       const interiorUppercase = (word.slice(1).match(/[A-Z]/g) || []).length;
       const lowercase = (word.match(/[a-z]/g) || []).length;
       if (!interiorUppercase || !lowercase) return word;
@@ -1821,10 +1990,13 @@ function legacyRenderCompendium() {
       <header class="topbar compendium-topbar">
         <div class="sigil" aria-hidden="true"><span></span></div>
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
-        <button class="roster-button" id="return-to-roster" type="button">Acolyte Archive</button>
+        <nav class="section-nav" aria-label="Portal sections">
+          <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
+          <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
+        </nav>
         <label class="text-size-control" title="Interface text size">
           <span aria-hidden="true">TEXT</span>
-          <input id="text-size" type="range" min="85" max="150" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" />
+          <input id="text-size" type="range" min="80" max="160" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" />
           <output id="text-size-value" for="text-size">${Math.round(textScale * 100)}%</output>
         </label>
       </header>
@@ -1969,7 +2141,7 @@ function compendiumSectionMatches() {
   return [...matches.values()].sort((a, b) => b.score - a.score || a.page.heading.localeCompare(b.page.heading));
 }
 
-const compendiumTooltipTerms = [...contextualRuleTerms, ...coreRuleTerms]
+const compendiumTooltipTerms = [...contextualRuleTerms, ...coreRuleTerms, ...characteristicRuleTerms]
   .flatMap((entry) => [entry.term, ...entry.aliases].map((alias) => ({ alias, entry })))
   .filter(({ alias }) => alias.length > 1)
   .sort((a, b) => b.alias.length - a.alias.length);
@@ -2037,11 +2209,18 @@ function highlightCompendiumTerms(text, book) {
 }
 
 function reflowCompendiumText(text) {
-  const lines = restoreCollapsedSpelling(normalizeErraticSmallCaps(restoreDetachedInitials(restoreSplitSmallCapsLines(String(text || "")))))
+  const lines = restoreCollapsedSpelling(restoreExpandedSpelling(normalizeErraticSmallCaps(restoreDetachedInitials(restoreSplitSmallCapsLines(String(text || ""))))))
+    .replace(/\bEXAMPM?\s*LE\b/gi, "EXAMPLE")
     .replace(/\bE\s+XAMPLE\b/gi, "EXAMPLE")
     .replace(/\bS\s+KILL TESTS\b/gi, "SKILL TESTS")
     .replace(/\bC\s+HARACTERISTIC T\s+ESTS\b/gi, "CHARACTERISTIC TESTS")
     .replace(/\bS\s+KILLS,\s*T\s+ALENTS,\s*T?\s*AND R\s+AITS\b/gi, "SKILLS, TALENTS, AND TRAITS")
+    .replace(/^DIFFI?F?\s*CULTY\s+TESE?\s*T\s+MODIFIER$/gim, "DIFFICULTY TEST MODIFIER")
+    .replace(/^Rout\w*\s+ine(\s+[+-]\d+)?$/gim, (_, modifier = "") => `Routine${modifier}`)
+    .replace(/^Challeng\w*\s+ing(\s+[+-]\d+)?$/gim, (_, modifier = "") => `Challenging${modifier}`)
+    .replace(/^Diffic\w*\s+ult(\s+[–-]\d+)?$/gim, (_, modifier = "") => `Difficult${modifier}`)
+    .replace(/^H\s+rd(\s+[–-]\d+)?$/gim, (_, modifier = "") => `Hard${modifier}`)
+    .replace(/([+-]\d)\+\s*0\b/g, (_, prefix) => `${prefix}0`)
     .replace(/\u00ad/g, "")
     .replaceAll("â€™", "’")
     .replaceAll("â€˜", "‘")
@@ -2067,6 +2246,12 @@ function reflowCompendiumText(text) {
       if (/\(cid:\d+\)/i.test(line)) return false;
       if (/(.{1,4})\1{4,}/i.test(line)) return false;
       if (/\b[A-Za-z]{42,}\b/.test(line)) return false;
+      const letters = (line.match(/[A-Za-z]/g) || []).length;
+      const spaces = (line.match(/\s/g) || []).length;
+      const repeatedLetters = [...line.matchAll(/([A-Za-z])\1+/g)]
+        .reduce((total, match) => total + match[0].length - 1, 0);
+      if (line.length >= 65 && spaces / line.length < 0.045) return false;
+      if (letters >= 55 && repeatedLetters / letters > 0.055 && spaces / line.length < 0.13) return false;
       return true;
     });
   const roughParagraphs = [];
@@ -2130,7 +2315,6 @@ function renderChapterArticle(selection) {
           <section class="compendium-section" id="rule-page-${page.pdfPage}">
             <div class="compendium-section-heading">
               <h3>${escapeHtmlAttribute(page.heading || chapter)}</h3>
-              <span>Printed page ${escapeHtmlAttribute(page.printedPage)}</span>
             </div>
             <div class="compendium-article-text">${paragraphs.map((paragraph) => `<p>${highlightCompendiumTerms(paragraph, book)}</p>`).join("")}</div>
           </section>`;
@@ -2203,8 +2387,9 @@ function renderSourcebookConnection() {
         <div class="sourcebook-actions">
           <button class="primary-button" id="connect-sourcebooks" type="button">Select Four PDFs</button>
           <button class="compact-button" id="import-rules-index" type="button">Import Local Index</button>
+          <button class="text-button" id="skip-sourcebooks" type="button">Skip for now</button>
         </div>
-        <p class="sourcebook-privacy">Processing and storage happen only in this browser. Sourcebook files and extracted text are not sent to GitHub, Supabase, or other players.</p>
+        <p class="sourcebook-privacy">Processing and storage happen only in this browser. After the first successful import, the index is reopened automatically on this browser and device. Sourcebook files and extracted text are not sent to GitHub, Supabase, or other players.</p>
       `}
     </div>`;
 }
@@ -2226,11 +2411,14 @@ function renderCompendium() {
       <header class="topbar compendium-topbar">
         <div class="sigil" aria-hidden="true"><span></span></div>
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
-        <button class="roster-button" id="return-to-roster" type="button">Acolyte Archive</button>
+        <nav class="section-nav" aria-label="Portal sections">
+          <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
+          <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
+        </nav>
         ${hostedEdition && compendiumData ? `<button class="compact-button sourcebook-control" id="replace-sourcebooks" type="button">Manage Sourcebooks</button>` : ""}
         <label class="text-size-control" title="Interface text size">
           <span aria-hidden="true">TEXT</span>
-          <input id="text-size" type="range" min="85" max="150" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" />
+          <input id="text-size" type="range" min="80" max="160" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" />
           <output id="text-size-value" for="text-size">${Math.round(textScale * 100)}%</output>
         </label>
       </header>
@@ -2387,6 +2575,9 @@ async function connectSourcebookFiles(files) {
       const progress = document.querySelector(".sourcebook-connect-copy > p:last-child");
       if (progress) progress.textContent = compendiumImportProgress;
     });
+    if (navigator.storage?.persist) {
+      await navigator.storage.persist().catch(() => false);
+    }
     activateCompendium(library);
     renderCompendium();
     resetCompendiumReader();
@@ -2417,11 +2608,17 @@ function wireCompendiumEvents() {
   document.querySelector("#import-rules-index")?.addEventListener("click", () => {
     document.querySelector("#sourcebook-index-file")?.click();
   });
+  document.querySelector("#skip-sourcebooks")?.addEventListener("click", () => {
+    localStorage.setItem("dh2-sourcebook-setup-skipped", "true");
+    appView = "roster";
+    save();
+    render();
+  });
   document.querySelector("#replace-sourcebooks")?.addEventListener("click", async () => {
     if (!confirm("Disconnect the sourcebook index from this browser? Character and campaign data will not be affected.")) return;
     await clearStoredSourcebookLibrary();
     compendiumData = null;
-    compendiumLoadError = "Connect your four sourcebooks to rebuild this browser’s private rules library.";
+    compendiumLoadError = "Connect your four sourcebooks to rebuild this browser’s compendium.";
     compendiumSearchIndex = [];
     compendiumWordFrequency = new Map();
     compendiumChapterHtmlCache.clear();
@@ -2491,34 +2688,38 @@ function wireCompendiumEvents() {
 function applyRuleHighlights() {
   const content = document.querySelector("#scene-content");
   if (!content || content.closest(".scene-identity")) return;
-  const aliases = coreRuleTerms
+  const aliases = creatorRuleTerms
     .flatMap((entry) => [entry.term, ...entry.aliases].map((alias) => ({ alias, id: entry.id })))
     .sort((a, b) => b.alias.length - a.alias.length);
-  const pattern = new RegExp(`\\b(${aliases.map(({ alias }) => alias.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")).join("|")})\\b`, "i");
+  const pattern = new RegExp(`\\b(${aliases.map(({ alias }) => alias.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")).join("|")})\\b`, "gi");
   const aliasMap = new Map(aliases.map(({ alias, id }) => [alias.toLowerCase(), id]));
-  const highlighted = new Set();
   const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
   for (const node of nodes) {
     if (!node.nodeValue?.trim()) continue;
     if (node.parentElement?.closest("button,input,textarea,select,option,a,.choice-source,.rule-term")) continue;
-    const match = node.nodeValue.match(pattern);
-    if (!match) continue;
-    const id = aliasMap.get(match[0].toLowerCase());
-    if (!id || highlighted.has(id)) continue;
-    highlighted.add(id);
-    const before = node.nodeValue.slice(0, match.index);
-    const after = node.nodeValue.slice(match.index + match[0].length);
+    const matches = [...node.nodeValue.matchAll(pattern)];
+    if (!matches.length) continue;
     const fragment = document.createDocumentFragment();
-    fragment.append(before);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "rule-term";
-    button.dataset.ruleTerm = id;
-    button.textContent = match[0];
-    button.setAttribute("aria-label", `${match[0]}: open quick rule`);
-    fragment.append(button, after);
+    let cursor = 0;
+    for (const match of matches) {
+      const id = aliasMap.get(match[0].toLowerCase());
+      const entry = ruleTermsById[id];
+      if (!entry || match.index < cursor) continue;
+      fragment.append(node.nodeValue.slice(cursor, match.index));
+      const button = document.createElement("button");
+      const tooltip = `${entry.category}: ${entry.summary} Source: ${entry.book}, page ${entry.page}.`;
+      button.type = "button";
+      button.className = `rule-term lore-term lore-term-${compendiumTermKind(entry.category)}`;
+      button.dataset.ruleTerm = id;
+      button.dataset.tooltip = tooltip;
+      button.textContent = match[0];
+      button.setAttribute("aria-label", `${match[0]}. ${tooltip}`);
+      fragment.append(button);
+      cursor = match.index + match[0].length;
+    }
+    fragment.append(node.nodeValue.slice(cursor));
     node.replaceWith(fragment);
   }
 }
@@ -2562,6 +2763,26 @@ function createRosterCharacter(seed = {}, origin = "Created locally") {
 
 function renderRoster() {
   const orderedRecords = [...characterLibrary].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  const repositoryLabel = cloudStatus === "connected"
+    ? "Shared campaign synchronized"
+    : cloudStatus === "connecting"
+      ? "Connecting shared campaign"
+      : cloudStatus === "offline"
+        ? "Shared campaign unavailable"
+        : repositoryStatus === "ready"
+          ? "Local repository"
+          : "Browser backup";
+  const repositoryMessage = cloudStatus === "connected"
+    ? `Changes synchronize automatically with campaign ${escapeHtmlAttribute(savedCampaignConnection()?.campaignId || "")}. Local recovery copies remain enabled.`
+    : cloudStatus === "connecting"
+      ? "The shared campaign is being contacted. You can keep working while the browser recovery copy remains active."
+      : cloudStatus === "offline"
+        ? "The shared service could not be reached. Characters remain safe in this browser; open Shared Campaign to retry or disconnect."
+        : cloudStatus === "unconfigured"
+          ? "Characters remain safe locally. Shared campaign storage is not configured yet."
+          : repositoryStatus === "ready"
+            ? "Characters are stored as separate files by this app, with a browser backup for recovery. Connect a campaign to synchronize with other players."
+            : "Characters are safe in this browser. Connect a shared campaign for cross-device synchronization.";
   root.innerHTML = `
     <a class="skip-link" href="#roster-content">Skip to character roster</a>
     <main class="roster-scene theme-assessment">
@@ -2569,10 +2790,14 @@ function renderRoster() {
       <header class="topbar roster-topbar">
         <div class="sigil" aria-hidden="true"><span></span></div>
         <div class="brand"><strong>Dark Heresy Character Creation</strong><span>Acolyte Archive</span></div>
+        <nav class="section-nav" aria-label="Portal sections">
+          <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
+          <button class="roster-button" id="open-compendium" type="button"><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
+        </nav>
         <button class="credits-button" id="credits" type="button">Source & credits</button>
         <label class="text-size-control" title="Interface text size">
           <span aria-hidden="true">TEXT</span>
-          <input id="text-size" type="range" min="85" max="150" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" />
+          <input id="text-size" type="range" min="80" max="160" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" />
           <output id="text-size-value" for="text-size">${Math.round(textScale * 100)}%</output>
         </label>
       </header>
@@ -2585,21 +2810,14 @@ function renderRoster() {
           </div>
           <div class="roster-actions">
             <button class="primary-button" id="new-character" type="button">Create Acolyte <span>›</span></button>
-            <button class="compact-button" id="open-compendium" type="button">Rules Compendium</button>
             <button class="compact-button" id="shared-archive" type="button">${savedCampaignConnection() ? "Shared Campaign" : "Connect Campaign"}</button>
             <button class="compact-button" id="import-character" type="button">Import Shared Character</button>
             <input class="sr-only" id="character-file" type="file" accept=".json,application/json" />
           </div>
         </div>
         <div class="roster-notice" role="status">
-          <strong>${cloudStatus === "connected" ? "Shared campaign synchronized" : repositoryStatus === "ready" ? "Local repository" : "Browser backup"}</strong>
-          <span>${cloudStatus === "connected"
-            ? `Changes synchronize automatically with campaign ${escapeHtmlAttribute(savedCampaignConnection()?.campaignId || "")}. Local recovery copies remain enabled.`
-            : cloudStatus === "unconfigured"
-              ? "Shared storage awaits its Supabase public configuration. Local file and browser recovery copies remain enabled."
-              : repositoryStatus === "ready"
-                ? "Characters are stored as separate files by this app, with a browser backup for recovery. Connect a campaign to synchronize with other players."
-                : "Characters are safe in this browser. Connect a shared campaign for cross-device synchronization."}</span>
+          <strong>${repositoryLabel}</strong>
+          <span>${repositoryMessage}</span>
         </div>
         <div class="roster-grid" aria-label="${orderedRecords.length} saved character${orderedRecords.length === 1 ? "" : "s"}">
           ${orderedRecords.map((record) => {
@@ -2652,9 +2870,11 @@ function renderRoster() {
       <h2 id="shared-dialog-title">Shared Campaign</h2>
       ${cloudIsConfigured() ? savedCampaignConnection() ? `
         <p>This device is connected as <strong>${escapeHtmlAttribute(savedCampaignConnection().displayName)}</strong>.</p>
+        <p class="credit-small">Sync status: <strong>${cloudStatus === "connected" ? "online" : cloudStatus === "connecting" ? "connecting" : "offline"}</strong>. Browser recovery copies remain available at all times.</p>
         <label>Campaign ID<input id="connected-campaign-id" value="${escapeHtmlAttribute(savedCampaignConnection().campaignId)}" readonly /></label>
         <div class="dialog-actions">
           <button class="compact-button" id="copy-campaign-id" type="button">Copy Campaign ID</button>
+          ${cloudStatus !== "connected" ? `<button class="compact-button" id="retry-campaign" type="button">Retry Sync</button>` : ""}
           <button class="text-button danger-button" id="disconnect-campaign" type="button">Disconnect this device</button>
         </div>` : `
         <div class="shared-campaign-grid">
@@ -2707,12 +2927,14 @@ function wireRosterEvents() {
     const values = new FormData(event.currentTarget);
     status.textContent = "Creating the shared campaign…";
     try {
-      const result = await createSharedCampaign({
+      const result = await withTimeout(createSharedCampaign({
         name: values.get("campaignName"),
         inviteCode: values.get("inviteCode"),
         displayName: values.get("displayName"),
-      });
-      for (const record of characterLibrary) await saveCloudCharacter(record);
+      }), 20000, "The shared service did not respond while creating the campaign.");
+      for (const record of characterLibrary) {
+        await withTimeout(saveCloudCharacter(record), 12000, "A character could not be synchronized in time.");
+      }
       cloudStatus = "connected";
       await initialiseCloudRepository();
       await navigator.clipboard?.writeText(result.connection.campaignId);
@@ -2729,12 +2951,14 @@ function wireRosterEvents() {
     const values = new FormData(event.currentTarget);
     status.textContent = "Joining the shared campaign…";
     try {
-      await connectToCampaign({
+      await withTimeout(connectToCampaign({
         campaignId: values.get("campaignId"),
         inviteCode: values.get("inviteCode"),
         displayName: values.get("displayName"),
-      });
-      for (const record of characterLibrary) await saveCloudCharacter(record);
+      }), 20000, "The shared service did not respond while joining the campaign.");
+      for (const record of characterLibrary) {
+        await withTimeout(saveCloudCharacter(record), 12000, "A character could not be synchronized in time.");
+      }
       cloudStatus = "connected";
       await initialiseCloudRepository();
       sharedDialog.close();
@@ -2746,6 +2970,18 @@ function wireRosterEvents() {
   document.querySelector("#copy-campaign-id")?.addEventListener("click", async () => {
     await navigator.clipboard?.writeText(savedCampaignConnection()?.campaignId || "");
     document.querySelector("#shared-dialog-status").textContent = "Campaign ID copied.";
+  });
+  document.querySelector("#retry-campaign")?.addEventListener("click", async () => {
+    const status = document.querySelector("#shared-dialog-status");
+    status.textContent = "Contacting the shared campaign…";
+    cloudStatus = "connecting";
+    await initialiseCloudRepository();
+    if (cloudStatus === "connected") {
+      sharedDialog.close();
+      renderRoster();
+    } else {
+      status.textContent = "The shared campaign is still unavailable. Your browser copies are safe.";
+    }
   });
   document.querySelector("#disconnect-campaign")?.addEventListener("click", () => {
     if (!confirm("Disconnect this browser from the shared campaign? Local character copies will remain.")) return;
@@ -3004,8 +3240,10 @@ function render() {
           <strong>Dark Heresy Character Creation</strong>
           <span>Create an Acolyte</span>
         </div>
-        <button class="roster-button" id="open-roster" type="button">Acolyte Archive</button>
-        <button class="roster-button compendium-button" id="open-compendium" type="button">Rules Compendium</button>
+        <nav class="section-nav" aria-label="Portal sections">
+          <button class="roster-button" id="open-roster" type="button"><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
+          <button class="roster-button compendium-button" id="open-compendium" type="button"><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
+        </nav>
         <button class="credits-button" id="credits" type="button">Source & credits</button>
         <div class="audio-controls">
           <button class="vfx-toggle" id="vfx-toggle" type="button" title="Change decorative animation quality">VFX ${vfxMode === "low" ? "LOW" : "HIGH"}</button>
@@ -3022,7 +3260,7 @@ function render() {
           </label>
           <label class="text-size-control" title="Interface text size">
             <span aria-hidden="true">TEXT</span>
-            <input id="text-size" type="range" min="85" max="150" step="5"
+            <input id="text-size" type="range" min="80" max="160" step="5"
               value="${Math.round(textScale * 100)}" aria-label="Interface text size" />
             <output id="text-size-value" for="text-size">${Math.round(textScale * 100)}%</output>
           </label>
@@ -3179,10 +3417,11 @@ function wireEvents() {
   if (scene.catalog) {
     document.querySelector("#previous-choice").addEventListener("click", () => cycleChoice(-1));
     document.querySelector("#next-choice").addEventListener("click", () => cycleChoice(1));
+    document.querySelector("#randomize-stage")?.addEventListener("click", () => randomizeCurrentCatalog(scene));
+    document.querySelector("#randomize-character")?.addEventListener("click", randomizeCharacterOrigins);
     document.querySelectorAll(".catalog-slot").forEach((slot) => {
       slot.addEventListener("click", () => {
-        if (character[scene.id] === slot.dataset.choiceId) return;
-        character[scene.id] = slot.dataset.choiceId;
+        if (!selectCatalogChoice(scene, slot.dataset.choiceId)) return;
         playMechanicalLock();
         pendingFocusSelector = `[data-choice-id="${slot.dataset.choiceId}"]`;
         save();
@@ -3190,8 +3429,7 @@ function wireEvents() {
       });
     });
     document.querySelector("#mobile-catalog-choice")?.addEventListener("change", (event) => {
-      if (character[scene.id] === event.target.value) return;
-      character[scene.id] = event.target.value;
+      if (!selectCatalogChoice(scene, event.target.value)) return;
       playMechanicalLock();
       pendingFocusSelector = "#mobile-catalog-choice";
       save();
@@ -3526,6 +3764,14 @@ function wireEvents() {
           rolled: Boolean(character.wounds?.total),
         },
         fatigue: { value: 0 },
+        psy: {
+          rating: foundryPsyRating(),
+          sustained: 0,
+          defaultPR: foundryPsyRating(),
+          class: character.background === "astra-telepathica" ? "bound" : "unbound",
+          cost: 0,
+          hasFocus: character.equipment.inventory.some((id) => /psy-focus/i.test(armoury.find((item) => item.id === id)?.name || "")),
+        },
         skills: foundrySkillData(),
         experience: { total: character.xp.starting, used: xpSpent() },
         insanity: 0,
@@ -3561,11 +3807,22 @@ function wireEvents() {
           system: { description: entry.source, level: 0 },
           flags: { dh2CharacterBuilder: { initial: true, conditional: Boolean(entry.conditional) } },
         })),
+        ...abilityEntries.filter(([source]) => source !== "Talents / Traits").map(foundrySpecialAbility),
+        ...character.advances.psychicPowers.filter((entry) => entry?.name).map((entry) => ({
+          name: entry.name,
+          type: "psychicPower",
+          system: {
+            description: entry.description || "Selected during character advancement.",
+            benefit: entry.description || "",
+            cost: Number(entry.cost || 0),
+          },
+          flags: { dh2CharacterBuilder: { initial: false, source: "XP" } },
+        })),
       ],
       flags: {
         dh2CharacterBuilder: {
           format: "mrkeathley-dark-heresy-2nd",
-          schemaVersion: 1,
+          schemaVersion: 2,
           source: character,
         },
       },
@@ -3641,5 +3898,7 @@ root.addEventListener("click", (event) => {
 });
 
 await initialiseLocalRepository();
-await initialiseCloudRepository();
 render();
+void initialiseCloudRepository().finally(() => {
+  if (appView === "roster") renderRoster();
+});

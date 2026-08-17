@@ -74,8 +74,8 @@ resolved against the current sourcebook and become internal links. Activating
 one opens the destination chapter, scrolls to the cited printed page, and moves
 keyboard focus to its section heading.
 
-This is a private reference made from books owned by the user. Its extracted
-text and cropped illustrations must not be published or redistributed.
+The local compendium is assembled from sourcebooks selected by the user. Its
+extracted text and cropped illustrations must not be published or redistributed.
 
 ## Hosted player edition
 
@@ -182,7 +182,7 @@ Book and page provenance is recorded in `PROJECT-NOTES.md`.
   heading is removed, the sheet occupies the full central area, validation and
   export remain in a narrow command rail, and dossier panels flow through three
   balanced desktop columns to minimise internal scrolling.
-- A persistent accessibility slider scales interface text from 85% to 150%
+- A persistent accessibility slider scales interface text from 80% to 160%
   across every creation and review screen without browser zoom. Its setting is
   saved locally, adapts when the viewport changes, and uses compact controls on
   tablet and mobile layouts.

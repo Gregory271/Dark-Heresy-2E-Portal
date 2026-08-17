@@ -4,6 +4,7 @@ dh2-cinematic-builder-prototype.zip
 scripts/__pycache__/
 node_modules/
 tmp-server.*.log
+gcm-browser.*.log
 
 # Private sourcebook extracts and locally supplied media are never committed to
 # the public player-edition repository. The hosted build uses redacted data and

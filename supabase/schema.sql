@@ -123,6 +123,14 @@ revoke all on function public.join_campaign(uuid, text, text) from public;
 grant execute on function public.create_campaign(text, text, text) to authenticated;
 grant execute on function public.join_campaign(uuid, text, text) to authenticated;
 
+-- Keep the setup script safe to run again when restoring or updating a project.
+drop policy if exists "Members can see their campaign" on public.campaigns;
+drop policy if exists "Members can see campaign membership" on public.campaign_members;
+drop policy if exists "Campaign members can read characters" on public.characters;
+drop policy if exists "Members can create their own characters" on public.characters;
+drop policy if exists "Owners and GMs can update characters" on public.characters;
+drop policy if exists "Owners and GMs can delete characters" on public.characters;
+
 create policy "Members can see their campaign"
 on public.campaigns for select to authenticated
 using (exists (
