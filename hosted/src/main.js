@@ -3223,8 +3223,14 @@ function renderRoster() {
       <p class="eyebrow">Credits and attribution</p>
       <h2 id="credits-dialog-title">Source & credits</h2>
       <p>Dark Heresy, Warhammer 40,000, and associated settings and sourcebook material belong to their respective rights holders. Original universe by Games Workshop; Dark Heresy Second Edition published by Fantasy Flight Games.</p>
+      <p class="credit-small"><strong>Game creators:</strong> Dark Heresy originally designed by Owen Barnes, Kate Flack, and Mike Mason. Dark Heresy Second Edition designed by Andrew Fischer and produced by Tim Huckelbery.</p>
+      ${hostedEdition ? "" : `<p class="credit-small"><strong>Soundtrack:</strong> “Dark Heresy — Roleplaying Game Ambient Music Mix,” supplied by the user for local playback.</p>`}
       <p class="credit-small">Sourcebook illustrations remain the work of their credited artists. Individual image, artist, book, and page provenance is recorded in the local project notes.</p>
       <p class="credit-small"><strong>Display type:</strong> Caslon Antique when available through a licensed local installation; bundled fallback IM FELL English by Igino Marini, licensed under the SIL Open Font License 1.1.</p>
+      <details class="artist-credits">
+        <summary>View credited Core Rulebook interior artists</summary>
+        <p>David Ardila, A.L. Ashbaugh, Jacob Atienza, Cristi Balanescu, Lin Bo, Alex Boca, Matt Bradbury, Filip Burburan, Jon Cave, Anna Christenson, Alexandre Dainche, Mauro Dal Bo, Vincent Devault, Guillaume Ducos, Álvaro Calvo Escudero, Zack Graves, Ilich Henriquez, Imaginary FS Pte Ltd, Toni Justamante Jacobs, Nicholas Kay, Julian Kok, Anton Kokarev, Mathias Kollros, Alex Konstad, Sam Lamont, Clint Langley, Ignacio Bazán Lazcano, Diego Gisbert Llorens, Henning Ludvigsen, Mark Molnar, David Auden Nash, Niten, Hector Ortiz, Shane Pierce, Yos Bayu Pratama, Neil Roberts, Michael Rookard, Martin de Diego Sádaba, Christian Schwager, Stephen Somers, Ray Swanland, Theo Sylinades, Thrung, Eric Tranchefeux, Ben Zweifel, and the Games Workshop Design Studio.</p>
+      </details>
     </dialog>
     <dialog id="shared-dialog" aria-labelledby="shared-dialog-title">
       <button class="dialog-close" aria-label="Close shared campaign">×</button>
@@ -3613,7 +3619,6 @@ function render() {
           <button class="roster-button" id="open-roster" type="button"><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
           <button class="roster-button compendium-button" id="open-compendium" type="button"><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
         </nav>
-        <button class="credits-button" id="credits" type="button">Source & credits</button>
         <div class="audio-controls">
           <button class="vfx-toggle" id="vfx-toggle" type="button" title="Change decorative animation quality">VFX ${vfxMode === "low" ? "LOW" : "HIGH"}</button>
           <button class="sound ${soundtrackPlaying ? "playing" : ""}" id="sound-toggle" type="button" ${hostedEdition ? "disabled" : ""}
@@ -3673,21 +3678,6 @@ function render() {
       <h2 id="detail-dialog-title">${scene.detailTitle}</h2>
       <p>${scene.detail}</p>
       ${selected ? `<p><strong>${selected.name}</strong></p><ul class="dialog-lore">${loreByChoice[selected.id].map((point) => `<li>${point}</li>`).join("")}</ul>` : ""}
-    </dialog>
-
-    <dialog id="credits-dialog" aria-labelledby="credits-dialog-title">
-      <button class="dialog-close" aria-label="Close credits">×</button>
-      <p class="eyebrow">Credits and attribution</p>
-      <h2 id="credits-dialog-title">Source & credits</h2>
-      <p>Dark Heresy, Warhammer 40,000, and all associated marks, settings, and sourcebook material belong to their respective rights holders. Original game and universe by Games Workshop; Dark Heresy Second Edition published by Fantasy Flight Games.</p>
-      <p class="credit-small"><strong>Game creators:</strong> Dark Heresy originally designed by Owen Barnes, Kate Flack, and Mike Mason. Dark Heresy Second Edition designed by Andrew Fischer and produced by Tim Huckelbery.</p>
-      ${hostedEdition ? "" : `<p class="credit-small"><strong>Soundtrack:</strong> “Dark Heresy — Roleplaying Game Ambient Music Mix,” supplied by the user for local playback.</p>`}
-      <p class="credit-small"><strong>Display type:</strong> Caslon Antique when available through a licensed local installation; bundled fallback IM FELL English by Igino Marini, licensed under the SIL Open Font License 1.1.</p>
-      <p class="credit-small">Sourcebook illustrations remain the work of their credited artists. Individual image, artist, book, and page credits are recorded in the local project notes as artwork is added. This unofficial prototype is not endorsed by or affiliated with Games Workshop or Fantasy Flight Games.</p>
-      <details class="artist-credits">
-        <summary>View credited Core Rulebook interior artists</summary>
-        <p>David Ardila, A.L. Ashbaugh, Jacob Atienza, Cristi Balanescu, Lin Bo, Alex Boca, Matt Bradbury, Filip Burburan, Jon Cave, Anna Christenson, Alexandre Dainche, Mauro Dal Bo, Vincent Devault, Guillaume Ducos, Álvaro Calvo Escudero, Zack Graves, Ilich Henriquez, Imaginary FS Pte Ltd, Toni Justamante Jacobs, Nicholas Kay, Julian Kok, Anton Kokarev, Mathias Kollros, Alex Konstad, Sam Lamont, Clint Langley, Ignacio Bazán Lazcano, Diego Gisbert Llorens, Henning Ludvigsen, Mark Molnar, David Auden Nash, Niten, Hector Ortiz, Shane Pierce, Yos Bayu Pratama, Neil Roberts, Michael Rookard, Martin de Diego Sádaba, Christian Schwager, Stephen Somers, Ray Swanland, Theo Sylinades, Thrung, Eric Tranchefeux, Ben Zweifel, and the Games Workshop Design Studio.</p>
-      </details>
     </dialog>
 
     <dialog id="rule-dialog" class="rule-dialog" aria-labelledby="rule-dialog-title">
@@ -4260,12 +4250,6 @@ function wireEvents() {
   dialog.querySelector(".dialog-close").addEventListener("click", () => dialog.close());
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
-  });
-  const credits = document.querySelector("#credits-dialog");
-  document.querySelector("#credits").addEventListener("click", () => credits.showModal());
-  credits.querySelector(".dialog-close").addEventListener("click", () => credits.close());
-  credits.addEventListener("click", (event) => {
-    if (event.target === credits) credits.close();
   });
   document.addEventListener("keydown", keyboardNavigation, { once: true });
 }

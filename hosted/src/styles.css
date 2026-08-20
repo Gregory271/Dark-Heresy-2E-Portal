@@ -214,12 +214,9 @@ html[data-edition="hosted"] .sound:disabled {
 .brand { display: flex; flex-direction: column; text-transform: uppercase; }
 .brand strong { font: 600 18px/1 "Barlow Condensed", sans-serif; letter-spacing: .16em; }
 .brand span { margin-top: 6px; color: var(--muted); font-size: 11px; letter-spacing: .15em; }
-.credits-button { margin-left: auto; border: 0; background: transparent; color: #8f8d85; font: 600 9px "Barlow Condensed", sans-serif; letter-spacing: .16em; text-transform: uppercase; cursor: pointer; }
-.credits-button:hover { color: #ddd7ca; }
 .roster-button { margin-left: auto; border: 1px solid rgba(235,226,208,.25); padding: 7px 10px; background: rgba(7,10,9,.62); color: #d4c7b2; font: 700 9px "Barlow Condensed",sans-serif; letter-spacing: .13em; text-transform: uppercase; cursor: pointer; }
 .roster-button:hover { border-color: var(--accent); color: #fff0d0; }
 .roster-button + .roster-button { margin-left: 0; }
-.roster-button + .credits-button { margin-left: 0; }
 .section-nav {
   display: flex;
   align-items: center;
@@ -234,7 +231,6 @@ html[data-edition="hosted"] .sound:disabled {
   cursor: default;
   opacity: 1;
 }
-.section-nav + .credits-button { margin-left: 0; }
 .nav-narrow { display: none; }
 .audio-controls { display: flex; align-items: center; gap: 8px; }
 .vfx-toggle { border: 1px solid rgba(235,226,208,.25); padding: 5px 7px; background: rgba(7,10,9,.62); color: #b9b5aa; font: 700 8px "Barlow Condensed",sans-serif; letter-spacing: .12em; cursor: pointer; }
@@ -669,7 +665,6 @@ html[data-text-size="extra-large"] .starting-package-items { grid-template-colum
 html[data-text-size="extra-large"] .scene-equipment .management-content > .kicker,
 html[data-text-size="extra-large"] .scene-equipment .management-content > .lede { display: none; }
 html[data-text-size="extra-large"] .scene-equipment .management-content > h1 { font-size: 36px; }
-html[data-text-size="extra-large"] .topbar .credits-button,
 html[data-text-size="extra-large"] .topbar .vfx-toggle,
 html[data-text-size="extra-large"] .topbar .volume-control { display: none; }
 html[data-text-size="extra-large"] .topbar .nav-wide { display: none; }
@@ -1789,7 +1784,7 @@ dialog h2,
     gap: 9px;
   }
   .brand strong { font-size: 14px; letter-spacing: .1em; }
-  .brand span, .credits-button, .vfx-toggle, .record { display: none; }
+  .brand span, .vfx-toggle, .record { display: none; }
   .audio-controls { gap: 6px; }
   .sound { width: 44px; height: 44px; }
   .volume-control { display: none; }
@@ -2152,8 +2147,6 @@ dialog h2,
 }
 
 @media (max-width: 800px), (max-height: 680px) {
-  html[data-text-size="large"] .credits-button,
-  html[data-text-size="extra-large"] .credits-button,
   html[data-text-size="extra-large"] .volume-control span,
   html[data-text-size="extra-large"] .text-size-control span,
   html[data-text-size="extra-large"] .text-size-control output {
@@ -2252,7 +2245,6 @@ dialog h2,
   .catalog-arrow { width: 34px; }
   .catalog-slots { width: calc(100% - 82px); margin-left: 41px; gap: 4px; }
   .catalog-randomizers { grid-template-columns: 1fr; }
-  .credits-button { display: none; }
   .volume-control span, .text-size-control span, .text-size-control output { display: none; }
   .volume-control input, .text-size-control input { width: 44px; }
   .text-size-control { padding-left: 5px; }
@@ -2278,8 +2270,7 @@ dialog h2,
   .volume-control { display: none; }
 }
 
-/* Keep the source attribution reachable on every phone layout,
-   including when large text activates the compact header rules above. */
+/* Keep the compact portal navigation aligned beneath the brand on phones. */
 @media (max-width: 640px) {
   .topbar > .section-nav,
   .roster-topbar > .section-nav,
@@ -2292,17 +2283,5 @@ dialog h2,
   .topbar > .audio-controls {
     grid-column: 3;
     grid-row: 1;
-  }
-  .credits-button,
-  html[data-text-size="medium"] .credits-button,
-  html[data-text-size="large"] .credits-button,
-  html[data-text-size="extra-large"] .credits-button {
-    display: block;
-    grid-column: 1 / -1;
-    justify-self: start;
-    min-height: 44px;
-    margin: -6px 0 0 40px;
-    padding: 8px 0;
-    color: #c9c4b8;
   }
 }
