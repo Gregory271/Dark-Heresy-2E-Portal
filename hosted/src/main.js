@@ -464,6 +464,18 @@ function applyTextScale(scope = root) {
     ".compendium-page-headings",
   ].join(",");
   const isPhone = window.matchMedia("(max-width: 640px)").matches;
+
+  // Select the responsive text mode before measuring computed font sizes.
+  // This keeps threshold changes deterministic whether the slider is moved
+  // gradually or jumps directly to a new value.
+  document.documentElement.dataset.textSize = textScale >= 1.4
+    ? "extra-large"
+    : textScale >= 1.15
+      ? "large"
+      : textScale >= 0.95
+        ? "medium"
+        : "normal";
+
   [...surface.querySelectorAll("*")]
     .filter((element) => {
       if (excludedTags.has(element.tagName)) return false;
@@ -482,14 +494,6 @@ function applyTextScale(scope = root) {
       element.dataset.accessFont = "";
       element.style.fontSize = `${(baseSize * textScale).toFixed(2)}px`;
     });
-
-  document.documentElement.dataset.textSize = textScale >= 1.4
-    ? "extra-large"
-    : textScale >= 1.15
-      ? "large"
-    : textScale >= 0.95
-      ? "medium"
-      : "normal";
 
   requestAnimationFrame(() => {
     root.querySelectorAll(".content:not(.management-content)").forEach((element) => {
