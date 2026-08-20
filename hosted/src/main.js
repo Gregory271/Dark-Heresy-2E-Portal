@@ -1,4 +1,4 @@
-import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.2";
+import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.3";
 import { armoury } from "./armoury-data.js?v=0.8.0";
 import { talentCatalogue } from "./talent-data.js?v=0.9.0";
 import { characteristicRuleTerms, contextualRuleTerms, coreRuleTerms, creatorRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.4.0";
@@ -1390,7 +1390,7 @@ function renderCharacteristics() {
           return `
             <article class="characteristic-entry ${result ? "complete" : ""}">
               <div class="characteristic-name">
-                <span>${entry.abbreviation}</span>
+                <span class="characteristic-abbreviation">${entry.abbreviation}</span>
                 <strong>${entry.name}</strong>
                 <small>${formula}</small>
               </div>
@@ -3035,7 +3035,7 @@ function applyRuleHighlights() {
   while (walker.nextNode()) nodes.push(walker.currentNode);
   for (const node of nodes) {
     if (!node.nodeValue?.trim()) continue;
-    if (node.parentElement?.closest("button,input,textarea,select,option,a,.choice-source,.rule-term")) continue;
+    if (node.parentElement?.closest("button,input,textarea,select,option,a,.choice-source,.characteristic-abbreviation,.rule-term")) continue;
     const matches = [...node.nodeValue.matchAll(pattern)];
     if (!matches.length) continue;
     const fragment = document.createDocumentFragment();
