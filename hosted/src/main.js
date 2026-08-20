@@ -1275,9 +1275,11 @@ function renderMechanics(selected) {
       </div>
       <dl>
         ${rows.map(([label, value]) => `
-          <div>
+          <div class="mechanics-row mechanics-row-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}">
             <dt>${label}</dt>
-            <dd>${value}</dd>
+            <dd${label === "Characteristics" ? ' class="mechanic-modifiers"' : ""}>${label === "Characteristics"
+              ? value.split(",").map((modifier) => `<span class="mechanic-modifier">${modifier.trim()}</span>`).join("")
+              : value}</dd>
           </div>`).join("")}
       </dl>
     </aside>`;
@@ -3622,8 +3624,13 @@ function render() {
         ${scene.kicker ? `<p class="kicker">${scene.kicker}</p>` : selected ? `<p class="kicker">${selected.name}</p>` : ""}
         <h1 id="scene-title">${scene.title}</h1>
         <p class="lede">${scene.copy}</p>
-        ${renderStageBody(scene, selected)}
-        ${selected ? renderMechanics(selected) : ""}
+        ${scene.catalog ? `
+          <div class="catalog-stage-layout">
+            <div class="catalog-selection-column">${renderStageBody(scene, selected)}</div>
+            ${selected ? renderMechanics(selected) : ""}
+          </div>` : `
+          ${renderStageBody(scene, selected)}
+          ${selected ? renderMechanics(selected) : ""}`}
       </section>
 
       <aside class="record" aria-label="Current character record">
