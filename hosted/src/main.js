@@ -110,6 +110,8 @@ let activeRecord = characterLibrary.find((entry) => entry.id === activeCharacter
 let step = Math.min(scenes.length - 1, Math.max(0, Number(activeRecord?.step || 0)));
 let character = prepareCharacter(activeRecord?.character);
 let appView = "roster";
+let activeFloatingTooltipTarget = null;
+let floatingTooltipListenersReady = false;
 
 async function repositoryRequest(path = "", options = {}) {
   if (location.hostname.endsWith("github.io")) throw new Error("Local repository is not available on GitHub Pages.");
@@ -2735,6 +2737,75 @@ function applyRuleHighlights() {
   }
 }
 
+function floatingRuleTooltip() {
+  let tooltip = document.querySelector("#floating-rule-tooltip");
+  if (tooltip) return tooltip;
+  tooltip = document.createElement("div");
+  tooltip.id = "floating-rule-tooltip";
+  tooltip.className = "floating-rule-tooltip";
+  tooltip.setAttribute("role", "tooltip");
+  tooltip.hidden = true;
+  document.body.append(tooltip);
+  return tooltip;
+}
+
+function hideFloatingRuleTooltip() {
+  activeFloatingTooltipTarget = null;
+  const tooltip = document.querySelector("#floating-rule-tooltip");
+  if (tooltip) tooltip.hidden = true;
+}
+
+function positionFloatingRuleTooltip(target) {
+  const text = target?.dataset.tooltip?.trim();
+  if (!text || !target.isConnected) return hideFloatingRuleTooltip();
+  const tooltip = floatingRuleTooltip();
+  activeFloatingTooltipTarget = target;
+  tooltip.textContent = text;
+  tooltip.style.setProperty("--tooltip-accent", getComputedStyle(target).color);
+  tooltip.style.fontSize = `${((window.matchMedia("(max-width: 640px)").matches ? 16 : 18) * textScale).toFixed(2)}px`;
+  tooltip.dataset.placement = "above";
+  tooltip.hidden = false;
+  tooltip.style.left = "0px";
+  tooltip.style.top = "0px";
+
+  const targetRect = target.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
+  const edge = 12;
+  const gap = 10;
+  const left = Math.min(
+    Math.max(edge, targetRect.left + (targetRect.width - tooltipRect.width) / 2),
+    Math.max(edge, viewportWidth - tooltipRect.width - edge),
+  );
+  let top = targetRect.top - tooltipRect.height - gap;
+  if (top < edge) {
+    top = targetRect.bottom + gap;
+    tooltip.dataset.placement = "below";
+  }
+  top = Math.min(Math.max(edge, top), Math.max(edge, viewportHeight - tooltipRect.height - edge));
+  tooltip.style.left = `${Math.round(left)}px`;
+  tooltip.style.top = `${Math.round(top)}px`;
+}
+
+function wireFloatingMechanicsTooltips() {
+  document.querySelectorAll(".mechanics-panel .lore-term[data-tooltip]").forEach((target) => {
+    target.addEventListener("pointerenter", () => positionFloatingRuleTooltip(target));
+    target.addEventListener("pointerleave", hideFloatingRuleTooltip);
+    target.addEventListener("focus", () => positionFloatingRuleTooltip(target));
+    target.addEventListener("blur", hideFloatingRuleTooltip);
+  });
+  if (floatingTooltipListenersReady) return;
+  floatingTooltipListenersReady = true;
+  window.addEventListener("resize", () => {
+    if (activeFloatingTooltipTarget) positionFloatingRuleTooltip(activeFloatingTooltipTarget);
+  });
+  document.addEventListener("scroll", () => {
+    if (!activeFloatingTooltipTarget) return;
+    requestAnimationFrame(() => positionFloatingRuleTooltip(activeFloatingTooltipTarget));
+  }, true);
+}
+
 function switchToCharacter(recordId) {
   const record = characterLibrary.find((entry) => entry.id === recordId);
   if (!record) return;
@@ -3342,6 +3413,7 @@ function render() {
   wireEvents();
   requestAnimationFrame(() => {
     applyRuleHighlights();
+    wireFloatingMechanicsTooltips();
     applyTextScale();
     if (pendingFocusSelector) {
       const focusTarget = document.querySelector(pendingFocusSelector);

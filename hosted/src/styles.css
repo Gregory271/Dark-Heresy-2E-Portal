@@ -1252,6 +1252,42 @@ dialog > p:not(.eyebrow) { color: #b8b4aa; line-height: 1.7; }
   opacity: 1;
   transform: translateY(0);
 }
+.mechanics-panel .lore-term::after { display: none; }
+.floating-rule-tooltip {
+  position: fixed;
+  z-index: 10000;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 24px));
+  border: 1px solid var(--tooltip-accent, #d8ad68);
+  padding: 10px 12px;
+  background: rgba(4, 8, 8, .985);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .72), inset 0 0 18px rgba(255, 255, 255, .025);
+  color: #eee7da;
+  font: 500 18px/1.48 "Inter", sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
+  pointer-events: none;
+}
+.floating-rule-tooltip[hidden] { display: none; }
+.floating-rule-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid var(--tooltip-accent, #d8ad68);
+  border-bottom: 1px solid var(--tooltip-accent, #d8ad68);
+  background: #050909;
+  transform: translateX(-50%) rotate(45deg);
+}
+.floating-rule-tooltip[data-placement="below"]::after {
+  top: -6px;
+  bottom: auto;
+  border: 0;
+  border-top: 1px solid var(--tooltip-accent, #d8ad68);
+  border-left: 1px solid var(--tooltip-accent, #d8ad68);
+}
 .lore-term-action { color: #f1bd63; }
 .lore-term-faction { color: #72bce3; }
 .lore-term-condition { color: #f0796f; }
