@@ -1,4 +1,4 @@
-import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.1";
+import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.2";
 import { armoury } from "./armoury-data.js?v=0.8.0";
 import { talentCatalogue } from "./talent-data.js?v=0.9.0";
 import { characteristicRuleTerms, contextualRuleTerms, coreRuleTerms, creatorRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.4.0";
@@ -579,16 +579,73 @@ function applyTextScale(scope = root) {
     "dt",
     ".eyebrow",
     ".choice-source",
+    ".selection-state",
     ".brand span",
+    ".roster-button",
+    ".text-button",
+    ".compact-button",
     ".facts dt",
+    ".identity-form label span",
     ".record span",
+    ".mechanics-panel dd",
+    ".management-heading",
+    ".manual-result",
+    ".rules-footnote",
+    ".applied-change span",
+    ".divination-choice span",
+    ".replacement-grid label",
+    ".acquisition-list label",
+    ".grant-panel p",
+    ".grant-entry",
+    ".grant-choice-list label",
+    ".granted-line",
+    ".legacy-warning",
+    ".loadout-slots label",
+    ".armoury-item span",
+    ".armoury-item em",
+    ".item-profile dd",
+    ".acquisition-heading span",
+    ".inventory-record-heading span",
+    ".inventory-strip button",
+    ".inventory-entry",
+    ".xp-meter span",
+    ".advance-warning span",
+    ".advance-nav button",
+    ".advance-rows label",
+    ".talent-filters button",
+    ".talent-row span",
+    ".talent-row em",
+    ".talent-cost span",
+    ".talent-inspector dt",
+    ".other-advances label",
+    ".elite-advances summary span",
+    ".elite-advances summary em",
+    ".elite-explanation p",
+    ".automatic-elite span",
+    ".elite-path-list span",
+    ".review-characteristics span",
+    ".calculation-note",
+    ".review-meta",
+    ".loadout-review span",
+    ".loadout-review strong",
+    ".dossier-list strong",
+    ".dossier-list span",
+    ".dossier-list em",
+    ".dossier-list p",
+    ".xp-ledger div",
+    ".roster-card-heading span",
+    ".roster-progress small",
     ".text-size-control",
     ".volume-control",
     ".roster-footer",
     ".compendium-provenance",
     ".compendium-page-headings",
+    ".source-note",
+    ".credit-small",
+    ".artist-credits p",
   ].join(",");
   const isPhone = window.matchMedia("(max-width: 640px)").matches;
+  const isCompactViewport = window.matchMedia("(max-width: 800px)").matches;
 
   // Select the responsive text mode before measuring computed font sizes.
   // This keeps threshold changes deterministic whether the slider is moved
@@ -614,7 +671,11 @@ function applyTextScale(scope = root) {
       const computedSize = Number.parseFloat(getComputedStyle(element).fontSize);
       if (!Number.isFinite(computedSize) || computedSize <= 0) return;
       const compact = element.matches(compactTextSelector);
-      const minimumSize = isPhone ? (compact ? 12 : 16) : (compact ? 14 : 18);
+      const minimumSize = isPhone
+        ? (compact ? 13 : 16)
+        : isCompactViewport
+          ? (compact ? 14 : 16)
+          : (compact ? 14 : 18);
       const baseSize = Math.max(computedSize, minimumSize);
       const scaledSize = baseSize * textScale;
       const phoneHeadingCap = Math.max(56, Math.min(78, window.innerWidth * 0.145));
@@ -1223,13 +1284,14 @@ function renderFacts(facts = []) {
 
 function renderCatalog(scene, selected) {
   const entries = catalogs[scene.catalog];
+  const selectionLabel = scene.id === "homeWorld" ? "home world" : scene.id;
   return `
     <label class="mobile-choice-control">
-      <span>Choose ${scene.id === "homeWorld" ? "home world" : scene.id}</span>
-      <select id="mobile-catalog-choice" aria-describedby="mobile-choice-help">
+      <span class="sr-only">Choose ${selectionLabel}</span>
+      <select id="mobile-catalog-choice" aria-label="Choose ${selectionLabel}" aria-describedby="mobile-choice-help">
         ${entries.map((entry) => `<option value="${entry.id}" ${entry.id === selected.id ? "selected" : ""}>${entry.name}</option>`).join("")}
       </select>
-      <small id="mobile-choice-help">Select an option to update its lore and rules below.</small>
+      <small class="sr-only" id="mobile-choice-help">Selecting an option updates its lore and rules.</small>
     </label>
     <div class="catalog-picker" role="listbox" aria-label="${scene.detailTitle}">
       <button class="catalog-arrow" id="previous-choice" aria-label="Previous choice">‹</button>
@@ -1257,7 +1319,7 @@ function renderCatalog(scene, selected) {
     <div class="catalog-randomizers" aria-label="Random character options">
       <button class="compact-button" id="randomize-stage" type="button">Randomize This Choice</button>
       <button class="compact-button" id="randomize-character" type="button">Randomize Character</button>
-      <small>Character randomization selects Home World, Background, and Role. Identity and dice remain yours.</small>
+      <small>Randomizes Home World, Background, and Role only. Dice are never rolled.</small>
     </div>`;
 }
 
@@ -3620,8 +3682,8 @@ function render() {
       </header>
 
       <section class="content ${!scene.catalog && !isIdentity ? "management-content" : ""}" id="scene-content" tabindex="-1">
-        <p class="eyebrow">${scene.eyebrow}</p>
-        ${scene.kicker ? `<p class="kicker">${scene.kicker}</p>` : selected ? `<p class="kicker">${selected.name}</p>` : ""}
+        ${scene.eyebrow ? `<p class="eyebrow">${scene.eyebrow}</p>` : ""}
+        ${scene.kicker ? `<p class="kicker">${scene.kicker}</p>` : ""}
         <h1 id="scene-title">${scene.title}</h1>
         <p class="lede">${scene.copy}</p>
         ${scene.catalog ? `
