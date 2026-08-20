@@ -869,8 +869,10 @@ function xpSpent() {
   return spent;
 }
 
-function save() {
+function save({ markComplete = false } = {}) {
   const now = new Date().toISOString();
+  if (markComplete) character.completedAt = now;
+  else if (step < scenes.length - 1) character.completedAt = null;
   const existingIndex = characterLibrary.findIndex((entry) => entry.id === activeCharacterId);
   const existing = characterLibrary[existingIndex];
   const record = {
@@ -1728,10 +1730,19 @@ function rosterChoiceName(catalogue, id) {
 
 function rosterProgress(record) {
   const currentStep = Math.min(scenes.length - 1, Math.max(0, Number(record.step || 0)));
+  const savedCharacter = record.character || {};
+  const hasStarted = currentStep > 0 || ["name", "player", "presentation", "appearance"]
+    .some((field) => String(savedCharacter[field] || "").trim());
+  const completedSections = Math.min(currentStep, scenes.length - 1);
+  const sectionTotal = scenes.length - 1;
+  let label = "Creation not started";
+  if (savedCharacter.completedAt) label = "Complete · editable";
+  else if (currentStep >= scenes.length - 1) label = "Ready for final review";
+  else if (hasStarted) label = `Creation in progress · ${completedSections} of ${sectionTotal} sections complete`;
   return {
     currentStep,
-    label: currentStep >= scenes.length - 1 ? "Review ready" : scenes[currentStep]?.title || "In progress",
-    percentage: Math.round(((currentStep + 1) / scenes.length) * 100),
+    label,
+    percentage: savedCharacter.completedAt ? 100 : Math.round((completedSections / sectionTotal) * 100),
   };
 }
 
@@ -2794,7 +2805,6 @@ function renderRoster() {
           <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
           <button class="roster-button" id="open-compendium" type="button"><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
         </nav>
-        <button class="credits-button" id="credits" type="button">Source & credits</button>
         <label class="text-size-control" title="Interface text size">
           <span aria-hidden="true">TEXT</span>
           <input id="text-size" type="range" min="80" max="160" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" />
@@ -2838,7 +2848,7 @@ function renderRoster() {
                   <div><dt>Role</dt><dd>${escapeHtmlAttribute(rosterChoiceName("roles", savedCharacter.role))}</dd></div>
                   <div><dt>Player</dt><dd>${escapeHtmlAttribute(savedCharacter.player || "Not recorded")}</dd></div>
                 </dl>
-                <div class="roster-progress" aria-label="${progress.percentage}% complete">
+                <div class="roster-progress" aria-label="${escapeHtmlAttribute(progress.label)}; ${progress.percentage}% complete">
                   <span style="--roster-progress:${progress.percentage}%"></span>
                   <small>${escapeHtmlAttribute(progress.label)}</small>
                 </div>
@@ -2854,7 +2864,7 @@ function renderRoster() {
       </section>
       <footer class="roster-footer">
         <span>Unofficial game aid</span>
-        <span>Games Workshop · Fantasy Flight Games · Sourcebook artists credited in project notes</span>
+        <button class="footer-credit-button" id="credits" type="button">Games Workshop · Fantasy Flight Games · Artist credits</button>
       </footer>
     </main>
     <dialog id="credits-dialog" aria-labelledby="credits-dialog-title">
@@ -3733,7 +3743,7 @@ function wireEvents() {
   document.querySelector(".save-to-roster")?.addEventListener("click", () => {
     playMechanicalLock();
     appView = "roster";
-    save();
+    save({ markComplete: true });
     render();
   });
   document.querySelector(".export-foundry")?.addEventListener("click", () => {
