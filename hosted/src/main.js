@@ -547,7 +547,6 @@ let soundtrackPlaying = false;
 let lockAudioContext;
 let diceBox;
 let diceBoxReady;
-let vfxMode = localStorage.getItem("dh2-vfx-mode") || "low";
 let textScale = Math.min(1.6, Math.max(0.8, Number(localStorage.getItem("dh2-text-scale")) || 1));
 let pendingFocusSelector = "";
 let compendiumData = null;
@@ -567,8 +566,6 @@ const compendiumState = {
   selectedBook: "core",
   selectedPage: 22,
 };
-document.documentElement.dataset.vfx = vfxMode;
-
 function applyTextScale(scope = root) {
   const surface = scope?.querySelectorAll ? scope : root;
   const previouslyScaled = [...surface.querySelectorAll("[data-access-font]")];
@@ -3577,7 +3574,7 @@ function render() {
   const isIdentity = scene.id === "identity";
   const unresolvedStageGrants = ["grants", "advances"].includes(scene.id) ? grantAlternatives().filter((choice) => !character.grantChoices[choice.id]) : [];
   const selected = selectedEntry(scene, character);
-  const sceneArt = hostedEdition ? null : selected ? artByChoice[selected.id] : stageArtById[scene.id] || null;
+  const sceneArt = selected ? artByChoice[selected.id] : stageArtById[scene.id] || null;
   const framing = selected ? artFramingByChoice[selected.id] : null;
   const imageStyle = sceneArt
     ? `--scene-image: url('${sceneArt}'); --scene-size: ${framing?.size || "cover"}; --scene-position: ${framing?.position || "68% center"}`
@@ -3587,10 +3584,6 @@ function render() {
     <main class="scene scene-${scene.id} theme-${scene.theme} ${selected ? "has-selection" : ""} ${!scene.catalog && !isIdentity ? "management-scene" : ""}" style="${imageStyle}">
       <div class="scene-art" aria-hidden="true"></div>
       <div class="fog fog-one" aria-hidden="true"></div>
-      <div class="fog fog-two" aria-hidden="true"></div>
-      <div class="smoke smoke-one" aria-hidden="true"></div>
-      <div class="smoke smoke-two" aria-hidden="true"></div>
-      <div class="signal-scan" aria-hidden="true"></div>
       <div class="grain" aria-hidden="true"></div>
 
       <header class="topbar">
@@ -3604,7 +3597,6 @@ function render() {
           <button class="roster-button compendium-button" id="open-compendium" type="button"><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
         </nav>
         <div class="audio-controls">
-          <button class="vfx-toggle" id="vfx-toggle" type="button" title="Change decorative animation quality">VFX ${vfxMode === "low" ? "LOW" : "HIGH"}</button>
           <button class="sound ${soundtrackPlaying ? "playing" : ""}" id="sound-toggle" type="button" ${hostedEdition ? "disabled" : ""}
             aria-label="${soundtrackPlaying ? "Pause" : "Play"} ambient soundtrack"
             aria-pressed="${soundtrackPlaying}" title="${hostedEdition ? "Soundtrack is available in the local GM edition" : `${soundtrackPlaying ? "Pause" : "Play"} soundtrack`}">
@@ -3695,12 +3687,6 @@ function wireEvents() {
   document.querySelector("#open-compendium")?.addEventListener("click", () => {
     appView = "compendium";
     save();
-    render();
-  });
-  document.querySelector("#vfx-toggle").addEventListener("click", () => {
-    vfxMode = vfxMode === "low" ? "high" : "low";
-    localStorage.setItem("dh2-vfx-mode", vfxMode);
-    document.documentElement.dataset.vfx = vfxMode;
     render();
   });
   document.querySelector("#sound-volume").addEventListener("input", (event) => {

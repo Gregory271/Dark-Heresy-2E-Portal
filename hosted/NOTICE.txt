@@ -1,7 +1,8 @@
 Unofficial Dark Heresy Second Edition game aid.
 Dark Heresy and Warhammer 40,000 are properties of their respective rights holders.
 Universe by Games Workshop; Dark Heresy Second Edition published by Fantasy Flight Games.
-The hosted player edition omits private sourcebook extracts, illustrations, and locally supplied music.
+The hosted player edition omits private sourcebook extracts and locally supplied music.
+Cropped sourcebook illustrations are used as interface backgrounds and remain the property of their credited artists and rights holders.
 Players may select their own sourcebook PDFs; those files and the resulting rules index stay in that browser and are never uploaded by the application.
 PDF reading is provided by PDF.js under the Apache License 2.0; see vendor-licenses/pdfjs-LICENSE.txt.
 IM FELL English is copyright Igino Marini and distributed under the SIL Open Font License 1.1; see public/assets/fonts/im-fell-english/OFL.txt.

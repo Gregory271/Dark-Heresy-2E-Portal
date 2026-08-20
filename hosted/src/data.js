@@ -81,18 +81,19 @@ export const defaultCharacter = {
 
 export const artByChoice = Object.fromEntries(
   [...catalogs.homeWorlds, ...catalogs.backgrounds, ...catalogs.roles]
-    .map((entry) => [entry.id, `./public/assets/choices/${entry.id}.webp?v=0.4.9`]),
+    .map((entry) => [entry.id, `../public/assets/choices/${entry.id}.webp?v=0.5.0`]),
 );
 
 export const stageArtById = {
-  characteristics: "./public/assets/stages/characteristics.webp?v=0.6.1",
-  fateWounds: "./public/assets/stages/fate-wounds.webp?v=0.6.1",
-  divination: "./public/assets/stages/divination.webp?v=0.6.1",
-  aptitudes: "./public/assets/stages/aptitudes.webp?v=0.6.1",
-  grants: "./public/assets/stages/grants.webp?v=0.6.1",
-  equipment: "./public/assets/stages/equipment.webp?v=0.6.1",
-  advances: "./public/assets/stages/advances.webp?v=0.6.1",
-  review: "./public/assets/stages/review.webp?v=0.6.1",
+  identity: "../public/assets/stages/grants.webp?v=0.6.2",
+  characteristics: "../public/assets/stages/characteristics.webp?v=0.6.2",
+  fateWounds: "../public/assets/stages/fate-wounds.webp?v=0.6.2",
+  divination: "../public/assets/stages/divination.webp?v=0.6.2",
+  aptitudes: "../public/assets/stages/aptitudes.webp?v=0.6.2",
+  grants: "../public/assets/stages/grants.webp?v=0.6.2",
+  equipment: "../public/assets/stages/equipment.webp?v=0.6.2",
+  advances: "../public/assets/stages/advances.webp?v=0.6.2",
+  review: "../public/assets/stages/review.webp?v=0.6.2",
 };
 
 export const divinations = [

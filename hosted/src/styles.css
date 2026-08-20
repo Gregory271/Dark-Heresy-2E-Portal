@@ -110,12 +110,6 @@ select:focus-visible, summary:focus-visible, a:focus-visible {
   animation: settle 12s ease-out both;
 }
 
-html[data-edition="hosted"] .scene-art {
-  background-image:
-    radial-gradient(circle at 68% 34%, rgba(160, 119, 62, .2), transparent 34%),
-    linear-gradient(118deg, rgba(4, 9, 9, .96) 9%, rgba(11, 22, 21, .86) 52%, rgba(30, 24, 17, .72));
-}
-
 html[data-edition="hosted"] .review-sheet {
   background-image:
     linear-gradient(145deg, rgba(6, 12, 12, .95), rgba(19, 21, 17, .88)),
@@ -169,18 +163,29 @@ html[data-edition="hosted"] .sound:disabled {
 }
 
 .grain {
-  position: absolute; z-index: 8; inset: 0; pointer-events: none; opacity: .13;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
-  mix-blend-mode: soft-light;
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  pointer-events: none;
+  opacity: .045;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.04) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, transparent 0 7px, rgba(255,255,255,.018) 7px 8px);
 }
 
-.fog { position: absolute; z-index: -1; width: 65vw; height: 24vh; filter: blur(38px); opacity: .13; background: #d5c7a4; border-radius: 50%; }
-.fog-one { bottom: 7%; left: 20%; animation: drift 13s ease-in-out infinite alternate; }
-.fog-two { top: 21%; right: -20%; opacity: .08; animation: drift 19s ease-in-out infinite alternate-reverse; }
-.smoke { position: absolute; z-index: -1; pointer-events: none; width: 42vw; height: 55vh; opacity: 0; filter: blur(28px); background: radial-gradient(ellipse at 50% 70%, rgba(202,194,171,.34), transparent 67%); }
-.smoke-one { right: 5%; bottom: -24%; animation: smoke-rise 16s ease-in-out infinite; }
-.smoke-two { right: 27%; bottom: -31%; animation: smoke-rise 21s 7s ease-in-out infinite; }
-.signal-scan { position: absolute; z-index: 7; inset: -25% 0 auto; height: 18%; opacity: .045; pointer-events: none; background: linear-gradient(transparent, rgba(238,224,191,.75), transparent); mix-blend-mode: screen; animation: signal-scan 14s linear infinite; }
+.fog {
+  position: absolute;
+  z-index: -1;
+  bottom: -8%;
+  left: 14%;
+  width: 62vw;
+  height: 30vh;
+  pointer-events: none;
+  opacity: .055;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(213,199,164,.72), transparent 68%);
+  animation: drift 32s ease-in-out infinite alternate;
+}
 
 .topbar, .controls { display: flex; align-items: center; position: relative; z-index: 10; }
 .topbar { gap: 15px; }
@@ -214,8 +219,6 @@ html[data-edition="hosted"] .sound:disabled {
 }
 .nav-narrow { display: none; }
 .audio-controls { display: flex; align-items: center; gap: 8px; }
-.vfx-toggle { border: 1px solid rgba(235,226,208,.25); padding: 5px 7px; background: rgba(7,10,9,.62); color: #b9b5aa; font: 700 8px "Barlow Condensed",sans-serif; letter-spacing: .12em; cursor: pointer; }
-.vfx-toggle:hover { border-color: var(--accent); color: #fff0d0; }
 .sound { width: 42px; height: 36px; padding: 0 8px; display: flex; align-items: center; justify-content: center; gap: 4px; border-radius: 18px; border: 1px solid var(--line); background: rgba(8, 11, 10, .35); cursor: pointer; }
 .sound:hover, .sound.playing { border-color: var(--accent); color: var(--accent-hot); }
 .sound-icon { width: 9px; font-size: 8px; line-height: 1; }
@@ -642,7 +645,6 @@ html[data-text-size="extra-large"] .loadout-slots { grid-template-columns: 1fr; 
 html[data-text-size="extra-large"] .scene-equipment .management-content > .kicker,
 html[data-text-size="extra-large"] .scene-equipment .management-content > .lede { display: none; }
 html[data-text-size="extra-large"] .scene-equipment .management-content > h1 { font-size: 36px; }
-html[data-text-size="extra-large"] .topbar .vfx-toggle,
 html[data-text-size="extra-large"] .topbar .volume-control { display: none; }
 html[data-text-size="extra-large"] .topbar .nav-wide { display: none; }
 html[data-text-size="extra-large"] .topbar .nav-narrow { display: inline; }
@@ -773,35 +775,21 @@ html[data-text-size="extra-large"] .topbar .nav-narrow { display: inline; }
 #dice-box canvas { width: 100%; height: 100%; }
 .dice-status { position: absolute; bottom: 5vh; margin: 0; color: #ffe6b6; font: 600 20px "Barlow Condensed",sans-serif; letter-spacing: .14em; text-transform: uppercase; text-shadow: 0 2px 8px #000; }
 
-/* Low is the default because large blurred, blended layers are expensive on
-   integrated GPUs. It preserves motion while cutting full-screen compositing. */
-html[data-vfx="low"] .fog { filter: blur(16px); opacity: .075; }
-html[data-vfx="low"] .fog-one { width: 48vw; height: 18vh; animation-duration: 24s; will-change: transform; }
-html[data-vfx="low"] .fog-two,
-html[data-vfx="low"] .smoke-two,
-html[data-vfx="low"] .signal-scan { display: none; }
-html[data-vfx="low"] .smoke-one { width: 34vw; height: 42vh; filter: blur(12px); animation-duration: 28s; will-change: transform,opacity; }
-html[data-vfx="low"] .grain { opacity: .045; mix-blend-mode: normal; }
-html[data-vfx="low"] .choice-card,
-html[data-vfx="low"] .mechanics-panel,
-html[data-vfx="low"] .management-shell,
-html[data-vfx="low"] .facts div,
-html[data-vfx="low"] dialog::backdrop { backdrop-filter: none; }
+.choice-card,
+.mechanics-panel,
+.management-shell,
+.advance-nav,
+.facts div,
+dialog::backdrop { backdrop-filter: none; }
 
 html.page-paused .fog,
-html.page-paused .smoke,
-html.page-paused .signal-scan,
 html.page-paused .scene-art,
 html.page-paused .sound-waves i,
-html.dice-active .fog,
-html.dice-active .smoke,
-html.dice-active .signal-scan { animation-play-state: paused !important; }
-html.page-paused .fog,
-html.page-paused .smoke,
-html.page-paused .signal-scan { visibility: hidden; }
+html.dice-active .fog { animation-play-state: paused !important; }
+html.page-paused .fog { visibility: hidden; }
 
 dialog { width: min(520px, calc(100% - 32px)); border: 1px solid rgba(209, 180, 125, .45); padding: 38px; color: #e7e1d5; background: linear-gradient(145deg, #141918, #090d0c); box-shadow: 0 30px 100px #000; }
-dialog::backdrop { background: rgba(0,0,0,.75); backdrop-filter: blur(7px); }
+dialog::backdrop { background: rgba(0,0,0,.78); backdrop-filter: none; }
 dialog h2 { margin: 10px 0 18px; font: 500 38px "Barlow Condensed", sans-serif; text-transform: uppercase; }
 dialog > p:not(.eyebrow) { color: #b8b4aa; line-height: 1.7; }
 .dialog-lore { padding-left: 20px; color: #c8c3b8; line-height: 1.55; }
@@ -1611,8 +1599,6 @@ dialog h2,
 @keyframes drift { from { transform: translateX(-8%) scale(.9); } to { transform: translateX(12%) scale(1.12); } }
 @keyframes settle { from { transform: scale(1.05); } to { transform: scale(1.015); } }
 @keyframes meter { from { height: 3px; } to { height: 12px; } }
-@keyframes smoke-rise { 0%,100% { opacity: 0; transform: translate3d(0,12%,0) scale(.8); } 24% { opacity: .12; } 68% { opacity: .07; transform: translate3d(-13%,-50%,0) scale(1.28); } }
-@keyframes signal-scan { from { transform: translateY(-15vh); } to { transform: translateY(145vh); } }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; } }
 @media (prefers-reduced-transparency: reduce) {
@@ -1627,7 +1613,7 @@ dialog h2,
 }
 @media (forced-colors: active) {
   * { forced-color-adjust: auto; }
-  .scene-art, .fog, .smoke, .grain, .signal-scan { display: none; }
+  .scene-art, .fog, .grain { display: none; }
   .catalog-slot.active, .progress i.active { outline: 2px solid Highlight; }
 }
 
@@ -1752,7 +1738,7 @@ dialog h2,
     opacity: .72;
     mask-image: linear-gradient(#000 0 68%, transparent 100%);
   }
-  .fog, .smoke, .signal-scan { display: none; }
+  .fog { display: none; }
   .grain { opacity: .06; }
   .topbar {
     display: grid;
@@ -1761,7 +1747,7 @@ dialog h2,
     gap: 9px;
   }
   .brand strong { font-size: 14px; letter-spacing: .1em; }
-  .brand span, .vfx-toggle, .record { display: none; }
+  .brand span, .record { display: none; }
   .audio-controls { gap: 6px; }
   .sound { width: 44px; height: 44px; }
   .volume-control { display: none; }
@@ -2231,7 +2217,6 @@ dialog h2,
 @media (max-width: 800px) {
   .brand span { display: none; }
   .audio-controls { gap: 5px; }
-  .vfx-toggle { display: none; }
   .sound { width: 36px; height: 32px; }
   .volume-control span, .text-size-control span { display: none; }
   .volume-control input, .text-size-control input { width: 50px; }
