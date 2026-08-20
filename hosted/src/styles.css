@@ -281,7 +281,7 @@ html[data-text-size="large"] .management-content,
 html[data-text-size="extra-large"] .management-content {
   align-self: stretch;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   width: 100%;
   max-width: 1440px;
   margin: 6px 0;
@@ -427,7 +427,7 @@ h1 { max-width: 820px; margin: 8px 0 20px; font-size: clamp(52px, 7.2vw, 112px);
   align-self: stretch;
   justify-self: center;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0,1fr);
+  grid-template-rows: auto auto auto auto minmax(0,1fr);
   width: 100%;
   max-width: 1440px;
   min-width: 0;
@@ -435,6 +435,11 @@ h1 { max-width: 820px; margin: 8px 0 20px; font-size: clamp(52px, 7.2vw, 112px);
   margin: clamp(5px,1.3vh,12px) 0;
   overflow: hidden;
 }
+.management-content > .eyebrow { grid-row: 1; }
+.management-content > .kicker { grid-row: 2; }
+.management-content > h1 { grid-row: 3; }
+.management-content > .lede { grid-row: 4; }
+.management-content > .management-shell { grid-row: 5; }
 .management-content .kicker { margin-top: 7px; font-size: 16px; }
 .management-content h1 { margin: 4px 0 8px; font-size: clamp(35px,4vw,58px); line-height: .94; }
 .management-content .lede { max-width: 900px; font-size: 14px; line-height: 1.4; }
@@ -479,6 +484,12 @@ h1 { max-width: 820px; margin: 8px 0 20px; font-size: clamp(52px, 7.2vw, 112px);
 .divination-choice select { min-width: 150px; padding: 6px 8px; }
 .aptitude-ledger { display: grid; grid-template-columns: 1fr 1.2fr 1fr; min-height: 310px; }
 .aptitude-ledger section { padding: 20px; border-right: 1px solid var(--line); }
+.scene-aptitudes .management-content > .management-shell {
+  align-self: center;
+  width: 100%;
+  max-height: 100%;
+  margin-top: 0;
+}
 .tag-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
 .tag-list span { border: 1px solid rgba(255,255,255,.19); padding: 6px 8px; background: rgba(255,255,255,.04); color: #d8d4ca; font-size: 10px; text-transform: uppercase; }
 .tag-list.final span { border-color: rgba(225,187,118,.48); color: #ffe6b6; }
@@ -499,7 +510,7 @@ select,.acquisition-list input,.choice-resolution textarea { border: 1px solid r
 .scene-grants .management-content {
   align-self: stretch;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0,1fr);
+  grid-template-rows: auto auto auto auto minmax(0,1fr);
   width: 100%;
   min-height: 0;
   margin: 8px 0;
