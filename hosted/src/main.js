@@ -62,6 +62,12 @@ function prepareCharacter(input = {}) {
   prepared.acquisitions ||= [];
   prepared.equipment ||= {};
   prepared.equipment.inventory ||= [];
+  if (!Array.isArray(prepared.equipment.noCostGrants)) {
+    prepared.equipment.noCostGrants = prepared.equipment.inventory
+      .filter((id) => !prepared.acquisitions.includes(id));
+  }
+  prepared.equipment.noCostGrants = [...new Set(prepared.equipment.noCostGrants)]
+    .filter((id) => prepared.equipment.inventory.includes(id) && !prepared.acquisitions.includes(id));
   prepared.equipment.equipped ||= {};
   prepared.equipment.selected ||= null;
   prepared.advances ||= { characteristics: {}, skills: {}, talents: [] };
@@ -988,6 +994,7 @@ function resetCreationDataFrom(sceneId) {
   character.acquisitions = [];
   character.equipment = {
     inventory: [],
+    noCostGrants: [],
     equipped: {},
     selected: null,
   };
@@ -1482,6 +1489,11 @@ function foundrySpecialAbility([source, value]) {
 }
 
 function foundryEquipmentItem(item) {
+  const inventorySource = character.acquisitions.includes(item.id)
+    ? "starting-acquisition"
+    : character.equipment.noCostGrants.includes(item.id)
+      ? "no-cost-grant"
+      : "inventory";
   return {
     name: item.name,
     type: item.documentType,
@@ -1493,7 +1505,7 @@ function foundryEquipmentItem(item) {
       weight: item.weight ?? 0,
       equipped: Object.values(character.equipment.equipped).includes(item.id),
     },
-    flags: { dh2CharacterBuilder: { source: item.source, category: item.category } },
+    flags: { dh2CharacterBuilder: { source: item.source, category: item.category, inventorySource } },
   };
 }
 
@@ -1565,6 +1577,19 @@ function renderEquipment() {
   const selected = armoury.find((item) => item.id === character.equipment.selected) || armoury[0];
   const categories = ["All", ...new Set(armoury.map((item) => item.category))];
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
+  const selectedInInventory = character.equipment.inventory.includes(selected.id);
+  const selectedAcquisition = character.acquisitions.includes(selected.id);
+  const selectedNoCostGrant = character.equipment.noCostGrants.includes(selected.id);
+  const acquisitionLimitReached = character.acquisitions.filter(Boolean).length >= slots;
+  const acquisitionLegal = isStartingAcquisitionLegal(selected);
+  const acquisitionDisabled = !acquisitionLegal || selectedAcquisition || acquisitionLimitReached;
+  const acquisitionTitle = selectedAcquisition
+    ? "This item already uses one starting acquisition."
+    : !acquisitionLegal
+      ? "This item's effective Availability is not eligible for a normal starting acquisition."
+      : acquisitionLimitReached
+        ? "No starting acquisition slots remain."
+        : "Spend one starting acquisition slot and add this item to inventory.";
   const rows = itemProfileRows(selected);
   return `
     <div class="management-shell armoury-layout">
@@ -1593,9 +1618,10 @@ function renderEquipment() {
               .map(([label, value]) => `<div><dt>${label}</dt><dd>${value ?? "—"}</dd></div>`).join("")}
           </dl>
           <div class="item-actions">
-            <button class="primary-button add-equipment" type="button" data-add-equipment="${selected.id}" ${character.equipment.inventory.includes(selected.id) ? "disabled" : ""}>${character.equipment.inventory.includes(selected.id) ? "In Inventory" : "Add to Inventory"} <span>›</span></button>
-            <button class="compact-button acquire-equipment" type="button" data-acquire-equipment="${selected.id}" ${!isStartingAcquisitionLegal(selected) || character.acquisitions.includes(selected.id) || character.acquisitions.filter(Boolean).length >= slots ? "disabled" : ""}>${character.acquisitions.includes(selected.id) ? "Acquisition Selected" : "Use Starting Acquisition"}</button>
+            <button class="primary-button acquire-equipment" type="button" data-acquire-equipment="${selected.id}" title="${acquisitionTitle}" ${acquisitionDisabled ? "disabled" : ""}>${selectedAcquisition ? "Starting Acquisition Recorded" : "Use 1 Starting Acquisition"} <span>›</span></button>
+            <button class="compact-button add-equipment" type="button" data-add-equipment="${selected.id}" ${selectedInInventory && !selectedNoCostGrant ? "disabled" : ""}>${selectedNoCostGrant ? "Remove No-Cost Grant" : selectedInInventory ? "Already in Inventory" : "Add Without Cost"}</button>
           </div>
+          <p class="item-cost-note"><strong>No-cost grant:</strong> Adds the item directly without spending XP, currency, or a starting acquisition. Use only for free Background equipment or an explicit GM grant.</p>
         </div>
         <aside class="loadout-panel">
           <div class="loadout-heading">
@@ -1616,7 +1642,14 @@ function renderEquipment() {
               return `<label><span>${label}</span><select data-equipment-slot="${slot}"><option value="">Empty</option>${inventoryItems.filter((item) => itemFitsSlot(item, slot)).map((item) => `<option value="${item.id}" ${equipped?.id === item.id ? "selected" : ""}>${item.name}</option>`).join("")}</select></label>`;
             }).join("")}
           </div>
-          <div class="inventory-strip">${inventoryItems.map((item) => `<button type="button" data-equipment-item="${item.id}">${item.name}</button>`).join("") || "<span>No items added yet.</span>"}</div>
+          <div class="inventory-strip">${inventoryItems.map((item) => {
+            const source = character.acquisitions.includes(item.id)
+              ? "Starting acquisition"
+              : character.equipment.noCostGrants.includes(item.id)
+                ? "No-cost grant"
+                : "Inventory";
+            return `<button type="button" data-equipment-item="${item.id}"><strong>${item.name}</strong><small>${source}</small></button>`;
+          }).join("") || "<span>No items added yet.</span>"}</div>
         </aside>
       </section>
     </div>`;
@@ -3184,6 +3217,7 @@ function renderReview() {
   const purchasedTalents = character.advances.talents.map((entry) => talentCatalogue.find((talent) => talent.id === entry.id)).filter(Boolean);
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
   const acquisitionItems = character.acquisitions.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
+  const noCostItems = character.equipment.noCostGrants.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
   const xpLedger = [
     ...characteristics.filter((entry) => Number(character.advances.characteristics[entry.id] || 0) > 0).map((entry) => [`${entry.name} +${Number(character.advances.characteristics[entry.id]) * 5}`, characteristicXpCost(entry.id)]),
     ...ownedSkills.filter((skill) => skillXpCost(skill.id) > 0).map((skill) => [`${skill.name} · ${rankNames[skillRank(skill.id) - 1]}`, skillXpCost(skill.id)]),
@@ -3282,7 +3316,7 @@ function renderReview() {
               const item = armoury.find((entry) => entry.id === character.equipment.equipped[slot]);
               return `<div><span>${label}</span><strong>${item?.name || "Empty"}</strong></div>`;
             }).join("")}</div>
-            <div class="dossier-list compact">${inventoryItems.map((item) => `<div><strong>${item.name}</strong><span>${item.category} · ${effectiveAvailability(item)} · ${displayWeight(item)}</span>${acquisitionItems.some((entry) => entry.id === item.id) ? "<em>Starting Acquisition</em>" : ""}</div>`).join("") || "<p>No inventory recorded.</p>"}</div>
+            <div class="dossier-list compact">${inventoryItems.map((item) => `<div><strong>${item.name}</strong><span>${item.category} · ${effectiveAvailability(item)} · ${displayWeight(item)}</span>${acquisitionItems.some((entry) => entry.id === item.id) ? "<em>Starting Acquisition</em>" : noCostItems.some((entry) => entry.id === item.id) ? "<em>No-Cost Grant · Background or GM</em>" : "<em>Inventory</em>"}</div>`).join("") || "<p>No inventory recorded.</p>"}</div>
           </section>
           <section>
             <h3>Divination</h3>
@@ -3740,7 +3774,16 @@ function wireEvents() {
   document.querySelector("[data-add-equipment]")?.addEventListener("click", (event) => {
     playMechanicalLock();
     const id = event.currentTarget.dataset.addEquipment;
-    if (!character.equipment.inventory.includes(id)) character.equipment.inventory.push(id);
+    if (character.equipment.noCostGrants.includes(id)) {
+      character.equipment.noCostGrants = character.equipment.noCostGrants.filter((entry) => entry !== id);
+      character.equipment.inventory = character.equipment.inventory.filter((entry) => entry !== id);
+      character.equipment.equipped = Object.fromEntries(
+        Object.entries(character.equipment.equipped).map(([slot, itemId]) => [slot, itemId === id ? "" : itemId]),
+      );
+    } else if (!character.equipment.inventory.includes(id)) {
+      character.equipment.inventory.push(id);
+      character.equipment.noCostGrants.push(id);
+    }
     save();
     render();
   });
@@ -3749,13 +3792,19 @@ function wireEvents() {
     const id = event.currentTarget.dataset.acquireEquipment;
     if (!character.acquisitions.includes(id)) character.acquisitions.push(id);
     if (!character.equipment.inventory.includes(id)) character.equipment.inventory.push(id);
+    character.equipment.noCostGrants = character.equipment.noCostGrants.filter((entry) => entry !== id);
     save();
     render();
   });
   document.querySelectorAll("[data-remove-acquisition]").forEach((button) => {
     button.addEventListener("click", () => {
       playMechanicalLock();
-      character.acquisitions = character.acquisitions.filter((id) => id !== button.dataset.removeAcquisition);
+      const id = button.dataset.removeAcquisition;
+      character.acquisitions = character.acquisitions.filter((entry) => entry !== id);
+      character.equipment.inventory = character.equipment.inventory.filter((entry) => entry !== id);
+      character.equipment.equipped = Object.fromEntries(
+        Object.entries(character.equipment.equipped).map(([slot, itemId]) => [slot, itemId === id ? "" : itemId]),
+      );
       save();
       render();
     });
