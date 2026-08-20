@@ -1770,6 +1770,7 @@ function renderEquipment() {
   const selectedGrant = grantedByItemId.get(selected.id);
   const categories = ["All", ...new Set(armoury.map((item) => item.category))];
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
+  const unlinkedGrantedItems = grantedEquipment.entries.filter((entry) => !entry.item);
   const selectedInInventory = character.equipment.inventory.includes(selected.id);
   const selectedAcquisition = character.acquisitions.includes(selected.id);
   const selectedNoCostGrant = character.equipment.noCostGrants.includes(selected.id);
@@ -1829,24 +1830,6 @@ function renderEquipment() {
             <span>Influence Bonus ${characteristicBonus("influence")}</span>
             <strong>${character.acquisitions.filter(Boolean).length} / ${slots} starting acquisitions recorded</strong>
           </div>
-          <section class="starting-package" aria-labelledby="starting-package-title">
-            <div class="starting-package-heading">
-              <span>Included at no cost</span>
-              <strong id="starting-package-title">${grantedEquipment.sourceName} Starting Package</strong>
-            </div>
-            <div class="starting-package-items">
-              ${grantedEquipment.entries.map((entry) => {
-                if (entry.unresolvedChoice) {
-                  return `<div class="starting-package-item unresolved"><strong>${entry.label}</strong><small>Choice unresolved</small><em>Return to Starting Abilities and choose one option.</em></div>`;
-                }
-                if (!entry.item) {
-                  return `<div class="starting-package-item unlinked"><strong>${entry.label}</strong><small>${entry.sourceType === "background-choice" ? "Background choice" : "Background grant"}</small><em>Recorded as written · Armoury link pending</em></div>`;
-                }
-                const originalLabel = normaliseItemName(entry.label) !== normaliseItemName(entry.item.name) ? `<em>Listed as “${entry.label}”</em>` : "";
-                return `<button class="starting-package-item" type="button" data-equipment-item="${entry.item.id}"><strong>${entry.item.name}</strong><small>${entry.sourceType === "background-choice" ? "Chosen from Background" : "Granted by Background"}</small>${originalLabel}</button>`;
-              }).join("") || `<p>No starting equipment is listed for this Background.</p>`}
-            </div>
-          </section>
           <div class="acquisition-heading"><strong>Optional Starting Acquisitions</strong><span>Each recorded item spends 1 of ${slots} slots.</span></div>
           <div class="acquisition-picks">
             ${character.acquisitions.filter(Boolean).map((id) => {
@@ -1861,10 +1844,21 @@ function renderEquipment() {
               return `<label><span>${label}</span><select data-equipment-slot="${slot}"><option value="">Empty</option>${inventoryItems.filter((item) => itemFitsSlot(item, slot)).map((item) => `<option value="${item.id}" ${equipped?.id === item.id ? "selected" : ""}>${item.name}</option>`).join("")}</select></label>`;
             }).join("")}
           </div>
-          <div class="inventory-strip">${inventoryItems.map((item) => {
-            const source = equipmentProvenance(item.id, grantedEquipment);
-            return `<button type="button" data-equipment-item="${item.id}" data-source-type="${source.type}"><strong>${item.name}</strong><small>${source.label}</small></button>`;
-          }).join("") || "<span>No items added yet.</span>"}</div>
+          <section class="inventory-record" aria-labelledby="inventory-record-title">
+            <div class="inventory-record-heading">
+              <strong id="inventory-record-title">Your Acolyte's Equipment</strong>
+              <span>Select an item to view its Armoury details.</span>
+            </div>
+            <div class="inventory-strip">${inventoryItems.map((item) => {
+              const source = equipmentProvenance(item.id, grantedEquipment);
+              return `<button class="${selected.id === item.id ? "selected" : ""}" type="button" data-equipment-item="${item.id}" data-source-type="${source.type}" aria-pressed="${selected.id === item.id}" title="View ${escapeHtmlAttribute(item.name)} details"><strong>${item.name}</strong><small>${source.label}</small></button>`;
+            }).join("")}${unlinkedGrantedItems.map((entry) => `
+              <div class="inventory-entry ${entry.unresolvedChoice ? "unresolved" : "unlinked"}">
+                <strong>${entry.label}</strong>
+                <small>${entry.unresolvedChoice ? "Background choice unresolved" : `Granted by ${entry.sourceName}`}</small>
+                <em>${entry.unresolvedChoice ? "Return to Starting Abilities and choose one option." : "Recorded as written · Armoury details not yet linked."}</em>
+              </div>`).join("")}${!inventoryItems.length && !unlinkedGrantedItems.length ? "<span>No equipment recorded yet.</span>" : ""}</div>
+          </section>
         </aside>
       </section>
     </div>`;

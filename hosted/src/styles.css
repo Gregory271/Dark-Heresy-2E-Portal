@@ -610,20 +610,6 @@ html[data-text-size="extra-large"] .scene-equipment .armoury-layout { margin-top
 .loadout-heading { display: grid; gap: 3px; border-bottom: 1px solid var(--line); padding-bottom: 9px; }
 .loadout-heading span { color: #caa86e; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; }
 .loadout-heading strong { color: #eee6d7; font: 500 14px "Barlow Condensed",sans-serif; text-transform: uppercase; }
-.starting-package { margin: 10px 0 12px; border: 1px solid rgba(125,166,151,.35); background: rgba(39,78,67,.12); }
-.starting-package-heading { display: grid; gap: 2px; border-bottom: 1px solid rgba(125,166,151,.25); padding: 8px 10px; }
-.starting-package-heading span { color: #9ecdb9; font-size: 7px; letter-spacing: .12em; text-transform: uppercase; }
-.starting-package-heading strong { color: #e9e0cf; font: 600 13px "Barlow Condensed",sans-serif; text-transform: uppercase; }
-.starting-package-items { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
-.starting-package-item { display: grid; min-width: 0; min-height: 58px; align-content: start; gap: 3px; border: 0; border-right: 1px solid rgba(125,166,151,.16); border-bottom: 1px solid rgba(125,166,151,.16); padding: 8px 9px; background: rgba(4,9,8,.42); color: #d8d1c5; text-align: left; }
-button.starting-package-item { cursor: pointer; }
-button.starting-package-item:hover,button.starting-package-item:focus-visible { background: rgba(74,117,100,.22); outline: 1px solid #9ecdb9; outline-offset: -1px; }
-.starting-package-item strong { min-width: 0; overflow-wrap: anywhere; color: #f0e4cf; font: 600 11px/1.15 "Barlow Condensed",sans-serif; text-transform: uppercase; }
-.starting-package-item small { color: #9ecdb9; font-size: 7px; letter-spacing: .05em; line-height: 1.25; text-transform: uppercase; }
-.starting-package-item em { color: #aaa69d; font-size: 7px; font-style: normal; line-height: 1.25; }
-.starting-package-item.unresolved { border-left: 2px solid #c77b53; background: rgba(134,63,39,.14); }
-.starting-package-item.unresolved small,.starting-package-item.unresolved em { color: #e2ad96; }
-.starting-package-item.unlinked { border-left: 2px solid #9b8b65; }
 .acquisition-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .acquisition-heading strong { color: #e4d6bf; font: 600 11px "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .acquisition-heading span { color: #a7a198; font-size: 7px; text-align: right; }
@@ -639,10 +625,22 @@ button.starting-package-item:hover,button.starting-package-item:focus-visible { 
 .loadout-slots { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 12px; }
 .loadout-slots label { display: grid; align-content: start; gap: 6px; min-width: 0; color: #aaa69d; font-size: 8px; line-height: 1.25; letter-spacing: .06em; text-transform: uppercase; }
 .loadout-slots select { width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; text-overflow: ellipsis; }
-.inventory-strip { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+.inventory-record { margin-top: 13px; border-top: 1px solid var(--line); padding-top: 10px; }
+.inventory-record-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.inventory-record-heading strong { color: #e4d6bf; font: 600 11px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.inventory-record-heading span { color: #a7a198; font-size: 7px; text-align: right; }
+.inventory-strip { display: flex; flex-wrap: wrap; gap: 4px; }
 .inventory-strip button { display: grid; gap: 2px; border: 1px solid rgba(225,187,118,.3); padding: 6px 8px; background: rgba(151,100,37,.13); color: #dfd6c6; font-size: 8px; text-align: left; cursor: pointer; }
 .inventory-strip button strong { color: #efe4d1; font: 600 1em "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .inventory-strip button small { color: #a9cbbb; font-size: .82em; letter-spacing: .05em; text-transform: uppercase; }
+.inventory-strip button:hover,.inventory-strip button:focus-visible,.inventory-strip button.selected { border-color: #e1bb76; background: rgba(151,100,37,.3); outline: none; }
+.inventory-strip button.selected { box-shadow: inset 2px 0 #e1bb76; }
+.inventory-entry { display: grid; gap: 2px; border: 1px solid rgba(155,139,101,.42); padding: 6px 8px; background: rgba(74,61,36,.15); color: #dfd6c6; font-size: 8px; text-align: left; }
+.inventory-entry strong { color: #efe4d1; font: 600 1em "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.inventory-entry small { color: #c6b68f; font-size: .82em; letter-spacing: .05em; text-transform: uppercase; }
+.inventory-entry em { color: #aaa69d; font-size: .82em; font-style: normal; }
+.inventory-entry.unresolved { border-left: 2px solid #c77b53; background: rgba(134,63,39,.14); }
+.inventory-entry.unresolved small,.inventory-entry.unresolved em { color: #e2ad96; }
 .inventory-strip button[data-source-type="background-grant"],
 .inventory-strip button[data-source-type="background-choice"] { border-color: rgba(125,166,151,.45); background: rgba(39,78,67,.17); }
 .inventory-strip button[data-source-type="starting-acquisition"] { border-color: rgba(185,205,153,.4); background: rgba(97,121,67,.14); }
@@ -659,9 +657,7 @@ html[data-text-size="extra-large"] .armoury-categories {
 html[data-text-size="large"] .armoury-categories button,
 html[data-text-size="extra-large"] .armoury-categories button { flex: 0 0 auto; white-space: nowrap; }
 html[data-text-size="large"] .loadout-slots,
-html[data-text-size="extra-large"] .loadout-slots,
-html[data-text-size="large"] .starting-package-items,
-html[data-text-size="extra-large"] .starting-package-items { grid-template-columns: 1fr; }
+html[data-text-size="extra-large"] .loadout-slots { grid-template-columns: 1fr; }
 html[data-text-size="extra-large"] .scene-equipment .management-content > .kicker,
 html[data-text-size="extra-large"] .scene-equipment .management-content > .lede { display: none; }
 html[data-text-size="extra-large"] .scene-equipment .management-content > h1 { font-size: 36px; }
@@ -1921,7 +1917,8 @@ dialog h2,
     overflow: visible;
   }
   .loadout-slots { grid-template-columns: 1fr; }
-  .starting-package-items { grid-template-columns: 1fr; }
+  .inventory-record-heading { align-items: flex-start; flex-direction: column; }
+  .inventory-record-heading span { text-align: left; }
   .acquisition-heading { align-items: flex-start; flex-direction: column; }
   .acquisition-heading span { text-align: left; }
   .armoury-browser, .talent-catalogue { border-right: 0; }
