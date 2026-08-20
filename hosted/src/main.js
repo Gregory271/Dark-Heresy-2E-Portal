@@ -1847,8 +1847,8 @@ function renderEquipment() {
         <div class="armoury-list" id="armoury-list">
           ${armoury.map((item) => `
               <button class="armoury-item ${selected.id === item.id ? "selected" : ""}" type="button" data-equipment-item="${item.id}" data-equipment-search="${escapeHtmlAttribute(normaliseItemName(`${item.name} ${item.category} ${item.description}`))}" data-equipment-type="${item.category}" aria-pressed="${selected.id === item.id}">
+              <strong class="item-name">${item.name}</strong>
               <span class="item-category">${item.category}</span>
-              <strong>${item.name}</strong>
               <span>${effectiveAvailability(item) || "Availability not recorded"}${effectiveAvailability(item) !== item.availability ? ` (base ${item.availability})` : ""} · ${displayWeight(item)}</span>
               ${grantedByItemId.has(item.id)
                 ? `<em class="granted">Included · ${grantedByItemId.get(item.id).sourceName}</em>`
