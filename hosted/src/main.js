@@ -1,4 +1,4 @@
-import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.0";
+import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.1";
 import { armoury } from "./armoury-data.js?v=0.8.0";
 import { talentCatalogue } from "./talent-data.js?v=0.9.0";
 import { characteristicRuleTerms, contextualRuleTerms, coreRuleTerms, creatorRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.4.0";
@@ -1311,7 +1311,7 @@ function renderIdentity() {
       </div>
       <label>
         <span>Appearance</span>
-        <textarea name="appearance" maxlength="240" placeholder="A brief description of the Acolyte's appearance…">${character.appearance}</textarea>
+        <textarea name="appearance" maxlength="240" placeholder="A brief description of your Acolyte's appearance…">${character.appearance}</textarea>
       </label>
     </form>`;
 }
@@ -2279,7 +2279,7 @@ function legacyRenderCompendium() {
         ${inquisitorialRosette}
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
         <nav class="section-nav" aria-label="Portal sections">
-          <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
+          <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
           <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
         </nav>
         <label class="text-size-control" title="Interface text size">
@@ -2700,7 +2700,7 @@ function renderCompendium() {
         ${inquisitorialRosette}
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
         <nav class="section-nav" aria-label="Portal sections">
-          <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
+          <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
           <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
         </nav>
         ${hostedEdition && compendiumData ? `<button class="compact-button sourcebook-control" id="replace-sourcebooks" type="button">Manage Sourcebooks</button>` : ""}
@@ -3146,9 +3146,9 @@ function renderRoster() {
       <div class="roster-art" aria-hidden="true"></div>
       <header class="topbar roster-topbar">
         ${inquisitorialRosette}
-        <div class="brand"><strong>Dark Heresy Character Creation</strong><span>Acolyte Archive</span></div>
+        <div class="brand"><strong>Dark Heresy Character Creation</strong><span>Your Acolytes</span></div>
         <nav class="section-nav" aria-label="Portal sections">
-          <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
+          <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
           <button class="roster-button" id="open-compendium" type="button"><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
         </nav>
         <label class="text-size-control" title="Interface text size">
@@ -3161,11 +3161,11 @@ function renderRoster() {
         <div class="roster-heading">
           <div>
             <p class="eyebrow">Acolyte Archive</p>
-            <h1>Your Characters</h1>
-            <p class="lede">Continue an Acolyte, preserve another version, or import a character shared by a friend.</p>
+            <h1>Your Acolytes</h1>
+            <p class="lede">Continue your Acolyte's creation, preserve another version, or import a character shared by a friend.</p>
           </div>
           <div class="roster-actions">
-            <button class="primary-button" id="new-character" type="button">Create Acolyte <span>›</span></button>
+            <button class="primary-button" id="new-character" type="button">Create Your Acolyte <span>›</span></button>
             <button class="compact-button" id="shared-archive" type="button">${savedCampaignConnection() ? "Shared Campaign" : "Connect Campaign"}</button>
             <button class="compact-button" id="import-character" type="button">Import Shared Character</button>
             <input class="sr-only" id="character-file" type="file" accept=".json,application/json" />
@@ -3205,7 +3205,7 @@ function renderRoster() {
                   <button class="text-button danger-button" type="button" data-delete-character="${record.id}">Delete</button>
                 </div>
               </article>`;
-          }).join("") || `<div class="empty-roster"><h2>No Acolytes recorded</h2><p>Create the first character or import one supplied by a friend.</p></div>`}
+          }).join("") || `<div class="empty-roster"><h2>No Acolytes Recorded</h2><p>Create your first Acolyte or import one supplied by a friend.</p></div>`}
         </div>
       </section>
       <footer class="roster-footer">
@@ -3601,10 +3601,10 @@ function render() {
         ${inquisitorialRosette}
         <div class="brand">
           <strong>Dark Heresy Character Creation</strong>
-          <span>Create an Acolyte</span>
+          <span>Create Your Acolyte</span>
         </div>
         <nav class="section-nav" aria-label="Portal sections">
-          <button class="roster-button" id="open-roster" type="button"><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
+          <button class="roster-button" id="open-roster" type="button"><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
           <button class="roster-button compendium-button" id="open-compendium" type="button"><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
         </nav>
         <button class="credits-button" id="credits" type="button">Source & credits</button>
@@ -3640,7 +3640,7 @@ function render() {
       </section>
 
       <aside class="record" aria-label="Current character record">
-        <span>Acolyte</span>
+        <span>Your Acolyte</span>
         <strong>${character.name || "Designation pending"}</strong>
         <p>${step > 0 ? catalogs.homeWorlds.find(x => x.id === character.homeWorld)?.name : "Home World not chosen"}</p>
         <p>${step > 1 ? catalogs.backgrounds.find(x => x.id === character.background)?.name : "Background not chosen"}</p>
