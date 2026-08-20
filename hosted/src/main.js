@@ -71,7 +71,40 @@ function prepareCharacter(input = {}) {
   }
   prepared.equipment.noCostGrants = [...new Set(prepared.equipment.noCostGrants)]
     .filter((id) => prepared.equipment.inventory.includes(id) && !prepared.acquisitions.includes(id));
-  prepared.equipment.equipped ||= {};
+  const inventoryIds = new Set(prepared.equipment.inventory);
+  const legacyEquipped = prepared.equipment.equipped || {};
+  const itemForId = (id) => armoury.find((item) => item.id === id);
+  const legacyReadied = [legacyEquipped.primary, legacyEquipped.secondary, legacyEquipped.melee].filter(Boolean);
+  const legacyArmour = [legacyEquipped.armour].filter(Boolean);
+  const legacyActiveGear = [legacyEquipped.utilityOne, legacyEquipped.utilityTwo]
+    .filter((id) => {
+      const item = itemForId(id);
+      return item && !["Weapons", "Armour", "Weapon Mods"].includes(item.category);
+    });
+  prepared.equipment.readiedWeapons = [...new Set([
+    ...(Array.isArray(prepared.equipment.readiedWeapons) ? prepared.equipment.readiedWeapons : []),
+    ...legacyReadied,
+  ])].filter((id) => inventoryIds.has(id) && itemForId(id)?.category === "Weapons");
+  prepared.equipment.wornArmour = [...new Set([
+    ...(Array.isArray(prepared.equipment.wornArmour) ? prepared.equipment.wornArmour : []),
+    ...legacyArmour,
+  ])].filter((id) => inventoryIds.has(id) && itemForId(id)?.category === "Armour");
+  prepared.equipment.activeGear = [...new Set([
+    ...(Array.isArray(prepared.equipment.activeGear) ? prepared.equipment.activeGear : []),
+    ...legacyActiveGear,
+  ])].filter((id) => {
+    const item = itemForId(id);
+    return inventoryIds.has(id) && item && !["Weapons", "Armour", "Weapon Mods"].includes(item.category);
+  });
+  prepared.equipment.weaponModAssignments = Object.fromEntries(
+    Object.entries(prepared.equipment.weaponModAssignments || {}).filter(([modId, weaponId]) => (
+      inventoryIds.has(modId)
+      && inventoryIds.has(weaponId)
+      && itemForId(modId)?.category === "Weapon Mods"
+      && itemForId(weaponId)?.category === "Weapons"
+    )),
+  );
+  delete prepared.equipment.equipped;
   prepared.equipment.selected ||= null;
   prepared.advances ||= { characteristics: {}, skills: {}, talents: [] };
   prepared.advances.characteristics ||= {};
@@ -466,9 +499,7 @@ function syncGrantedEquipment() {
     if (currentIds.has(previousId)) continue;
     if (!character.acquisitions.includes(previousId) && !character.equipment.noCostGrants.includes(previousId)) {
       character.equipment.inventory = character.equipment.inventory.filter((entry) => entry !== previousId);
-      character.equipment.equipped = Object.fromEntries(
-        Object.entries(character.equipment.equipped).map(([slot, itemId]) => [slot, itemId === previousId ? "" : itemId]),
-      );
+      removeEquipmentState(previousId);
     }
   }
 
@@ -600,13 +631,19 @@ function applyTextScale(scope = root) {
     ".grant-choice-list label",
     ".granted-line",
     ".legacy-warning",
-    ".loadout-slots label",
+    ".carrying-summary span",
+    ".carrying-summary small",
+    ".equipment-rule-alerts p",
+    ".equipment-state-heading span",
+    ".equipment-check-list small",
+    ".modification-entry small",
+    ".carried-equipment-entry > span",
+    ".carried-equipment-entry label",
     ".armoury-item span",
     ".armoury-item em",
     ".item-profile dd",
     ".acquisition-heading span",
     ".inventory-record-heading span",
-    ".inventory-strip button",
     ".inventory-entry",
     ".xp-meter span",
     ".advance-warning span",
@@ -1070,9 +1107,13 @@ function automaticTraits() {
 }
 
 function equipmentGrantedTraits() {
-  const equippedIds = new Set(Object.values(character.equipment.equipped).filter(Boolean));
+  const activeIds = new Set([
+    ...character.equipment.readiedWeapons,
+    ...character.equipment.wornArmour,
+    ...character.equipment.activeGear,
+  ]);
   const traits = [];
-  if (equippedIds.has("core-gear-photo-visors-contacts")) {
+  if (activeIds.has("core-gear-photo-visors-contacts")) {
     traits.push({
       name: "Dark-sight",
       source: "Photo-Visors/Contacts - active only while this item is equipped",
@@ -1208,7 +1249,10 @@ function resetCreationDataFrom(sceneId) {
     noCostGrants: [],
     characterCreationGrants: [],
     unlinkedCharacterCreationGrants: [],
-    equipped: {},
+    readiedWeapons: [],
+    wornArmour: [],
+    activeGear: [],
+    weaponModAssignments: {},
     selected: null,
   };
   character.advances = {
@@ -1537,15 +1581,6 @@ function splitGrant(value = "") {
   return value.split(";").map((entry) => entry.trim()).filter(Boolean);
 }
 
-const equipmentSlots = [
-  ["primary", "Primary Weapon"],
-  ["secondary", "Secondary Weapon"],
-  ["melee", "Melee Weapon"],
-  ["armour", "Armour"],
-  ["utilityOne", "Utility I"],
-  ["utilityTwo", "Utility II"],
-];
-
 const availabilityOrder = ["Ubiquitous", "Abundant", "Plentiful", "Common", "Average", "Scarce", "Rare", "Very Rare", "Extremely Rare", "Near Unique", "Unique"];
 
 function effectiveAvailability(item) {
@@ -1597,12 +1632,120 @@ function itemProfileRows(item) {
     .map(([key, value]) => [key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase()), value]);
 }
 
-function itemFitsSlot(item, slot) {
-  if (slot === "armour") return item.category === "Armour";
-  if (slot === "melee") return item.category === "Weapons" && item.profile.class === "Melee";
-  if (slot === "primary") return item.category === "Weapons" && ["Basic", "Heavy"].includes(item.profile.class);
-  if (slot === "secondary") return item.category === "Weapons" && item.profile.class === "Pistol";
-  return !["Weapons", "Armour"].includes(item.category);
+function equipmentItem(itemId) {
+  return armoury.find((item) => item.id === itemId) || null;
+}
+
+function removeEquipmentState(itemId) {
+  character.equipment.readiedWeapons = character.equipment.readiedWeapons.filter((id) => id !== itemId);
+  character.equipment.wornArmour = character.equipment.wornArmour.filter((id) => id !== itemId);
+  character.equipment.activeGear = character.equipment.activeGear.filter((id) => id !== itemId);
+  delete character.equipment.weaponModAssignments[itemId];
+  character.equipment.weaponModAssignments = Object.fromEntries(
+    Object.entries(character.equipment.weaponModAssignments).filter(([, weaponId]) => weaponId !== itemId),
+  );
+}
+
+function equipmentItemIsActive(itemId) {
+  return character.equipment.readiedWeapons.includes(itemId)
+    || character.equipment.wornArmour.includes(itemId)
+    || character.equipment.activeGear.includes(itemId)
+    || Boolean(character.equipment.weaponModAssignments[itemId]);
+}
+
+function modificationCompatibility(modification, weapon) {
+  if (!modification || !weapon) return { compatible: false, reason: "Select an owned weapon." };
+  const rules = String(modification.profile?.upgrades || "").trim();
+  if (!rules) return { compatible: true, reason: "No eligibility restriction is recorded." };
+  const lower = rules.toLowerCase();
+  const weaponClass = String(weapon.profile?.class || "").toLowerCase();
+  const weaponType = String(weapon.profile?.type || "").toLowerCase();
+  const ranged = weaponClass !== "melee";
+  if (/except[^.]*pistol/.test(lower) && weaponClass === "pistol") return { compatible: false, reason: rules };
+  if (/except[^.]*thrown/.test(lower) && (weaponClass === "thrown" || weaponType.includes("grenade"))) return { compatible: false, reason: rules };
+  if (lower.includes("any weapon")) return { compatible: true, reason: rules };
+  if (lower.includes("ranged weapon") && !ranged) return { compatible: false, reason: rules };
+  if (lower.includes("melee weapon") && ranged) return { compatible: false, reason: rules };
+
+  const classNames = ["basic", "pistol", "heavy", "melee", "thrown"];
+  const mentionedClasses = classNames.filter((name) => lower.includes(name));
+  if (mentionedClasses.length && !mentionedClasses.includes(weaponClass)) return { compatible: false, reason: rules };
+
+  const typeNames = ["las", "solid projectile", "bolt", "flame", "melta", "plasma", "low-tech", "power", "launcher"];
+  const mentionedTypes = typeNames.filter((name) => lower.includes(name));
+  if (mentionedTypes.length && !mentionedTypes.some((name) => weaponType.includes(name))) {
+    return { compatible: false, reason: rules };
+  }
+  return { compatible: true, reason: rules };
+}
+
+function isSightModification(item) {
+  return item?.category === "Weapon Mods" && /\bsight\b/i.test(item.name);
+}
+
+const carryingWeights = [0.9, 2.25, 4.5, 9, 18, 27, 36, 45, 56, 67, 78, 90, 112, 225, 337, 450, 675, 900, 1350, 1800, 2250];
+
+function equipmentRulesState(inventoryItems = []) {
+  const readiedWeapons = inventoryItems.filter((item) => character.equipment.readiedWeapons.includes(item.id));
+  const wornArmour = inventoryItems.filter((item) => character.equipment.wornArmour.includes(item.id));
+  const activeGear = inventoryItems.filter((item) => character.equipment.activeGear.includes(item.id));
+  const weaponModifications = inventoryItems.filter((item) => item.category === "Weapon Mods");
+  const assignedModifications = weaponModifications.filter((item) => character.equipment.weaponModAssignments[item.id]);
+  const knownWeight = inventoryItems.reduce((sum, item) => sum + (Number.isFinite(item.weight) ? item.weight : 0), 0);
+  const carryingStatsRecorded = Boolean(character.rolls.strength?.value && character.rolls.toughness?.value);
+  const strengthAndToughness = Math.min(20, Math.max(0, characteristicBonus("strength") + characteristicBonus("toughness")));
+  const baseCapacity = carryingStatsRecorded ? (carryingWeights[strengthAndToughness] || 0) : null;
+  const hasBackpack = activeGear.some((item) => /\bbackpack\b/i.test(item.name));
+  const hasCombatVest = activeGear.some((item) => /\bcombat vest\b/i.test(item.name));
+  const containerCapacity = Math.max(hasBackpack ? 30 : 0, hasCombatVest ? 15 : 0);
+  const carryingCapacity = carryingStatsRecorded ? baseCapacity + containerCapacity : null;
+  const warnings = [];
+
+  if (hasBackpack && hasCombatVest) {
+    warnings.push({ level: "warning", message: "Only one backpack or combat vest can be worn at a time." });
+  }
+  if (wornArmour.length > 1) {
+    warnings.push({ level: "info", message: "Multiple armour pieces may be worn, but Armour Points do not add together; use the highest AP covering each location." });
+  }
+  const activeFields = wornArmour.filter((item) => /force field/i.test(item.profile?.type || ""));
+  if (activeFields.length > 1) {
+    warnings.push({ level: "warning", message: "A character may benefit from only one force field at a time." });
+  }
+  const modificationsByWeapon = new Map();
+  assignedModifications.forEach((modification) => {
+    const weaponId = character.equipment.weaponModAssignments[modification.id];
+    if (!modificationsByWeapon.has(weaponId)) modificationsByWeapon.set(weaponId, []);
+    modificationsByWeapon.get(weaponId).push(modification);
+    const weapon = equipmentItem(weaponId);
+    const compatibility = modificationCompatibility(modification, weapon);
+    if (!compatibility.compatible) {
+      warnings.push({ level: "warning", message: `${modification.name} is not listed as compatible with ${weapon?.name || "the selected weapon"}. Eligibility: ${compatibility.reason}` });
+    }
+  });
+  modificationsByWeapon.forEach((modifications, weaponId) => {
+    const weapon = equipmentItem(weaponId);
+    if (modifications.length > 4) warnings.push({ level: "warning", message: `${weapon?.name || "A weapon"} has more than four modifications assigned.` });
+    if (modifications.filter(isSightModification).length > 1) warnings.push({ level: "warning", message: `${weapon?.name || "A weapon"} has more than one sight modification assigned.` });
+  });
+  weaponModifications.filter((item) => !character.equipment.weaponModAssignments[item.id]).forEach((item) => {
+    warnings.push({ level: "info", message: `${item.name} is owned but has not been installed on a weapon.` });
+  });
+  if (carryingStatsRecorded && knownWeight > carryingCapacity) {
+    warnings.push({ level: "warning", message: `Known carried weight (${knownWeight.toFixed(1)} kg) exceeds carrying capacity (${carryingCapacity} kg).` });
+  }
+  return {
+    readiedWeapons,
+    wornArmour,
+    activeGear,
+    weaponModifications,
+    assignedModifications,
+    knownWeight,
+    carryingStatsRecorded,
+    baseCapacity,
+    containerCapacity,
+    carryingCapacity,
+    warnings,
+  };
 }
 
 function displayWeight(item) {
@@ -1706,6 +1849,14 @@ function foundrySpecialAbility([source, value]) {
 
 function foundryEquipmentItem(item) {
   const provenance = equipmentProvenance(item.id);
+  const installedOnId = character.equipment.weaponModAssignments[item.id] || "";
+  const installedOn = equipmentItem(installedOnId);
+  const assignedModifications = item.category === "Weapons"
+    ? Object.entries(character.equipment.weaponModAssignments)
+      .filter(([, weaponId]) => weaponId === item.id)
+      .map(([modId]) => equipmentItem(modId)?.name)
+      .filter(Boolean)
+    : [];
   return {
     name: item.name,
     type: item.documentType,
@@ -1715,7 +1866,9 @@ function foundryEquipmentItem(item) {
       availability: item.availability,
       craftsmanship: item.craftsmanship,
       weight: item.weight ?? 0,
-      equipped: Object.values(character.equipment.equipped).includes(item.id),
+      equipped: equipmentItemIsActive(item.id),
+      ...(item.category === "Weapon Mods" ? { installed: Boolean(installedOnId) } : {}),
+      ...(item.category === "Weapons" ? { modifications: assignedModifications } : {}),
     },
     flags: {
       dh2CharacterBuilder: {
@@ -1724,6 +1877,11 @@ function foundryEquipmentItem(item) {
         inventorySource: provenance.type,
         grantedBy: provenance.grant?.sourceName || "",
         sourceDetail: provenance.detail,
+        readied: character.equipment.readiedWeapons.includes(item.id),
+        worn: character.equipment.wornArmour.includes(item.id),
+        activeGear: character.equipment.activeGear.includes(item.id),
+        installedOn: installedOn?.name || "",
+        installedOnBuilderId: installedOnId,
       },
     },
   };
@@ -1824,6 +1982,16 @@ function renderEquipment() {
   const categories = ["All", ...new Set(armoury.map((item) => item.category))];
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
   const unlinkedGrantedItems = grantedEquipment.entries.filter((entry) => !entry.item);
+  const ownedWeapons = inventoryItems.filter((item) => item.category === "Weapons");
+  const ownedArmour = inventoryItems.filter((item) => item.category === "Armour");
+  const ownedModifications = inventoryItems.filter((item) => item.category === "Weapon Mods");
+  const rulesState = equipmentRulesState(inventoryItems);
+  const carriedItems = inventoryItems.filter((item) => {
+    if (item.category === "Weapons") return !character.equipment.readiedWeapons.includes(item.id);
+    if (item.category === "Armour") return !character.equipment.wornArmour.includes(item.id);
+    if (item.category === "Weapon Mods") return !character.equipment.weaponModAssignments[item.id];
+    return true;
+  });
   const selectedInInventory = character.equipment.inventory.includes(selected.id);
   const selectedAcquisition = character.acquisitions.includes(selected.id);
   const selectedNoCostGrant = character.equipment.noCostGrants.includes(selected.id);
@@ -1891,26 +2059,56 @@ function renderEquipment() {
             }).join("") || "<span>No starting acquisitions selected.</span>"}
           </div>
           ${character.equipment.legacyAcquisitions?.length ? `<div class="legacy-warning"><strong>Review previous entries:</strong> ${character.equipment.legacyAcquisitions.join("; ")}. These older free-text entries were not counted because no unambiguous Armoury match was found.<button type="button" data-clear-legacy>Dismiss old entries</button></div>` : ""}
-          <div class="loadout-slots">
-            ${equipmentSlots.map(([slot, label]) => {
-              const equipped = armoury.find((item) => item.id === character.equipment.equipped[slot]);
-              return `<label><span>${label}</span><select data-equipment-slot="${slot}"><option value="">Empty</option>${inventoryItems.filter((item) => itemFitsSlot(item, slot)).map((item) => `<option value="${item.id}" ${equipped?.id === item.id ? "selected" : ""}>${item.name}</option>`).join("")}</select></label>`;
-            }).join("")}
+          <div class="carrying-summary">
+            <span>Known carried weight</span>
+            <strong>${rulesState.carryingStatsRecorded ? `${rulesState.knownWeight.toFixed(1)} / ${rulesState.carryingCapacity} kg` : `${rulesState.knownWeight.toFixed(1)} kg · capacity pending`}</strong>
+            <small>${rulesState.carryingStatsRecorded ? `Base ${rulesState.baseCapacity} kg${rulesState.containerCapacity ? ` · carrying gear +${rulesState.containerCapacity} kg` : ""}` : "Record Strength and Toughness to calculate carrying capacity."}</small>
           </div>
+          ${rulesState.warnings.length ? `<div class="equipment-rule-alerts" aria-label="Equipment rules notices">${rulesState.warnings.map((warning) => `<p class="${warning.level}">${warning.message}</p>`).join("")}</div>` : ""}
+          <div class="equipment-state-grid">
+            <section class="equipment-state-panel">
+              <div class="equipment-state-heading"><strong>Weapons Readied</strong><span>Convenience only; this does not limit inventory.</span></div>
+              <div class="equipment-check-list">${ownedWeapons.map((item) => `
+                <label><input type="checkbox" data-ready-weapon="${item.id}" ${character.equipment.readiedWeapons.includes(item.id) ? "checked" : ""} /><span><strong>${item.name}</strong><small>${item.profile?.class || "Weapon"} · ${displayWeight(item)}</small></span></label>`).join("") || "<p>No weapons owned.</p>"}</div>
+            </section>
+            <section class="equipment-state-panel">
+              <div class="equipment-state-heading"><strong>Armour Worn</strong><span>Multiple pieces are allowed; AP does not stack.</span></div>
+              <div class="equipment-check-list">${ownedArmour.map((item) => `
+                <label><input type="checkbox" data-wear-armour="${item.id}" ${character.equipment.wornArmour.includes(item.id) ? "checked" : ""} /><span><strong>${item.name}</strong><small>${item.profile?.type || "Armour"} · ${displayWeight(item)}</small></span></label>`).join("") || "<p>No armour owned.</p>"}</div>
+            </section>
+          </div>
+          <section class="equipment-state-panel modification-panel">
+            <div class="equipment-state-heading"><strong>Weapon Modifications</strong><span>Install each owned modification on a specific weapon.</span></div>
+            <div class="modification-list">${ownedModifications.map((modification) => {
+              const assignedWeaponId = character.equipment.weaponModAssignments[modification.id] || "";
+              return `<div class="modification-entry">
+                <div><strong>${modification.name}</strong><small>${modification.profile?.upgrades || "Eligibility not recorded"}</small></div>
+                <label><span>Installed on</span><select data-modification-target="${modification.id}"><option value="">Not installed</option>${ownedWeapons.map((weapon) => {
+                  const compatibility = modificationCompatibility(modification, weapon);
+                  return `<option value="${weapon.id}" ${assignedWeaponId === weapon.id ? "selected" : ""}>${weapon.name}${compatibility.compatible ? "" : " · check eligibility"}</option>`;
+                }).join("")}</select></label>
+              </div>`;
+            }).join("") || "<p>No weapon modifications owned.</p>"}</div>
+          </section>
           <section class="inventory-record" aria-labelledby="inventory-record-title">
             <div class="inventory-record-heading">
-              <strong id="inventory-record-title">Your Acolyte's Equipment</strong>
-              <span>Select an item to view its Armoury details.</span>
+              <strong id="inventory-record-title">Carried Equipment</strong>
+              <span>All other owned items. Mark gear currently worn or in use; there is no two-item limit.</span>
             </div>
-            <div class="inventory-strip">${inventoryItems.map((item) => {
+            <div class="carried-equipment-list">${carriedItems.map((item) => {
               const source = equipmentProvenance(item.id, grantedEquipment);
-              return `<button class="${selected.id === item.id ? "selected" : ""}" type="button" data-equipment-item="${item.id}" data-source-type="${source.type}" aria-pressed="${selected.id === item.id}" title="View ${escapeHtmlAttribute(item.name)} details"><strong>${item.name}</strong><small class="item-origin">${source.label}</small></button>`;
+              const canActivate = !["Weapons", "Armour", "Weapon Mods"].includes(item.category);
+              return `<div class="carried-equipment-entry ${selected.id === item.id ? "selected" : ""}">
+                <button type="button" data-equipment-item="${item.id}" title="View ${escapeHtmlAttribute(item.name)} details"><strong>${item.name}</strong><small class="item-origin">${source.label}</small></button>
+                <span>${item.category} · ${displayWeight(item)}</span>
+                ${canActivate ? `<label><input type="checkbox" data-active-gear="${item.id}" ${character.equipment.activeGear.includes(item.id) ? "checked" : ""} /><span>Currently worn / in use</span></label>` : ""}
+              </div>`;
             }).join("")}${unlinkedGrantedItems.map((entry) => `
               <div class="inventory-entry ${entry.unresolvedChoice ? "unresolved" : "unlinked"}">
                 <strong>${entry.label}</strong>
                 <small class="item-origin">${entry.unresolvedChoice ? "Background choice unresolved" : `Granted by ${entry.sourceName}`}</small>
                 <em>${entry.unresolvedChoice ? "Return to Starting Abilities and choose one option." : "Recorded as written · Armoury details not yet linked."}</em>
-              </div>`).join("")}${!inventoryItems.length && !unlinkedGrantedItems.length ? "<span>No equipment recorded yet.</span>" : ""}</div>
+              </div>`).join("")}${!carriedItems.length && !unlinkedGrantedItems.length ? "<p>Nothing else is being carried.</p>" : ""}</div>
           </section>
         </aside>
       </section>
@@ -3038,7 +3236,7 @@ function applyRuleHighlights() {
   while (walker.nextNode()) nodes.push(walker.currentNode);
   for (const node of nodes) {
     if (!node.nodeValue?.trim()) continue;
-    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term")) continue;
+    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term,.loadout-panel,.review-sections strong,.review-sections h1,.review-sections h2,.review-sections h3")) continue;
     const matches = [...node.nodeValue.matchAll(pattern)];
     if (!matches.length) continue;
     const fragment = document.createDocumentFragment();
@@ -3486,6 +3684,7 @@ function renderReview() {
   const initialTalents = Object.values(resolvedGrantedTalents());
   const purchasedTalents = character.advances.talents.map((entry) => talentCatalogue.find((talent) => talent.id === entry.id)).filter(Boolean);
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
+  const equipmentState = equipmentRulesState(inventoryItems);
   const grantedEquipment = resolvedGrantedEquipment();
   const unlinkedGrantedEquipment = character.equipment.unlinkedCharacterCreationGrants || [];
   const xpLedger = [
@@ -3510,6 +3709,7 @@ function renderReview() {
     unresolvedGrantChoices.length ? `${unresolvedGrantChoices.length} granted alternative${unresolvedGrantChoices.length === 1 ? "" : "s"} remain.` : "",
     unresolvedAptitudes > 0 ? `${unresolvedAptitudes} duplicate aptitude replacements remain.` : "",
     spent > character.xp.starting ? `XP is overspent by ${spent - character.xp.starting}.` : "",
+    ...equipmentState.warnings.filter((entry) => entry.level === "warning").map((entry) => entry.message),
   ].filter(Boolean);
   return `
     <div class="management-shell review-layout">
@@ -3582,10 +3782,16 @@ function renderReview() {
           </section>
           <section>
             <h3>Equipment and Loadout</h3>
-            <div class="loadout-review">${equipmentSlots.map(([slot, label]) => {
-              const item = armoury.find((entry) => entry.id === character.equipment.equipped[slot]);
-              return `<div><span>${label}</span><strong>${item?.name || "Empty"}</strong></div>`;
-            }).join("")}</div>
+            <div class="loadout-review">
+              <div><span>Weapons Readied</span><strong>${equipmentState.readiedWeapons.map((item) => item.name).join(", ") || "None"}</strong></div>
+              <div><span>Armour Worn</span><strong>${equipmentState.wornArmour.map((item) => item.name).join(", ") || "None"}</strong></div>
+              <div><span>Active Gear</span><strong>${equipmentState.activeGear.map((item) => item.name).join(", ") || "None"}</strong></div>
+              <div><span>Known Weight</span><strong>${equipmentState.carryingStatsRecorded ? `${equipmentState.knownWeight.toFixed(1)} / ${equipmentState.carryingCapacity} kg` : `${equipmentState.knownWeight.toFixed(1)} kg · capacity pending`}</strong></div>
+            </div>
+            <div class="dossier-list compact">${equipmentState.assignedModifications.map((modification) => {
+              const weapon = equipmentItem(character.equipment.weaponModAssignments[modification.id]);
+              return `<div><strong>${modification.name}</strong><span>Installed on ${weapon?.name || "unresolved weapon"}</span><em>Weapon Modification</em></div>`;
+            }).join("") || "<p>No weapon modifications installed.</p>"}</div>
             <div class="dossier-list compact">${[
               ...inventoryItems.map((item) => {
                 const source = equipmentProvenance(item.id, grantedEquipment);
@@ -4032,9 +4238,7 @@ function wireEvents() {
     if (character.equipment.noCostGrants.includes(id)) {
       character.equipment.noCostGrants = character.equipment.noCostGrants.filter((entry) => entry !== id);
       character.equipment.inventory = character.equipment.inventory.filter((entry) => entry !== id);
-      character.equipment.equipped = Object.fromEntries(
-        Object.entries(character.equipment.equipped).map(([slot, itemId]) => [slot, itemId === id ? "" : itemId]),
-      );
+      removeEquipmentState(id);
     } else if (!character.equipment.inventory.includes(id)) {
       character.equipment.inventory.push(id);
       character.equipment.noCostGrants.push(id);
@@ -4057,9 +4261,7 @@ function wireEvents() {
       const id = button.dataset.removeAcquisition;
       character.acquisitions = character.acquisitions.filter((entry) => entry !== id);
       character.equipment.inventory = character.equipment.inventory.filter((entry) => entry !== id);
-      character.equipment.equipped = Object.fromEntries(
-        Object.entries(character.equipment.equipped).map(([slot, itemId]) => [slot, itemId === id ? "" : itemId]),
-      );
+      removeEquipmentState(id);
       save();
       render();
     });
@@ -4069,11 +4271,51 @@ function wireEvents() {
     save();
     render();
   });
-  document.querySelectorAll("[data-equipment-slot]").forEach((select) => {
+  document.querySelectorAll("[data-ready-weapon]").forEach((input) => {
+    input.addEventListener("change", () => {
+      playMechanicalLock();
+      const id = input.dataset.readyWeapon;
+      character.equipment.readiedWeapons = input.checked
+        ? [...new Set([...character.equipment.readiedWeapons, id])]
+        : character.equipment.readiedWeapons.filter((entry) => entry !== id);
+      pendingFocusSelector = `[data-ready-weapon="${id}"]`;
+      save();
+      render();
+    });
+  });
+  document.querySelectorAll("[data-wear-armour]").forEach((input) => {
+    input.addEventListener("change", () => {
+      playMechanicalLock();
+      const id = input.dataset.wearArmour;
+      character.equipment.wornArmour = input.checked
+        ? [...new Set([...character.equipment.wornArmour, id])]
+        : character.equipment.wornArmour.filter((entry) => entry !== id);
+      pendingFocusSelector = `[data-wear-armour="${id}"]`;
+      save();
+      render();
+    });
+  });
+  document.querySelectorAll("[data-active-gear]").forEach((input) => {
+    input.addEventListener("change", () => {
+      playMechanicalLock();
+      const id = input.dataset.activeGear;
+      character.equipment.activeGear = input.checked
+        ? [...new Set([...character.equipment.activeGear, id])]
+        : character.equipment.activeGear.filter((entry) => entry !== id);
+      pendingFocusSelector = `[data-active-gear="${id}"]`;
+      save();
+      render();
+    });
+  });
+  document.querySelectorAll("[data-modification-target]").forEach((select) => {
     select.addEventListener("change", () => {
       playMechanicalLock();
-      character.equipment.equipped[select.dataset.equipmentSlot] = select.value;
+      const modificationId = select.dataset.modificationTarget;
+      if (select.value) character.equipment.weaponModAssignments[modificationId] = select.value;
+      else delete character.equipment.weaponModAssignments[modificationId];
+      pendingFocusSelector = `[data-modification-target="${modificationId}"]`;
       save();
+      render();
     });
   });
   document.querySelectorAll("[data-characteristic-advance]").forEach((select) => {

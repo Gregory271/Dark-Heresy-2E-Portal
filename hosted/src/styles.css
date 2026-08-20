@@ -617,32 +617,54 @@ html[data-text-size="extra-large"] .scene-equipment .armoury-layout { margin-top
 .legacy-warning { border-left: 2px solid #bd624d; padding: 6px 8px; background: rgba(140,48,34,.1); color: #deb5aa; font-size: 8px; line-height: 1.4; }
 .legacy-warning strong { color: #ffbfad; text-transform: uppercase; }
 .legacy-warning button { display: block; margin-top: 5px; border: 1px solid rgba(255,185,168,.35); padding: 4px 6px; background: transparent; color: #ffbfad; font-size: 7px; text-transform: uppercase; cursor: pointer; }
-.loadout-slots { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 12px; }
-.loadout-slots label { display: grid; align-content: start; gap: 6px; min-width: 0; color: #aaa69d; font-size: 8px; line-height: 1.25; letter-spacing: .06em; text-transform: uppercase; }
-.loadout-slots select { width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; text-overflow: ellipsis; }
+.carrying-summary { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 3px 10px; margin-top: 10px; border: 1px solid rgba(225,187,118,.22); padding: 8px 10px; background: rgba(151,100,37,.1); }
+.carrying-summary span { color: #bfa16f; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
+.carrying-summary strong { color: #f3e6ce; font: 600 15px "Barlow Condensed",sans-serif; }
+.carrying-summary small { grid-column: 1 / -1; color: #9f9a91; font-size: 7px; }
+.equipment-rule-alerts { display: grid; gap: 5px; margin-top: 8px; }
+.equipment-rule-alerts p { margin: 0; border-left: 2px solid #a88750; padding: 6px 8px; background: rgba(119,89,44,.12); color: #cfc3ae; font-size: 8px; line-height: 1.4; }
+.equipment-rule-alerts p.warning { border-left-color: #c8735b; background: rgba(139,62,44,.13); color: #e0b3a7; }
+.equipment-state-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 10px; }
+.equipment-state-panel { min-width: 0; border: 1px solid rgba(255,255,255,.11); background: rgba(5,9,8,.55); }
+.equipment-state-heading { display: grid; gap: 2px; border-bottom: 1px solid rgba(255,255,255,.09); padding: 8px 9px; }
+.equipment-state-heading strong { color: #ead8b8; font: 600 12px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.equipment-state-heading span { color: #99958d; font-size: 7px; line-height: 1.35; }
+.equipment-check-list { display: grid; gap: 1px; padding: 4px; }
+.equipment-check-list > p,.modification-list > p,.carried-equipment-list > p { margin: 5px; color: #8f8a82; font-size: 9px; }
+.equipment-check-list label { display: grid; grid-template-columns: 20px minmax(0,1fr); align-items: center; gap: 7px; min-width: 0; padding: 6px; cursor: pointer; }
+.equipment-check-list label:hover { background: rgba(151,100,37,.13); }
+.equipment-check-list input,.carried-equipment-entry input { width: 17px; height: 17px; margin: 0; accent-color: #d0a354; }
+.equipment-check-list label > span { display: grid; gap: 1px; min-width: 0; }
+.equipment-check-list strong { color: #e8dfcf; font: 600 10px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.equipment-check-list small { color: #969188; font-size: 7px; line-height: 1.3; }
+.modification-panel { margin-top: 8px; }
+.modification-list { display: grid; }
+.modification-entry { display: grid; grid-template-columns: minmax(0,.9fr) minmax(150px,1.1fr); gap: 8px; padding: 8px 9px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.modification-entry:last-child { border-bottom: 0; }
+.modification-entry > div { display: grid; align-content: start; gap: 2px; min-width: 0; }
+.modification-entry strong { color: #e7dbc7; font: 600 11px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.modification-entry small { color: #99938a; font-size: 7px; line-height: 1.35; }
+.modification-entry label { display: grid; gap: 4px; min-width: 0; color: #aaa49a; font-size: 7px; letter-spacing: .05em; text-transform: uppercase; }
+.modification-entry select { width: 100%; min-width: 0; min-height: 38px; padding: 6px 8px; text-overflow: ellipsis; }
 .inventory-record { margin-top: 13px; border-top: 1px solid var(--line); padding-top: 10px; }
 .inventory-record-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
 .inventory-record-heading strong { color: #e4d6bf; font: 600 11px "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .inventory-record-heading span { color: #a7a198; font-size: 7px; text-align: right; }
-.inventory-strip { display: flex; flex-wrap: wrap; gap: 4px; }
-.inventory-strip button { display: grid; gap: 2px; border: 1px solid rgba(225,187,118,.3); padding: 6px 8px; background: rgba(151,100,37,.13); color: #dfd6c6; font-size: 8px; text-align: left; cursor: pointer; }
-.inventory-strip button strong { color: #efe4d1; font: 600 1em "Barlow Condensed",sans-serif; text-transform: uppercase; }
-.inventory-strip button small { color: #a9cbbb; font-size: .82em; letter-spacing: .05em; text-transform: uppercase; }
-.inventory-strip button small.item-origin,
+.carried-equipment-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; }
+.carried-equipment-entry { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 8px; border: 1px solid rgba(225,187,118,.2); padding: 6px 7px; background: rgba(151,100,37,.08); }
+.carried-equipment-entry.selected { border-color: #e1bb76; background: rgba(151,100,37,.23); }
+.carried-equipment-entry > button { display: grid; gap: 2px; min-width: 0; border: 0; padding: 0; background: transparent; color: #dfd6c6; text-align: left; cursor: pointer; }
+.carried-equipment-entry > button strong { color: #efe4d1; font: 600 10px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.carried-equipment-entry > button small.item-origin,
 .inventory-entry small.item-origin { color: #91aaa0; font-family: "Barlow",sans-serif; font-size: 8px; font-weight: 400; letter-spacing: .015em; line-height: 1.35; text-transform: none; }
-.inventory-strip button:hover,.inventory-strip button:focus-visible,.inventory-strip button.selected { border-color: #e1bb76; background: rgba(151,100,37,.3); outline: none; }
-.inventory-strip button.selected { box-shadow: inset 2px 0 #e1bb76; }
+.carried-equipment-entry > span { grid-column: 1; color: #979289; font-size: 7px; }
+.carried-equipment-entry > label { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-columns: 17px; align-content: center; justify-items: center; gap: 2px; max-width: 64px; color: #a9b9af; font-size: 7px; line-height: 1.2; text-align: center; cursor: pointer; }
 .inventory-entry { display: grid; gap: 2px; border: 1px solid rgba(155,139,101,.42); padding: 6px 8px; background: rgba(74,61,36,.15); color: #dfd6c6; font-size: 8px; text-align: left; }
 .inventory-entry strong { color: #efe4d1; font: 600 1em "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .inventory-entry small { color: #c6b68f; font-size: .82em; letter-spacing: .05em; text-transform: uppercase; }
 .inventory-entry em { color: #aaa69d; font-size: .82em; font-style: normal; }
 .inventory-entry.unresolved { border-left: 2px solid #c77b53; background: rgba(134,63,39,.14); }
 .inventory-entry.unresolved small,.inventory-entry.unresolved em { color: #e2ad96; }
-.inventory-strip button[data-source-type="background-grant"],
-.inventory-strip button[data-source-type="background-choice"] { border-color: rgba(125,166,151,.45); background: rgba(39,78,67,.17); }
-.inventory-strip button[data-source-type="starting-acquisition"] { border-color: rgba(185,205,153,.4); background: rgba(97,121,67,.14); }
-.inventory-strip button[data-source-type="gm-grant"] { border-color: rgba(195,153,105,.42); background: rgba(116,75,39,.15); }
-
 html[data-text-size="large"] .armoury-categories,
 html[data-text-size="extra-large"] .armoury-categories {
   flex-wrap: nowrap;
@@ -653,14 +675,18 @@ html[data-text-size="extra-large"] .armoury-categories {
 }
 html[data-text-size="large"] .armoury-categories button,
 html[data-text-size="extra-large"] .armoury-categories button { flex: 0 0 auto; white-space: nowrap; }
-html[data-text-size="large"] .loadout-slots,
-html[data-text-size="extra-large"] .loadout-slots { grid-template-columns: 1fr; }
+html[data-text-size="large"] .equipment-state-grid,
+html[data-text-size="extra-large"] .equipment-state-grid,
+html[data-text-size="large"] .carried-equipment-list,
+html[data-text-size="extra-large"] .carried-equipment-list { grid-template-columns: 1fr; }
 html[data-text-size="extra-large"] .scene-equipment .management-content > .kicker,
 html[data-text-size="extra-large"] .scene-equipment .management-content > .lede { display: none; }
 html[data-text-size="extra-large"] .scene-equipment .management-content > h1 { font-size: 36px; }
 html[data-text-size="extra-large"] .topbar .volume-control { display: none; }
 html[data-text-size="extra-large"] .topbar .nav-wide { display: none; }
 html[data-text-size="extra-large"] .topbar .nav-narrow { display: inline; }
+html[data-text-size="extra-large"] .armoury-item { grid-template-columns: minmax(0,1fr); }
+html[data-text-size="extra-large"] .armoury-item .item-category { display: none; }
 .advance-layout { display: grid; grid-template-columns: 180px 1fr; height: min(72vh,620px); overflow: hidden; }
 .xp-meter { display: grid; align-content: start; gap: 5px; padding: 20px; border-right: 1px solid var(--line); }
 .xp-meter span { margin-top: 10px; color: #aaa69d; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
@@ -1904,7 +1930,7 @@ dialog h2,
   .roll-actions, .dual-actions { flex-wrap: wrap; }
   .compact-button, .catalog-arrow, .text-button,
   .armoury-categories button, .advance-nav button, .talent-filters button,
-  .inventory-strip button, .acquisition-picks button {
+  .carried-equipment-entry > button, .acquisition-picks button {
     min-height: 44px;
   }
   .ceremony-card, .divination-card, .divination-reference,
@@ -1930,7 +1956,8 @@ dialog h2,
     height: auto;
     overflow: visible;
   }
-  .loadout-slots { grid-template-columns: 1fr; }
+  .equipment-state-grid, .carried-equipment-list { grid-template-columns: 1fr; }
+  .modification-entry { grid-template-columns: 1fr; }
   .inventory-record-heading { align-items: flex-start; flex-direction: column; }
   .inventory-record-heading span { text-align: left; }
   .acquisition-heading { align-items: flex-start; flex-direction: column; }
