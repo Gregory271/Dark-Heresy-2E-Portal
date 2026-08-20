@@ -582,6 +582,7 @@ html[data-text-size="extra-large"] .scene-equipment .armoury-layout { margin-top
 .armoury-item .item-category { color: #d9b271; letter-spacing: .06em; text-transform: uppercase; }
 .armoury-item > span:not(.item-category),.armoury-item em { grid-column: 1 / -1; }
 .armoury-item em { color: #b9ce9f; }
+.armoury-item em.granted { color: #9ed8c1; }
 .armoury-item em.restricted { color: #d7a395; }
 .item-inspector { display: grid; grid-template-columns: minmax(300px,1.15fr) minmax(340px,.9fr); min-height: 0; overflow: hidden; }
 .item-inspector > div { min-height: 0; overflow-y: auto; padding: clamp(17px,1.6vw,24px); }
@@ -596,10 +597,29 @@ html[data-text-size="extra-large"] .scene-equipment .armoury-layout { margin-top
 .item-actions button:disabled { opacity: .4; cursor: not-allowed; }
 .item-cost-note { margin: 10px 0 0; border-left: 2px solid rgba(125,166,151,.72); padding: 8px 10px; background: rgba(63,105,91,.13); color: #c4d4cc !important; line-height: 1.45 !important; }
 .item-cost-note strong { color: #a9d3c2; text-transform: uppercase; }
+.item-cost-note.included { border-left-color: rgba(213,173,100,.8); background: rgba(151,100,37,.14); color: #e0d1b5 !important; }
+.item-cost-note.included strong { color: #f2ca83; }
 .loadout-panel { min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; padding: clamp(17px,1.6vw,24px); border-left: 1px solid var(--line); background: rgba(2,5,5,.52); }
 .loadout-heading { display: grid; gap: 3px; border-bottom: 1px solid var(--line); padding-bottom: 9px; }
 .loadout-heading span { color: #caa86e; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; }
 .loadout-heading strong { color: #eee6d7; font: 500 14px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.starting-package { margin: 10px 0 12px; border: 1px solid rgba(125,166,151,.35); background: rgba(39,78,67,.12); }
+.starting-package-heading { display: grid; gap: 2px; border-bottom: 1px solid rgba(125,166,151,.25); padding: 8px 10px; }
+.starting-package-heading span { color: #9ecdb9; font-size: 7px; letter-spacing: .12em; text-transform: uppercase; }
+.starting-package-heading strong { color: #e9e0cf; font: 600 13px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.starting-package-items { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.starting-package-item { display: grid; min-width: 0; min-height: 58px; align-content: start; gap: 3px; border: 0; border-right: 1px solid rgba(125,166,151,.16); border-bottom: 1px solid rgba(125,166,151,.16); padding: 8px 9px; background: rgba(4,9,8,.42); color: #d8d1c5; text-align: left; }
+button.starting-package-item { cursor: pointer; }
+button.starting-package-item:hover,button.starting-package-item:focus-visible { background: rgba(74,117,100,.22); outline: 1px solid #9ecdb9; outline-offset: -1px; }
+.starting-package-item strong { min-width: 0; overflow-wrap: anywhere; color: #f0e4cf; font: 600 11px/1.15 "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.starting-package-item small { color: #9ecdb9; font-size: 7px; letter-spacing: .05em; line-height: 1.25; text-transform: uppercase; }
+.starting-package-item em { color: #aaa69d; font-size: 7px; font-style: normal; line-height: 1.25; }
+.starting-package-item.unresolved { border-left: 2px solid #c77b53; background: rgba(134,63,39,.14); }
+.starting-package-item.unresolved small,.starting-package-item.unresolved em { color: #e2ad96; }
+.starting-package-item.unlinked { border-left: 2px solid #9b8b65; }
+.acquisition-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.acquisition-heading strong { color: #e4d6bf; font: 600 11px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.acquisition-heading span { color: #a7a198; font-size: 7px; text-align: right; }
 .acquisition-picks { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
 .acquisition-picks > span { color: #89857d; font-size: 8px; }
 .acquisition-picks button { display: flex; align-items: center; gap: 6px; border: 1px solid rgba(185,205,153,.32); padding: 5px 7px; background: rgba(97,121,67,.14); color: #dbe8c9; font-size: 8px; cursor: pointer; }
@@ -616,6 +636,10 @@ html[data-text-size="extra-large"] .scene-equipment .armoury-layout { margin-top
 .inventory-strip button { display: grid; gap: 2px; border: 1px solid rgba(225,187,118,.3); padding: 6px 8px; background: rgba(151,100,37,.13); color: #dfd6c6; font-size: 8px; text-align: left; cursor: pointer; }
 .inventory-strip button strong { color: #efe4d1; font: 600 1em "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .inventory-strip button small { color: #a9cbbb; font-size: .82em; letter-spacing: .05em; text-transform: uppercase; }
+.inventory-strip button[data-source-type="background-grant"],
+.inventory-strip button[data-source-type="background-choice"] { border-color: rgba(125,166,151,.45); background: rgba(39,78,67,.17); }
+.inventory-strip button[data-source-type="starting-acquisition"] { border-color: rgba(185,205,153,.4); background: rgba(97,121,67,.14); }
+.inventory-strip button[data-source-type="gm-grant"] { border-color: rgba(195,153,105,.42); background: rgba(116,75,39,.15); }
 
 html[data-text-size="large"] .armoury-categories,
 html[data-text-size="extra-large"] .armoury-categories {
@@ -628,7 +652,9 @@ html[data-text-size="extra-large"] .armoury-categories {
 html[data-text-size="large"] .armoury-categories button,
 html[data-text-size="extra-large"] .armoury-categories button { flex: 0 0 auto; white-space: nowrap; }
 html[data-text-size="large"] .loadout-slots,
-html[data-text-size="extra-large"] .loadout-slots { grid-template-columns: 1fr; }
+html[data-text-size="extra-large"] .loadout-slots,
+html[data-text-size="large"] .starting-package-items,
+html[data-text-size="extra-large"] .starting-package-items { grid-template-columns: 1fr; }
 html[data-text-size="extra-large"] .scene-equipment .management-content > .kicker,
 html[data-text-size="extra-large"] .scene-equipment .management-content > .lede { display: none; }
 html[data-text-size="extra-large"] .scene-equipment .management-content > h1 { font-size: 36px; }
@@ -1866,6 +1892,9 @@ dialog > p:not(.eyebrow) { color: #b8b4aa; line-height: 1.7; }
     overflow: visible;
   }
   .loadout-slots { grid-template-columns: 1fr; }
+  .starting-package-items { grid-template-columns: 1fr; }
+  .acquisition-heading { align-items: flex-start; flex-direction: column; }
+  .acquisition-heading span { text-align: left; }
   .armoury-browser, .talent-catalogue { border-right: 0; }
   .armoury-list, .talent-list {
     max-height: 42vh;

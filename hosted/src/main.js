@@ -74,6 +74,8 @@ function prepareCharacter(input = {}) {
   prepared.acquisitions ||= [];
   prepared.equipment ||= {};
   prepared.equipment.inventory ||= [];
+  prepared.equipment.characterCreationGrants ||= [];
+  prepared.equipment.unlinkedCharacterCreationGrants ||= [];
   if (!Array.isArray(prepared.equipment.noCostGrants)) {
     prepared.equipment.noCostGrants = prepared.equipment.inventory
       .filter((id) => !prepared.acquisitions.includes(id));
@@ -384,6 +386,143 @@ function findLegacyArmouryItem(value) {
     })
     .sort((a, b) => b.score - a.score)
     .find((entry) => entry.score >= 0.75)?.item || null;
+}
+
+const grantedEquipmentAliases = {
+  autoquill: "Auto Quill",
+  robes: "Imperial Robes",
+  "light carapace": "Enforcer Light Carapace",
+  chestplate: "Carapace Chestplate",
+  vest: "Flak Vest",
+  "servo skull": "Monotask Servo-Skull",
+  "optical mechadendrite": "Mechadendrite",
+  "guard flak": "Imperial Guard Flak Armour",
+  grapnel: "Grapnel and Line",
+  bodyglove: "Armoured Bodyglove",
+  injector: "Inhaler/Injector",
+  pack: "Backpack",
+  "glow globe": "Glow-globe/stab light",
+  stablight: "Glow-globe/stab light",
+  "laud hailer skull": "Laud Hailer",
+  disguise: "Disguise Kit",
+  light: "Glow-globe/stab light",
+  plugs: "Filtration Plugs",
+  "combat shotgun": "Shotgun (Combat)",
+  auspex: "Auspex/Scanner",
+};
+
+const compositeEquipmentGrants = {
+  "compact laspistol": ["Laspistol", "Compact"],
+  "compact autopistol": ["Autopistol", "Compact"],
+};
+
+function armouryItemWithExactName(value = "") {
+  const target = normaliseItemName(value);
+  const alias = grantedEquipmentAliases[target];
+  const resolvedTarget = normaliseItemName(alias || value);
+  return armoury.find((item) => normaliseItemName(item.name) === resolvedTarget) || null;
+}
+
+function expandGrantedEquipmentLabel(value = "") {
+  const target = normaliseItemName(value);
+  if (compositeEquipmentGrants[target]) return compositeEquipmentGrants[target];
+  if (armouryItemWithExactName(value)) return [value];
+  return value.split(/\s+and\s+/i).map((entry) => entry.trim()).filter(Boolean);
+}
+
+function resolvedGrantedEquipment() {
+  const background = catalogs.backgrounds.find((entry) => entry.id === character.background);
+  const sourceName = background?.name || "Selected Background";
+  const entries = [];
+  splitGrant(ruleValue(character.background, "Starting Equipment")).forEach((grantText, index) => {
+    const choiceId = `background-equipment-${index}`;
+    const isChoice = /\sor\s/i.test(grantText);
+    const selectedText = isChoice ? character.grantChoices[choiceId] : grantText;
+    if (!selectedText) {
+      entries.push({
+        key: `${choiceId}-unresolved`,
+        label: grantText,
+        sourceType: "background-choice",
+        sourceName,
+        choiceId,
+        unresolvedChoice: true,
+      });
+      return;
+    }
+    expandGrantedEquipmentLabel(selectedText).forEach((label, itemIndex) => {
+      const item = armouryItemWithExactName(label);
+      entries.push({
+        key: `${choiceId}-${itemIndex}`,
+        label,
+        listedAs: selectedText,
+        item,
+        itemId: item?.id || "",
+        sourceType: isChoice ? "background-choice" : "background-grant",
+        sourceName,
+        choiceId: isChoice ? choiceId : "",
+        unresolvedChoice: false,
+      });
+    });
+  });
+  return { sourceName, entries };
+}
+
+function syncGrantedEquipment() {
+  if (!character?.equipment) return;
+  const grants = resolvedGrantedEquipment();
+  const previousIds = new Set(character.equipment.characterCreationGrants || []);
+  const currentIds = new Set(grants.entries.map((entry) => entry.itemId).filter(Boolean));
+
+  for (const previousId of previousIds) {
+    if (currentIds.has(previousId)) continue;
+    if (!character.acquisitions.includes(previousId) && !character.equipment.noCostGrants.includes(previousId)) {
+      character.equipment.inventory = character.equipment.inventory.filter((entry) => entry !== previousId);
+      character.equipment.equipped = Object.fromEntries(
+        Object.entries(character.equipment.equipped).map(([slot, itemId]) => [slot, itemId === previousId ? "" : itemId]),
+      );
+    }
+  }
+
+  for (const itemId of currentIds) {
+    if (!character.equipment.inventory.includes(itemId)) character.equipment.inventory.push(itemId);
+    character.acquisitions = character.acquisitions.filter((entry) => entry !== itemId);
+    character.equipment.noCostGrants = character.equipment.noCostGrants.filter((entry) => entry !== itemId);
+  }
+
+  character.equipment.characterCreationGrants = [...currentIds];
+  character.equipment.unlinkedCharacterCreationGrants = grants.entries
+    .filter((entry) => !entry.item && !entry.unresolvedChoice)
+    .map((entry) => ({
+      key: entry.key,
+      label: entry.label,
+      listedAs: entry.listedAs,
+      sourceType: entry.sourceType,
+      sourceName: entry.sourceName,
+      choiceId: entry.choiceId,
+    }));
+}
+
+function equipmentProvenance(itemId, grants = resolvedGrantedEquipment()) {
+  const creationGrant = grants.entries.find((entry) => entry.itemId === itemId);
+  if (creationGrant) {
+    return {
+      type: creationGrant.sourceType,
+      label: creationGrant.sourceType === "background-choice"
+        ? `Chosen from ${creationGrant.sourceName}`
+        : `Granted by ${creationGrant.sourceName}`,
+      detail: creationGrant.sourceType === "background-choice"
+        ? `${creationGrant.sourceName} starting-equipment choice`
+        : `${creationGrant.sourceName} starting equipment`,
+      grant: creationGrant,
+    };
+  }
+  if (character.acquisitions.includes(itemId)) {
+    return { type: "starting-acquisition", label: "Starting acquisition · 1 slot", detail: "Purchased with one starting acquisition" };
+  }
+  if (character.equipment.noCostGrants.includes(itemId)) {
+    return { type: "gm-grant", label: "GM grant · no cost", detail: "Added without XP, currency, or an acquisition slot" };
+  }
+  return { type: "inventory", label: "Inventory", detail: "Inventory source not recorded" };
 }
 
 function migrateLegacyEquipment() {
@@ -917,6 +1056,7 @@ function xpSpent() {
 }
 
 function save({ markComplete = false } = {}) {
+  syncGrantedEquipment();
   const now = new Date().toISOString();
   if (markComplete) character.completedAt = now;
   else if (step < scenes.length - 1) character.completedAt = null;
@@ -1011,6 +1151,8 @@ function resetCreationDataFrom(sceneId) {
   character.equipment = {
     inventory: [],
     noCostGrants: [],
+    characterCreationGrants: [],
+    unlinkedCharacterCreationGrants: [],
     equipped: {},
     selected: null,
   };
@@ -1505,11 +1647,7 @@ function foundrySpecialAbility([source, value]) {
 }
 
 function foundryEquipmentItem(item) {
-  const inventorySource = character.acquisitions.includes(item.id)
-    ? "starting-acquisition"
-    : character.equipment.noCostGrants.includes(item.id)
-      ? "no-cost-grant"
-      : "inventory";
+  const provenance = equipmentProvenance(item.id);
   return {
     name: item.name,
     type: item.documentType,
@@ -1521,8 +1659,39 @@ function foundryEquipmentItem(item) {
       weight: item.weight ?? 0,
       equipped: Object.values(character.equipment.equipped).includes(item.id),
     },
-    flags: { dh2CharacterBuilder: { source: item.source, category: item.category, inventorySource } },
+    flags: {
+      dh2CharacterBuilder: {
+        source: item.source,
+        category: item.category,
+        inventorySource: provenance.type,
+        grantedBy: provenance.grant?.sourceName || "",
+        sourceDetail: provenance.detail,
+      },
+    },
   };
+}
+
+function foundryUnlinkedGrantedEquipment() {
+  return (character.equipment.unlinkedCharacterCreationGrants || []).map((entry) => ({
+    name: entry.label,
+    type: "tool",
+    system: {
+      description: `${entry.sourceName} starting equipment. The builder preserved this grant as written because no unambiguous Armoury entry was available.`,
+      availability: "",
+      craftsmanship: "Common",
+      weight: 0,
+      equipped: false,
+    },
+    flags: {
+      dh2CharacterBuilder: {
+        initial: true,
+        inventorySource: entry.sourceType,
+        grantedBy: entry.sourceName,
+        sourceDetail: entry.sourceType === "background-choice" ? "Selected starting-equipment choice" : "Starting equipment",
+        unresolvedArmouryLink: true,
+      },
+    },
+  }));
 }
 
 function hasPsykerAccess() {
@@ -1590,7 +1759,10 @@ function renderGrants() {
 
 function renderEquipment() {
   const slots = Math.max(0, characteristicBonus("influence"));
+  const grantedEquipment = resolvedGrantedEquipment();
+  const grantedByItemId = new Map(grantedEquipment.entries.filter((entry) => entry.itemId).map((entry) => [entry.itemId, entry]));
   const selected = armoury.find((item) => item.id === character.equipment.selected) || armoury[0];
+  const selectedGrant = grantedByItemId.get(selected.id);
   const categories = ["All", ...new Set(armoury.map((item) => item.category))];
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
   const selectedInInventory = character.equipment.inventory.includes(selected.id);
@@ -1598,8 +1770,10 @@ function renderEquipment() {
   const selectedNoCostGrant = character.equipment.noCostGrants.includes(selected.id);
   const acquisitionLimitReached = character.acquisitions.filter(Boolean).length >= slots;
   const acquisitionLegal = isStartingAcquisitionLegal(selected);
-  const acquisitionDisabled = !acquisitionLegal || selectedAcquisition || acquisitionLimitReached;
-  const acquisitionTitle = selectedAcquisition
+  const acquisitionDisabled = Boolean(selectedGrant) || !acquisitionLegal || selectedAcquisition || acquisitionLimitReached;
+  const acquisitionTitle = selectedGrant
+    ? `This item is already included by ${selectedGrant.sourceName} and does not use an acquisition.`
+    : selectedAcquisition
     ? "This item already uses one starting acquisition."
     : !acquisitionLegal
       ? "This item's effective Availability is not eligible for a normal starting acquisition."
@@ -1620,7 +1794,11 @@ function renderEquipment() {
               <span class="item-category">${item.category}</span>
               <strong>${item.name}</strong>
               <span>${effectiveAvailability(item) || "Availability not recorded"}${effectiveAvailability(item) !== item.availability ? ` (base ${item.availability})` : ""} · ${displayWeight(item)}</span>
-              ${isStartingAcquisitionLegal(item) ? `<em>Starting acquisition</em>` : `<em class="restricted">Requires acquisition test</em>`}
+              ${grantedByItemId.has(item.id)
+                ? `<em class="granted">Included · ${grantedByItemId.get(item.id).sourceName}</em>`
+                : isStartingAcquisitionLegal(item)
+                  ? `<em>Eligible starting acquisition</em>`
+                  : `<em class="restricted">Requires acquisition test</em>`}
             </button>`).join("")}
         </div>
       </section>
@@ -1634,23 +1812,43 @@ function renderEquipment() {
               .map(([label, value]) => `<div><dt>${label}</dt><dd>${value ?? "—"}</dd></div>`).join("")}
           </dl>
           <div class="item-actions">
-            <button class="primary-button acquire-equipment" type="button" data-acquire-equipment="${selected.id}" title="${acquisitionTitle}" ${acquisitionDisabled ? "disabled" : ""}>${selectedAcquisition ? "Starting Acquisition Recorded" : "Use 1 Starting Acquisition"} <span>›</span></button>
-            <button class="compact-button add-equipment" type="button" data-add-equipment="${selected.id}" ${selectedInInventory && !selectedNoCostGrant ? "disabled" : ""}>${selectedNoCostGrant ? "Remove No-Cost Grant" : selectedInInventory ? "Already in Inventory" : "Add Without Cost"}</button>
+            <button class="primary-button acquire-equipment" type="button" data-acquire-equipment="${selected.id}" title="${acquisitionTitle}" ${acquisitionDisabled ? "disabled" : ""}>${selectedGrant ? `Included by ${selectedGrant.sourceName}` : selectedAcquisition ? "Starting Acquisition Recorded" : "Use 1 Starting Acquisition"} <span>›</span></button>
+            <button class="compact-button add-equipment" type="button" data-add-equipment="${selected.id}" ${selectedGrant || (selectedInInventory && !selectedNoCostGrant) ? "disabled" : ""}>${selectedGrant ? "Granted Automatically" : selectedNoCostGrant ? "Remove GM Grant" : selectedInInventory ? "Already in Inventory" : "Add as GM Grant (No Cost)"}</button>
           </div>
-          <p class="item-cost-note"><strong>No-cost grant:</strong> Adds the item directly without spending XP, currency, or a starting acquisition. Use only for free Background equipment or an explicit GM grant.</p>
+          ${selectedGrant
+            ? `<p class="item-cost-note included"><strong>Character-creation grant:</strong> ${selectedGrant.sourceType === "background-choice" ? "You selected this from" : "This is included by"} ${selectedGrant.sourceName}. It costs no XP, currency, or starting-acquisition slot.</p>`
+            : `<p class="item-cost-note"><strong>GM grant:</strong> “Add as GM Grant” records that the item was awarded free. Use it only when the GM explicitly gives the character an item outside the normal starting-acquisition allowance.</p>`}
         </div>
         <aside class="loadout-panel">
           <div class="loadout-heading">
             <span>Influence Bonus ${characteristicBonus("influence")}</span>
             <strong>${character.acquisitions.filter(Boolean).length} / ${slots} starting acquisitions recorded</strong>
           </div>
+          <section class="starting-package" aria-labelledby="starting-package-title">
+            <div class="starting-package-heading">
+              <span>Included at no cost</span>
+              <strong id="starting-package-title">${grantedEquipment.sourceName} Starting Package</strong>
+            </div>
+            <div class="starting-package-items">
+              ${grantedEquipment.entries.map((entry) => {
+                if (entry.unresolvedChoice) {
+                  return `<div class="starting-package-item unresolved"><strong>${entry.label}</strong><small>Choice unresolved</small><em>Return to Starting Abilities and choose one option.</em></div>`;
+                }
+                if (!entry.item) {
+                  return `<div class="starting-package-item unlinked"><strong>${entry.label}</strong><small>${entry.sourceType === "background-choice" ? "Background choice" : "Background grant"}</small><em>Recorded as written · Armoury link pending</em></div>`;
+                }
+                const originalLabel = normaliseItemName(entry.label) !== normaliseItemName(entry.item.name) ? `<em>Listed as “${entry.label}”</em>` : "";
+                return `<button class="starting-package-item" type="button" data-equipment-item="${entry.item.id}"><strong>${entry.item.name}</strong><small>${entry.sourceType === "background-choice" ? "Chosen from Background" : "Granted by Background"}</small>${originalLabel}</button>`;
+              }).join("") || `<p>No starting equipment is listed for this Background.</p>`}
+            </div>
+          </section>
+          <div class="acquisition-heading"><strong>Optional Starting Acquisitions</strong><span>Each recorded item spends 1 of ${slots} slots.</span></div>
           <div class="acquisition-picks">
             ${character.acquisitions.filter(Boolean).map((id) => {
               const item = armoury.find((entry) => entry.id === id);
               return item ? `<button type="button" data-remove-acquisition="${id}" title="Remove acquisition">${item.name}<span>×</span></button>` : "";
             }).join("") || "<span>No starting acquisitions selected.</span>"}
           </div>
-          <p class="granted-line"><strong>Background:</strong> ${ruleValue(character.background, "Starting Equipment")}</p>
           ${character.equipment.legacyAcquisitions?.length ? `<div class="legacy-warning"><strong>Review previous entries:</strong> ${character.equipment.legacyAcquisitions.join("; ")}. These older free-text entries were not counted because no unambiguous Armoury match was found.<button type="button" data-clear-legacy>Dismiss old entries</button></div>` : ""}
           <div class="loadout-slots">
             ${equipmentSlots.map(([slot, label]) => {
@@ -1659,12 +1857,8 @@ function renderEquipment() {
             }).join("")}
           </div>
           <div class="inventory-strip">${inventoryItems.map((item) => {
-            const source = character.acquisitions.includes(item.id)
-              ? "Starting acquisition"
-              : character.equipment.noCostGrants.includes(item.id)
-                ? "No-cost grant"
-                : "Inventory";
-            return `<button type="button" data-equipment-item="${item.id}"><strong>${item.name}</strong><small>${source}</small></button>`;
+            const source = equipmentProvenance(item.id, grantedEquipment);
+            return `<button type="button" data-equipment-item="${item.id}" data-source-type="${source.type}"><strong>${item.name}</strong><small>${source.label}</small></button>`;
           }).join("") || "<span>No items added yet.</span>"}</div>
         </aside>
       </section>
@@ -3232,8 +3426,8 @@ function renderReview() {
   const initialTalents = Object.values(resolvedGrantedTalents());
   const purchasedTalents = character.advances.talents.map((entry) => talentCatalogue.find((talent) => talent.id === entry.id)).filter(Boolean);
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
-  const acquisitionItems = character.acquisitions.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
-  const noCostItems = character.equipment.noCostGrants.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
+  const grantedEquipment = resolvedGrantedEquipment();
+  const unlinkedGrantedEquipment = character.equipment.unlinkedCharacterCreationGrants || [];
   const xpLedger = [
     ...characteristics.filter((entry) => Number(character.advances.characteristics[entry.id] || 0) > 0).map((entry) => [`${entry.name} +${Number(character.advances.characteristics[entry.id]) * 5}`, characteristicXpCost(entry.id)]),
     ...ownedSkills.filter((skill) => skillXpCost(skill.id) > 0).map((skill) => [`${skill.name} · ${rankNames[skillRank(skill.id) - 1]}`, skillXpCost(skill.id)]),
@@ -3332,7 +3526,13 @@ function renderReview() {
               const item = armoury.find((entry) => entry.id === character.equipment.equipped[slot]);
               return `<div><span>${label}</span><strong>${item?.name || "Empty"}</strong></div>`;
             }).join("")}</div>
-            <div class="dossier-list compact">${inventoryItems.map((item) => `<div><strong>${item.name}</strong><span>${item.category} · ${effectiveAvailability(item)} · ${displayWeight(item)}</span>${acquisitionItems.some((entry) => entry.id === item.id) ? "<em>Starting Acquisition</em>" : noCostItems.some((entry) => entry.id === item.id) ? "<em>No-Cost Grant · Background or GM</em>" : "<em>Inventory</em>"}</div>`).join("") || "<p>No inventory recorded.</p>"}</div>
+            <div class="dossier-list compact">${[
+              ...inventoryItems.map((item) => {
+                const source = equipmentProvenance(item.id, grantedEquipment);
+                return `<div><strong>${item.name}</strong><span>${item.category} · ${effectiveAvailability(item)} · ${displayWeight(item)}</span><em>${source.label}</em></div>`;
+              }),
+              ...unlinkedGrantedEquipment.map((entry) => `<div><strong>${entry.label}</strong><span>Starting equipment · Armoury record pending</span><em>${entry.sourceType === "background-choice" ? `Chosen from ${entry.sourceName}` : `Granted by ${entry.sourceName}`}</em></div>`),
+            ].join("") || "<p>No inventory recorded.</p>"}</div>
           </section>
           <section>
             <h3>Divination</h3>
@@ -4003,6 +4203,7 @@ function wireEvents() {
           flags: { dh2CharacterBuilder: { initial: true } },
         })),
         ...character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean).map(foundryEquipmentItem),
+        ...foundryUnlinkedGrantedEquipment(),
         ...[
           ...Object.values(resolvedGrantedTalents()).map((talent) => ({ talent, initial: true })),
           ...character.advances.talents.map((entry) => ({ talent: talentCatalogue.find((candidate) => candidate.id === entry.id), initial: false })),
