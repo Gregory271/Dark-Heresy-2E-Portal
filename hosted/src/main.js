@@ -2821,7 +2821,7 @@ function positionFloatingRuleTooltip(target) {
 }
 
 function wireFloatingMechanicsTooltips() {
-  document.querySelectorAll(".mechanics-panel .lore-term[data-tooltip]").forEach((target) => {
+  document.querySelectorAll(".scene .lore-term[data-tooltip]").forEach((target) => {
     target.addEventListener("pointerenter", () => positionFloatingRuleTooltip(target));
     target.addEventListener("pointerleave", hideFloatingRuleTooltip);
     target.addEventListener("focus", () => positionFloatingRuleTooltip(target));

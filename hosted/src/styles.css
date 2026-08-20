@@ -67,6 +67,7 @@ select:focus-visible, summary:focus-visible, a:focus-visible {
 /* Every scene reserves the header and footer first. The active scene content may
    use all remaining space, but it can never push navigation below the viewport. */
 .scene > .content {
+  min-width: 0;
   min-height: 0;
   max-height: 100%;
 }
@@ -259,7 +260,8 @@ html[data-text-size="extra-large"] .management-content {
   align-self: stretch;
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
-  width: min(1240px, 91vw);
+  width: 100%;
+  max-width: 1440px;
   margin: 6px 0;
   overflow: hidden;
 }
@@ -399,15 +401,26 @@ h1 { max-width: 820px; margin: 8px 0 20px; font-size: clamp(52px, 7.2vw, 112px);
 
 .management-scene::after { background: linear-gradient(90deg,rgba(3,6,6,.97),rgba(3,6,6,.89) 68%,rgba(3,6,6,.7)); }
 .management-scene .record { display: none; }
-.management-content { align-self: start; width: min(1120px,84vw); margin: 22px 0 12px; }
+.management-content {
+  align-self: stretch;
+  justify-self: center;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0,1fr);
+  width: 100%;
+  max-width: 1440px;
+  min-width: 0;
+  min-height: 0;
+  margin: clamp(5px,1.3vh,12px) 0;
+  overflow: hidden;
+}
 .management-content .kicker { margin-top: 7px; font-size: 16px; }
 .management-content h1 { margin: 4px 0 8px; font-size: clamp(35px,4vw,58px); line-height: .94; }
 .management-content .lede { max-width: 900px; font-size: 14px; line-height: 1.4; }
-.management-shell { max-height: 52vh; margin-top: 15px; overflow: auto; border: 1px solid var(--line); background: rgba(6,9,9,.82); box-shadow: 0 18px 60px rgba(0,0,0,.32); backdrop-filter: blur(14px); }
+.management-shell { min-height: 0; max-height: none; margin-top: 9px; overflow: auto; border: 1px solid var(--line); background: rgba(6,9,9,.82); box-shadow: 0 18px 60px rgba(0,0,0,.32); backdrop-filter: blur(14px); }
 .management-heading { display: flex; justify-content: space-between; gap: 20px; padding: 11px 14px; border-bottom: 1px solid var(--line); color: #d8d3c7; font-size: 12px; }
 .management-heading span { color: var(--accent-hot); text-transform: uppercase; letter-spacing: .12em; }
 .characteristic-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
-.characteristic-entry { display: grid; grid-template-columns: minmax(145px,1fr) 78px minmax(220px,1.25fr); align-items: center; gap: 10px; min-height: 82px; padding: 9px 12px; border-right: 1px solid rgba(255,255,255,.1); border-bottom: 1px solid rgba(255,255,255,.1); }
+.characteristic-entry { display: grid; grid-template-columns: minmax(130px,1fr) 72px minmax(160px,1.1fr); align-items: center; gap: 10px; min-height: 82px; padding: 9px 12px; border-right: 1px solid rgba(255,255,255,.1); border-bottom: 1px solid rgba(255,255,255,.1); }
 .characteristic-entry.complete { background: linear-gradient(90deg,rgba(122,91,42,.13),transparent); }
 .characteristic-name { display: grid; grid-template-columns: 31px 1fr; align-items: center; }
 .characteristic-name > span { grid-row: 1 / 3; color: var(--accent-hot); font: 600 20px "Barlow Condensed",sans-serif; }
@@ -501,26 +514,33 @@ select,.acquisition-list input,.choice-resolution textarea { border: 1px solid r
   margin-top: 0;
 }
 .acquisition-list { display: grid; gap: 11px; margin-top: 15px; }
-.armoury-layout { display: grid; grid-template-columns: minmax(330px,.88fr) minmax(500px,1.32fr); height: min(72vh,620px); overflow: hidden; }
+.scene-equipment .management-content > .eyebrow { margin-bottom: 2px; }
+.scene-equipment .management-content > .kicker { margin-top: 2px; }
+.scene-equipment .management-content > h1 { margin: 2px 0 5px; font-size: clamp(30px,3.4vw,50px); }
+.scene-equipment .management-content > .lede { margin: 0 0 7px; max-width: 1050px; line-height: 1.35; }
+.scene-equipment .armoury-layout { height: 100%; margin-top: 0; }
+.armoury-layout { display: grid; grid-template-columns: minmax(310px,.74fr) minmax(0,1.66fr); min-width: 0; height: min(72vh,620px); overflow: hidden; }
 .armoury-browser { display: grid; grid-template-rows: auto 1fr; min-height: 0; border-right: 1px solid var(--line); }
-.armoury-toolbar { padding: 12px; border-bottom: 1px solid var(--line); background: rgba(4,7,7,.82); }
+.armoury-toolbar { min-width: 0; overflow: hidden; padding: 14px; border-bottom: 1px solid var(--line); background: rgba(4,7,7,.82); }
 .armoury-toolbar label { display: grid; gap: 4px; color: #b8b2a7; font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
-.armoury-toolbar input { border: 1px solid rgba(255,255,255,.22); padding: 9px 10px; background: #080c0b; color: #fff1d5; }
-.armoury-categories { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-.armoury-categories button { border: 1px solid rgba(255,255,255,.15); padding: 5px 7px; background: rgba(255,255,255,.035); color: #b9b4aa; font: 600 8px "Barlow Condensed",sans-serif; letter-spacing: .07em; text-transform: uppercase; cursor: pointer; }
+.armoury-toolbar input { width: 100%; min-height: 42px; border: 1px solid rgba(255,255,255,.22); padding: 9px 10px; background: #080c0b; color: #fff1d5; }
+.armoury-categories { display: flex; width: 100%; min-width: 0; max-width: 100%; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.armoury-categories button { flex: 1 1 126px; min-height: 38px; border: 1px solid rgba(255,255,255,.15); padding: 6px 8px; background: rgba(255,255,255,.035); color: #b9b4aa; font: 600 8px/1.2 "Barlow Condensed",sans-serif; letter-spacing: .05em; text-align: center; text-transform: uppercase; cursor: pointer; }
 .armoury-categories button.active { border-color: #d3a55c; background: rgba(151,100,37,.34); color: #ffe7b9; }
 .armoury-list { min-height: 0; overflow-y: auto; scrollbar-color: #a77a3e #090d0c; scrollbar-width: thin; }
-.armoury-item { position: relative; display: grid; width: 100%; grid-template-columns: 88px 1fr auto; gap: 3px 8px; border: 0; border-bottom: 1px solid rgba(255,255,255,.09); padding: 8px 11px; background: rgba(4,7,7,.68); color: #aaa69d; text-align: left; cursor: pointer; }
+.armoury-item { position: relative; display: grid; width: 100%; grid-template-columns: minmax(150px,.95fr) minmax(0,1.05fr); gap: 4px 10px; overflow: hidden; border: 0; border-bottom: 1px solid rgba(255,255,255,.09); padding: 10px 12px; background: rgba(4,7,7,.68); color: #aaa69d; text-align: left; cursor: pointer; }
 .armoury-item[hidden] { display: none; }
 .armoury-item:hover,.armoury-item.selected { background: linear-gradient(90deg,rgba(151,100,37,.3),rgba(8,12,11,.86)); }
 .armoury-item.selected { box-shadow: inset 2px 0 #dfb36c; }
 .armoury-item strong { color: #eee6d7; font: 600 13px "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .armoury-item span,.armoury-item em { font-size: 8px; font-style: normal; line-height: 1.3; }
+.armoury-item strong,.armoury-item span { min-width: 0; overflow-wrap: anywhere; }
 .armoury-item .item-category { color: #d9b271; letter-spacing: .06em; text-transform: uppercase; }
-.armoury-item em { grid-column: 2 / 4; color: #b9ce9f; }
+.armoury-item > span:not(.item-category),.armoury-item em { grid-column: 1 / -1; }
+.armoury-item em { color: #b9ce9f; }
 .armoury-item em.restricted { color: #d7a395; }
-.item-inspector { display: grid; grid-template-columns: minmax(270px,1fr) minmax(240px,.78fr); min-height: 0; overflow: hidden; }
-.item-inspector > div { min-height: 0; overflow-y: auto; padding: 17px; }
+.item-inspector { display: grid; grid-template-columns: minmax(300px,1.15fr) minmax(340px,.9fr); min-height: 0; overflow: hidden; }
+.item-inspector > div { min-height: 0; overflow-y: auto; padding: clamp(17px,1.6vw,24px); }
 .item-inspector h2 { margin: 4px 0 7px; color: #fff0d0; font: 600 30px "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .item-inspector > div > p:not(.choice-source) { color: #bdb7ac; font-size: 10px; line-height: 1.45; }
 .item-profile { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 12px 0; border: 1px solid rgba(255,255,255,.11); }
@@ -530,7 +550,7 @@ select,.acquisition-list input,.choice-resolution textarea { border: 1px solid r
 .item-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .item-actions button { flex: 1 1 150px; }
 .item-actions button:disabled { opacity: .4; cursor: not-allowed; }
-.loadout-panel { min-height: 0; overflow-y: auto; padding: 14px; border-left: 1px solid var(--line); background: rgba(2,5,5,.52); }
+.loadout-panel { min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; padding: clamp(17px,1.6vw,24px); border-left: 1px solid var(--line); background: rgba(2,5,5,.52); }
 .loadout-heading { display: grid; gap: 3px; border-bottom: 1px solid var(--line); padding-bottom: 9px; }
 .loadout-heading span { color: #caa86e; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; }
 .loadout-heading strong { color: #eee6d7; font: 500 14px "Barlow Condensed",sans-serif; text-transform: uppercase; }
@@ -543,11 +563,32 @@ select,.acquisition-list input,.choice-resolution textarea { border: 1px solid r
 .legacy-warning { border-left: 2px solid #bd624d; padding: 6px 8px; background: rgba(140,48,34,.1); color: #deb5aa; font-size: 8px; line-height: 1.4; }
 .legacy-warning strong { color: #ffbfad; text-transform: uppercase; }
 .legacy-warning button { display: block; margin-top: 5px; border: 1px solid rgba(255,185,168,.35); padding: 4px 6px; background: transparent; color: #ffbfad; font-size: 7px; text-transform: uppercase; cursor: pointer; }
-.loadout-slots { display: grid; gap: 7px; }
-.loadout-slots label { display: grid; gap: 3px; color: #aaa69d; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
-.loadout-slots select { min-width: 0; padding: 7px; }
+.loadout-slots { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-top: 12px; }
+.loadout-slots label { display: grid; align-content: start; gap: 6px; min-width: 0; color: #aaa69d; font-size: 8px; line-height: 1.25; letter-spacing: .06em; text-transform: uppercase; }
+.loadout-slots select { width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px; text-overflow: ellipsis; }
 .inventory-strip { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
 .inventory-strip button { border: 1px solid rgba(225,187,118,.3); padding: 5px 7px; background: rgba(151,100,37,.13); color: #dfd6c6; font-size: 8px; cursor: pointer; }
+
+html[data-text-size="large"] .armoury-categories,
+html[data-text-size="extra-large"] .armoury-categories {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  padding-bottom: 5px;
+}
+html[data-text-size="large"] .armoury-categories button,
+html[data-text-size="extra-large"] .armoury-categories button { flex: 0 0 auto; white-space: nowrap; }
+html[data-text-size="large"] .loadout-slots,
+html[data-text-size="extra-large"] .loadout-slots { grid-template-columns: 1fr; }
+html[data-text-size="extra-large"] .scene-equipment .management-content > .kicker,
+html[data-text-size="extra-large"] .scene-equipment .management-content > .lede { display: none; }
+html[data-text-size="extra-large"] .scene-equipment .management-content > h1 { font-size: 36px; }
+html[data-text-size="extra-large"] .topbar .credits-button,
+html[data-text-size="extra-large"] .topbar .vfx-toggle,
+html[data-text-size="extra-large"] .topbar .volume-control { display: none; }
+html[data-text-size="extra-large"] .topbar .nav-wide { display: none; }
+html[data-text-size="extra-large"] .topbar .nav-narrow { display: inline; }
 .advance-layout { display: grid; grid-template-columns: 180px 1fr; height: min(72vh,620px); overflow: hidden; }
 .xp-meter { display: grid; align-content: start; gap: 5px; padding: 20px; border-right: 1px solid var(--line); }
 .xp-meter span { margin-top: 10px; color: #aaa69d; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
@@ -728,6 +769,7 @@ dialog > p:not(.eyebrow) { color: #b8b4aa; line-height: 1.7; }
 }
 .rule-term::after { content: " +"; color: #e4ac57; font: 700 .65em "Barlow Condensed",sans-serif; vertical-align: super; }
 .rule-term:hover,.rule-term:focus-visible { border-bottom-style: solid; background: rgba(194,132,53,.22); color: #fff4dc; }
+.scene .lore-term::after { display: none; }
 .rule-dialog .primary-button { width: 100%; margin-top: 18px; }
 
 .compendium-scene {
@@ -1775,6 +1817,7 @@ dialog > p:not(.eyebrow) { color: #b8b4aa; line-height: 1.7; }
     height: auto;
     overflow: visible;
   }
+  .loadout-slots { grid-template-columns: 1fr; }
   .armoury-browser, .talent-catalogue { border-right: 0; }
   .armoury-list, .talent-list {
     max-height: 42vh;
@@ -1790,10 +1833,14 @@ dialog > p:not(.eyebrow) { color: #b8b4aa; line-height: 1.7; }
     border-left: 0;
   }
   .armoury-item {
-    grid-template-columns: 72px minmax(0,1fr);
+    grid-template-columns: 1fr;
     min-height: 52px;
+    gap: 4px;
+    padding: 12px;
   }
-  .armoury-item em { grid-column: 2; }
+  .armoury-item > *,
+  .armoury-item > span:not(.item-category),
+  .armoury-item em { grid-column: 1; }
   .advance-shop { padding: 14px 10px 24px; }
   .xp-meter {
     grid-template-columns: repeat(3,1fr);
@@ -2073,6 +2120,15 @@ dialog > p:not(.eyebrow) { color: #b8b4aa; line-height: 1.7; }
   .mechanics-panel dl div { grid-template-columns: 88px 1fr; gap: 9px; padding: 9px 11px; }
   .mechanics-panel dd { font-size: 11px; }
   .review-sections { column-count: 2; }
+}
+
+/* Between phone and wide-desktop layouts, retain the catalogue beside the
+   item record while stacking the inspector and loadout inside the right pane.
+   This avoids squeezing readable 100% text into a narrow equipment column. */
+@media (min-width: 641px) and (max-width: 1080px) {
+  .armoury-layout { grid-template-columns: minmax(240px,.72fr) minmax(0,1.28fr); }
+  .item-inspector { grid-template-columns: 1fr; overflow-y: auto; }
+  .loadout-panel { border-top: 1px solid var(--line); border-left: 0; }
 }
 
 @media (max-width: 520px) {
