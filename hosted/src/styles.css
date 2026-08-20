@@ -560,6 +560,7 @@ select,.acquisition-list input,.choice-resolution textarea { border: 1px solid r
 .scene-equipment .management-content > .kicker { margin-top: 2px; }
 .scene-equipment .management-content > h1 { margin: 2px 0 5px; font-size: clamp(30px,3.4vw,50px); }
 .scene-equipment .management-content > .lede { margin: 0 0 7px; max-width: 1050px; line-height: 1.35; }
+.scene-equipment { padding-right: clamp(18px,3vw,48px); padding-left: clamp(18px,3vw,48px); }
 .scene-equipment .armoury-layout { height: 100%; margin-top: 0; }
 html[data-text-size="medium"] .scene-equipment .armoury-layout,
 html[data-text-size="large"] .scene-equipment .armoury-layout,
@@ -651,14 +652,15 @@ html[data-text-size="extra-large"] .scene-equipment .armoury-layout { margin-top
 .inventory-record-heading strong { color: #e4d6bf; font: 600 11px "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .inventory-record-heading span { color: #a7a198; font-size: 7px; text-align: right; }
 .carried-equipment-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; }
-.carried-equipment-entry { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 8px; border: 1px solid rgba(225,187,118,.2); padding: 6px 7px; background: rgba(151,100,37,.08); }
+.carried-equipment-entry { display: grid; grid-template-columns: minmax(0,1fr); gap: 4px; min-width: 0; border: 1px solid rgba(225,187,118,.2); padding: 7px 8px; background: rgba(151,100,37,.08); }
 .carried-equipment-entry.selected { border-color: #e1bb76; background: rgba(151,100,37,.23); }
 .carried-equipment-entry > button { display: grid; gap: 2px; min-width: 0; border: 0; padding: 0; background: transparent; color: #dfd6c6; text-align: left; cursor: pointer; }
 .carried-equipment-entry > button strong { color: #efe4d1; font: 600 10px "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .carried-equipment-entry > button small.item-origin,
 .inventory-entry small.item-origin { color: #91aaa0; font-family: "Barlow",sans-serif; font-size: 8px; font-weight: 400; letter-spacing: .015em; line-height: 1.35; text-transform: none; }
-.carried-equipment-entry > span { grid-column: 1; color: #979289; font-size: 7px; }
-.carried-equipment-entry > label { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-columns: 17px; align-content: center; justify-items: center; gap: 2px; max-width: 64px; color: #a9b9af; font-size: 7px; line-height: 1.2; text-align: center; cursor: pointer; }
+.carried-equipment-entry > span { grid-column: 1; min-width: 0; color: #979289; font-size: 7px; overflow-wrap: anywhere; }
+.carried-equipment-entry > label { grid-column: 1; grid-row: auto; display: flex; align-items: center; justify-content: flex-start; gap: 7px; min-width: 0; max-width: 100%; border-top: 1px solid rgba(255,255,255,.07); padding-top: 5px; color: #a9b9af; font-size: 7px; line-height: 1.25; text-align: left; cursor: pointer; }
+.carried-equipment-entry > label span { min-width: 0; white-space: normal; overflow-wrap: normal; word-break: normal; }
 .inventory-entry { display: grid; gap: 2px; border: 1px solid rgba(155,139,101,.42); padding: 6px 8px; background: rgba(74,61,36,.15); color: #dfd6c6; font-size: 8px; text-align: left; }
 .inventory-entry strong { color: #efe4d1; font: 600 1em "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .inventory-entry small { color: #c6b68f; font-size: .82em; letter-spacing: .05em; text-transform: uppercase; }

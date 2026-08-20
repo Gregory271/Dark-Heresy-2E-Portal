@@ -639,6 +639,7 @@ function applyTextScale(scope = root) {
     ".modification-entry small",
     ".carried-equipment-entry > span",
     ".carried-equipment-entry label",
+    ".carried-equipment-entry label span",
     ".armoury-item span",
     ".armoury-item em",
     ".item-profile dd",
@@ -2101,7 +2102,7 @@ function renderEquipment() {
               return `<div class="carried-equipment-entry ${selected.id === item.id ? "selected" : ""}">
                 <button type="button" data-equipment-item="${item.id}" title="View ${escapeHtmlAttribute(item.name)} details"><strong>${item.name}</strong><small class="item-origin">${source.label}</small></button>
                 <span>${item.category} · ${displayWeight(item)}</span>
-                ${canActivate ? `<label><input type="checkbox" data-active-gear="${item.id}" ${character.equipment.activeGear.includes(item.id) ? "checked" : ""} /><span>Currently worn / in use</span></label>` : ""}
+                ${canActivate ? `<label><input type="checkbox" data-active-gear="${item.id}" ${character.equipment.activeGear.includes(item.id) ? "checked" : ""} /><span>Worn / in use</span></label>` : ""}
               </div>`;
             }).join("")}${unlinkedGrantedItems.map((entry) => `
               <div class="inventory-entry ${entry.unresolvedChoice ? "unresolved" : "unlinked"}">
