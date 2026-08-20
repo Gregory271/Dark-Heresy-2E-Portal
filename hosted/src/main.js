@@ -33,6 +33,18 @@ import {
 } from "./creation-data.js?v=0.7.0";
 
 const root = document.querySelector("#app");
+const inquisitorialRosette = `
+  <svg class="sigil" viewBox="0 0 48 64" aria-hidden="true" focusable="false">
+    <g class="sigil-bars">
+      <path d="M8 18h32M5 25h38M2 32h44M5 39h38M8 46h32" />
+    </g>
+    <path class="sigil-spine" d="M24 3 18 12h3v40h-3l6 9 6-9h-3V12h3Z" />
+    <g class="sigil-rosette">
+      <path d="m24 18 2.2 5.4 5.2-3.2-.5 6.1 6.1-.5-3.2 5.2 5.4 2.2-5.4 2.2 3.2 5.2-6.1-.5.5 6.1-5.2-3.2L24 48l-2.2-5.4-5.2 3.2.5-6.1-6.1.5 3.2-5.2-5.4-2.2 5.4-2.2-3.2-5.2 6.1.5-.5-6.1 5.2 3.2Z" />
+      <circle cx="24" cy="33" r="7.25" />
+      <path class="sigil-skull" d="M20.2 31.6c0-2.3 1.6-4 3.8-4s3.8 1.7 3.8 4c0 1.5-.6 2.6-1.7 3.4v2.4h-4.2V35c-1.1-.8-1.7-1.9-1.7-3.4Zm1.9-.3h1.2v1.3h-1.2Zm2.6 0h1.2v1.3h-1.2Z" />
+    </g>
+  </svg>`;
 const hostedEdition = location.hostname.endsWith("github.io")
   || document.querySelector('meta[name="dh2-edition"]')?.content === "hosted";
 document.documentElement.dataset.edition = hostedEdition ? "hosted" : "local";
@@ -2066,7 +2078,7 @@ function legacyRenderCompendium() {
     <a class="skip-link" href="#compendium-content">Skip to rules compendium</a>
     <main class="compendium-scene theme-assessment">
       <header class="topbar compendium-topbar">
-        <div class="sigil" aria-hidden="true"><span></span></div>
+        ${inquisitorialRosette}
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
         <nav class="section-nav" aria-label="Portal sections">
           <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
@@ -2487,7 +2499,7 @@ function renderCompendium() {
     <a class="skip-link" href="#compendium-content">Skip to rules compendium</a>
     <main class="compendium-scene theme-assessment">
       <header class="topbar compendium-topbar">
-        <div class="sigil" aria-hidden="true"><span></span></div>
+        ${inquisitorialRosette}
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
         <nav class="section-nav" aria-label="Portal sections">
           <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
@@ -2935,7 +2947,7 @@ function renderRoster() {
     <main class="roster-scene theme-assessment">
       <div class="roster-art" aria-hidden="true"></div>
       <header class="topbar roster-topbar">
-        <div class="sigil" aria-hidden="true"><span></span></div>
+        ${inquisitorialRosette}
         <div class="brand"><strong>Dark Heresy Character Creation</strong><span>Acolyte Archive</span></div>
         <nav class="section-nav" aria-label="Portal sections">
           <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Acolyte Archive</span><span class="nav-narrow">Archive</span></button>
@@ -3382,7 +3394,7 @@ function render() {
       <div class="grain" aria-hidden="true"></div>
 
       <header class="topbar">
-        <div class="sigil" aria-hidden="true"><span></span></div>
+        ${inquisitorialRosette}
         <div class="brand">
           <strong>Dark Heresy Character Creation</strong>
           <span>Create an Acolyte</span>

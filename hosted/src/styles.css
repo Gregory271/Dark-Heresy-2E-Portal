@@ -173,11 +173,33 @@ html[data-edition="hosted"] .sound:disabled {
 
 .topbar, .controls { display: flex; align-items: center; position: relative; z-index: 10; }
 .topbar { gap: 15px; }
-.sigil { width: 32px; height: 40px; border: 1px solid var(--accent); position: relative; clip-path: polygon(50% 0, 100% 26%, 80% 100%, 20% 100%, 0 26%); }
-.sigil::before, .sigil::after, .sigil span { content: ""; position: absolute; background: var(--accent); }
-.sigil::before { width: 1px; height: 100%; left: 50%; }
-.sigil::after { height: 1px; width: 76%; left: 12%; top: 43%; }
-.sigil span { width: 8px; height: 8px; border-radius: 50%; left: calc(50% - 4px); top: 21%; }
+.sigil {
+  width: 32px;
+  height: 40px;
+  flex: 0 0 auto;
+  overflow: visible;
+  color: var(--accent);
+  filter: drop-shadow(0 0 7px rgba(223, 189, 92, .2));
+}
+.sigil-bars path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: square;
+}
+.sigil-spine { fill: currentColor; }
+.sigil-rosette > path:first-child {
+  fill: var(--ink);
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: bevel;
+}
+.sigil-rosette circle {
+  fill: var(--panel-solid);
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.sigil-rosette .sigil-skull { fill: currentColor; }
 .brand { display: flex; flex-direction: column; text-transform: uppercase; }
 .brand strong { font: 600 18px/1 "Barlow Condensed", sans-serif; letter-spacing: .16em; }
 .brand span { margin-top: 6px; color: var(--muted); font-size: 11px; letter-spacing: .15em; }
