@@ -33,18 +33,7 @@ import {
 } from "./creation-data.js?v=0.7.0";
 
 const root = document.querySelector("#app");
-const inquisitorialRosette = `
-  <svg class="sigil" viewBox="0 0 48 64" aria-hidden="true" focusable="false">
-    <g class="sigil-bars">
-      <path d="M8 18h32M5 25h38M2 32h44M5 39h38M8 46h32" />
-    </g>
-    <path class="sigil-spine" d="M24 3 18 12h3v40h-3l6 9 6-9h-3V12h3Z" />
-    <g class="sigil-rosette">
-      <path d="m24 18 2.2 5.4 5.2-3.2-.5 6.1 6.1-.5-3.2 5.2 5.4 2.2-5.4 2.2 3.2 5.2-6.1-.5.5 6.1-5.2-3.2L24 48l-2.2-5.4-5.2 3.2.5-6.1-6.1.5 3.2-5.2-5.4-2.2 5.4-2.2-3.2-5.2 6.1.5-.5-6.1 5.2 3.2Z" />
-      <circle cx="24" cy="33" r="7.25" />
-      <path class="sigil-skull" d="M20.2 31.6c0-2.3 1.6-4 3.8-4s3.8 1.7 3.8 4c0 1.5-.6 2.6-1.7 3.4v2.4h-4.2V35c-1.1-.8-1.7-1.9-1.7-3.4Zm1.9-.3h1.2v1.3h-1.2Zm2.6 0h1.2v1.3h-1.2Z" />
-    </g>
-  </svg>`;
+const inquisitionEmblem = `<img class="sigil" src="./public/assets/brand/inquisition-emblem.png?v=0.1.0" alt="" aria-hidden="true" />`;
 const hostedEdition = location.hostname.endsWith("github.io")
   || document.querySelector('meta[name="dh2-edition"]')?.content === "hosted";
 document.documentElement.dataset.edition = hostedEdition ? "hosted" : "local";
@@ -2275,7 +2264,7 @@ function legacyRenderCompendium() {
     <a class="skip-link" href="#compendium-content">Skip to rules compendium</a>
     <main class="compendium-scene theme-assessment">
       <header class="topbar compendium-topbar">
-        ${inquisitorialRosette}
+        ${inquisitionEmblem}
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
         <nav class="section-nav" aria-label="Portal sections">
           <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
@@ -2696,7 +2685,7 @@ function renderCompendium() {
     <a class="skip-link" href="#compendium-content">Skip to rules compendium</a>
     <main class="compendium-scene theme-assessment">
       <header class="topbar compendium-topbar">
-        ${inquisitorialRosette}
+        ${inquisitionEmblem}
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
         <nav class="section-nav" aria-label="Portal sections">
           <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
@@ -3144,7 +3133,7 @@ function renderRoster() {
     <main class="roster-scene theme-assessment">
       <div class="roster-art" aria-hidden="true"></div>
       <header class="topbar roster-topbar">
-        ${inquisitorialRosette}
+        ${inquisitionEmblem}
         <div class="brand"><strong>Dark Heresy Character Creation</strong><span>Your Acolytes</span></div>
         <nav class="section-nav" aria-label="Portal sections">
           <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
@@ -3220,6 +3209,7 @@ function renderRoster() {
       <p class="credit-small"><strong>Game creators:</strong> Dark Heresy originally designed by Owen Barnes, Kate Flack, and Mike Mason. Dark Heresy Second Edition designed by Andrew Fischer and produced by Tim Huckelbery.</p>
       ${hostedEdition ? "" : `<p class="credit-small"><strong>Soundtrack:</strong> “Dark Heresy — Roleplaying Game Ambient Music Mix,” supplied by the user for local playback.</p>`}
       <p class="credit-small">Sourcebook illustrations remain the work of their credited artists. Individual image, artist, book, and page provenance is recorded in the local project notes.</p>
+      <p class="credit-small"><strong>Header emblem:</strong> Inquisition icon artwork © Games Workshop; reference image preserved by Lexicanum.</p>
       <p class="credit-small"><strong>Display type:</strong> Caslon Antique when available through a licensed local installation; bundled fallback IM FELL English by Igino Marini, licensed under the SIL Open Font License 1.1.</p>
       <details class="artist-credits">
         <summary>View credited Core Rulebook interior artists</summary>
@@ -3604,7 +3594,7 @@ function render() {
       <div class="grain" aria-hidden="true"></div>
 
       <header class="topbar">
-        ${inquisitorialRosette}
+        ${inquisitionEmblem}
         <div class="brand">
           <strong>Dark Heresy Character Creation</strong>
           <span>Create Your Acolyte</span>

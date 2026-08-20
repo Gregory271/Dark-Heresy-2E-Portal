@@ -187,30 +187,11 @@ html[data-edition="hosted"] .sound:disabled {
 .sigil {
   width: 32px;
   height: 40px;
+  display: block;
   flex: 0 0 auto;
-  overflow: visible;
-  color: var(--accent);
-  filter: drop-shadow(0 0 7px rgba(223, 189, 92, .2));
+  object-fit: contain;
+  filter: drop-shadow(0 0 7px rgba(223, 189, 92, .26));
 }
-.sigil-bars path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: square;
-}
-.sigil-spine { fill: currentColor; }
-.sigil-rosette > path:first-child {
-  fill: var(--ink);
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linejoin: bevel;
-}
-.sigil-rosette circle {
-  fill: var(--panel-solid);
-  stroke: currentColor;
-  stroke-width: 1.5;
-}
-.sigil-rosette .sigil-skull { fill: currentColor; }
 .brand { display: flex; flex-direction: column; text-transform: uppercase; }
 .brand strong { font: 600 18px/1 "Barlow Condensed", sans-serif; letter-spacing: .16em; }
 .brand span { margin-top: 6px; color: var(--muted); font-size: 11px; letter-spacing: .15em; }

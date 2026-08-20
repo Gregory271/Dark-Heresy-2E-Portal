@@ -5,3 +5,4 @@ The hosted player edition omits private sourcebook extracts, illustrations, and 
 Players may select their own sourcebook PDFs; those files and the resulting rules index stay in that browser and are never uploaded by the application.
 PDF reading is provided by PDF.js under the Apache License 2.0; see vendor-licenses/pdfjs-LICENSE.txt.
 IM FELL English is copyright Igino Marini and distributed under the SIL Open Font License 1.1; see public/assets/fonts/im-fell-english/OFL.txt.
+The Inquisition emblem is Games Workshop artwork; the reference image is preserved by Lexicanum.
