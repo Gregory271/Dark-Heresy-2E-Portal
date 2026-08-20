@@ -3038,7 +3038,7 @@ function applyRuleHighlights() {
   while (walker.nextNode()) nodes.push(walker.currentNode);
   for (const node of nodes) {
     if (!node.nodeValue?.trim()) continue;
-    if (node.parentElement?.closest("button,input,textarea,select,option,a,.choice-source,.characteristic-abbreviation,.rule-term")) continue;
+    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term")) continue;
     const matches = [...node.nodeValue.matchAll(pattern)];
     if (!matches.length) continue;
     const fragment = document.createDocumentFragment();
