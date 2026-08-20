@@ -228,41 +228,62 @@ async function initialiseCloudRepository() {
   }
 }
 
+async function persistRepositoryRecord(record) {
+  try {
+    await repositoryRequest(`/${encodeURIComponent(record.id)}`, {
+      method: "PUT",
+      body: JSON.stringify(record),
+    });
+    repositoryStatus = "ready";
+  } catch (error) {
+    repositoryStatus = "browser-only";
+    console.warn("Character retained in browser backup because repository save failed.", error);
+  }
+}
+
+async function persistCloudRecord(record) {
+  try {
+    await withTimeout(
+      saveCloudCharacter(record),
+      12000,
+      "The shared campaign did not respond while saving.",
+    );
+    cloudStatus = "connected";
+  } catch (error) {
+    cloudStatus = "offline";
+    console.warn("Shared save failed; local recovery copies remain current.", error);
+  }
+}
+
 function queueRepositorySave(record) {
   if (repositoryStatus !== "browser-only") {
     clearTimeout(repositorySaveTimers.get(record.id));
-    repositorySaveTimers.set(record.id, setTimeout(async () => {
-      try {
-        await repositoryRequest(`/${encodeURIComponent(record.id)}`, {
-          method: "PUT",
-          body: JSON.stringify(record),
-        });
-        repositoryStatus = "ready";
-      } catch (error) {
-        repositoryStatus = "browser-only";
-        console.warn("Character retained in browser backup because repository save failed.", error);
-      } finally {
-        repositorySaveTimers.delete(record.id);
-      }
+    repositorySaveTimers.set(record.id, setTimeout(() => {
+      repositorySaveTimers.delete(record.id);
+      void persistRepositoryRecord(record);
     }, 180));
   }
   if (savedCampaignConnection()) {
     clearTimeout(cloudSaveTimers.get(record.id));
-    cloudSaveTimers.set(record.id, setTimeout(async () => {
-      try {
-        await withTimeout(
-          saveCloudCharacter(record),
-          12000,
-          "The shared campaign did not respond while saving.",
-        );
-        cloudStatus = "connected";
-      } catch (error) {
-        cloudStatus = "offline";
-        console.warn("Shared save failed; local recovery copies remain current.", error);
-      } finally {
-        cloudSaveTimers.delete(record.id);
-      }
-    }, 500));
+    cloudSaveTimers.set(record.id, setTimeout(() => {
+      cloudSaveTimers.delete(record.id);
+      void persistCloudRecord(record);
+    }, 350));
+  }
+}
+
+function flushActiveCharacterSaves() {
+  const record = characterLibrary.find((entry) => entry.id === activeCharacterId);
+  if (!record) return;
+  if (repositoryStatus !== "browser-only") {
+    clearTimeout(repositorySaveTimers.get(record.id));
+    repositorySaveTimers.delete(record.id);
+    void persistRepositoryRecord(record);
+  }
+  if (savedCampaignConnection()) {
+    clearTimeout(cloudSaveTimers.get(record.id));
+    cloudSaveTimers.delete(record.id);
+    void persistCloudRecord(record);
   }
 }
 
@@ -466,7 +487,9 @@ window.addEventListener("resize", () => {
 });
 document.addEventListener("visibilitychange", () => {
   document.documentElement.classList.toggle("page-paused", document.hidden);
+  if (document.hidden) flushActiveCharacterSaves();
 });
+window.addEventListener("pagehide", flushActiveCharacterSaves);
 
 function playMechanicalLock() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -916,14 +939,23 @@ function refreshCharacteristicDisplay(characteristicId) {
   const input = document.querySelector(`[data-manual-characteristic="${characteristicId}"]`);
   const article = input?.closest(".characteristic-entry");
   const result = character.rolls[characteristicId];
-  if (!article || !result) return;
-  article.classList.add("complete");
+  if (!article) return;
   const resultBox = article.querySelector(".characteristic-result");
-  resultBox.innerHTML = `<strong>${result.value}</strong><small>Entered manually</small>`;
   const rollButton = article.querySelector(".roll-characteristic");
-  if (rollButton) {
-    rollButton.textContent = character.characteristicReroll === characteristicId ? "Re-roll kept" : "Use one re-roll";
-    rollButton.disabled = Boolean(character.characteristicReroll);
+  if (result) {
+    article.classList.add("complete");
+    resultBox.innerHTML = `<strong>${result.value}</strong><small>Entered manually</small>`;
+    if (rollButton) {
+      rollButton.textContent = character.characteristicReroll === characteristicId ? "Re-roll kept" : "Use one re-roll";
+      rollButton.disabled = Boolean(character.characteristicReroll);
+    }
+  } else {
+    article.classList.remove("complete");
+    resultBox.innerHTML = "<strong>—</strong><small>Awaiting result</small>";
+    if (rollButton) {
+      rollButton.textContent = "Roll 3D Dice";
+      rollButton.disabled = false;
+    }
   }
   const complete = characteristics.filter((entry) => character.rolls[entry.id]?.value).length;
   const counter = document.querySelector(".management-heading span");
@@ -3543,9 +3575,18 @@ function wireEvents() {
 
   document.querySelectorAll("[data-manual-characteristic]").forEach((input) => {
     input.addEventListener("input", () => {
-      const value = Number(input.value);
-      if (!Number.isFinite(value) || value < 20 || value > 50) return;
       const id = input.dataset.manualCharacteristic;
+      if (!input.value.trim()) {
+        delete character.rolls[id];
+        if (character.characteristicReroll === id) character.characteristicReroll = null;
+        save();
+        refreshCharacteristicDisplay(id);
+        return;
+      }
+      const value = Number(input.value);
+      const minimum = Number(input.min || 20);
+      const maximum = Number(input.max || 50);
+      if (!Number.isFinite(value) || value < minimum || value > maximum) return;
       const config = characteristicRollConfig(id);
       character.rolls[id] = { value, dice: [], formula: `${config.quantity}d10+20`, keep: config.keep, source: "manual" };
       save();
@@ -3564,8 +3605,15 @@ function wireEvents() {
     save();
     render();
   });
-  document.querySelector("#manual-fate")?.addEventListener("change", (event) => {
+  const manualFate = document.querySelector("#manual-fate");
+  manualFate?.addEventListener("input", (event) => {
+    if (!event.target.value.trim()) {
+      character.fate = {};
+      save();
+      return;
+    }
     const value = Number(event.target.value);
+    if (!Number.isFinite(value) || value < 1 || value > 10) return;
     const rules = homeWorldRules();
     character.fate = {
       roll: value,
@@ -3573,6 +3621,8 @@ function wireEvents() {
       threshold: rules.fate.threshold + (value >= rules.fate.blessing ? 1 : 0),
     };
     save();
+  });
+  manualFate?.addEventListener("change", () => {
     render();
   });
   document.querySelector("#roll-wounds")?.addEventListener("click", async () => {
@@ -3588,9 +3638,21 @@ function wireEvents() {
     save();
     render();
   });
-  document.querySelector("#manual-wounds")?.addEventListener("change", (event) => {
-    character.wounds = { total: Number(event.target.value), dice: [], source: "manual" };
+  const manualWounds = document.querySelector("#manual-wounds");
+  manualWounds?.addEventListener("input", (event) => {
+    if (!event.target.value.trim()) {
+      character.wounds = {};
+      save();
+      return;
+    }
+    const total = Number(event.target.value);
+    const minimum = Number(event.target.min);
+    const maximum = Number(event.target.max);
+    if (!Number.isFinite(total) || total < minimum || total > maximum) return;
+    character.wounds = { total, dice: [], source: "manual" };
     save();
+  });
+  manualWounds?.addEventListener("change", () => {
     render();
   });
   document.querySelector("#roll-divination")?.addEventListener("click", async () => {
@@ -3600,10 +3662,19 @@ function wireEvents() {
     save();
     render();
   });
-  document.querySelector("#manual-divination")?.addEventListener("change", (event) => {
-    const value = Math.min(100, Math.max(1, Number(event.target.value)));
+  const manualDivination = document.querySelector("#manual-divination");
+  manualDivination?.addEventListener("input", (event) => {
+    if (!event.target.value.trim()) {
+      character.divination = { statChoices: {} };
+      save();
+      return;
+    }
+    const value = Number(event.target.value);
+    if (!Number.isFinite(value) || value < 1 || value > 100) return;
     character.divination = { roll: value, dice: [], source: "manual", result: divinationFor(value), statChoices: {} };
     save();
+  });
+  manualDivination?.addEventListener("change", () => {
     render();
   });
   document.querySelectorAll("[data-divination-choice]").forEach((select) => {
