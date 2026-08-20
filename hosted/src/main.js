@@ -33,7 +33,7 @@ import {
 } from "./creation-data.js?v=0.7.0";
 
 const root = document.querySelector("#app");
-const inquisitionEmblem = `<img class="sigil" src="./public/assets/brand/inquisition-emblem.png?v=0.1.0" alt="" aria-hidden="true" />`;
+const portalEmblem = `<img class="sigil" src="./public/assets/brand/pax-historia-emblem.png?v=0.1.0" alt="" aria-hidden="true" />`;
 const hostedEdition = location.hostname.endsWith("github.io")
   || document.querySelector('meta[name="dh2-edition"]')?.content === "hosted";
 document.documentElement.dataset.edition = hostedEdition ? "hosted" : "local";
@@ -2263,7 +2263,7 @@ function legacyRenderCompendium() {
     <a class="skip-link" href="#compendium-content">Skip to rules compendium</a>
     <main class="compendium-scene theme-assessment">
       <header class="topbar compendium-topbar">
-        ${inquisitionEmblem}
+        ${portalEmblem}
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
         <nav class="section-nav" aria-label="Portal sections">
           <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
@@ -2684,7 +2684,7 @@ function renderCompendium() {
     <a class="skip-link" href="#compendium-content">Skip to rules compendium</a>
     <main class="compendium-scene theme-assessment">
       <header class="topbar compendium-topbar">
-        ${inquisitionEmblem}
+        ${portalEmblem}
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
         <nav class="section-nav" aria-label="Portal sections">
           <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
@@ -3132,7 +3132,7 @@ function renderRoster() {
     <main class="roster-scene theme-assessment">
       <div class="roster-art" aria-hidden="true"></div>
       <header class="topbar roster-topbar">
-        ${inquisitionEmblem}
+        ${portalEmblem}
         <div class="brand"><strong>Dark Heresy Character Creation</strong><span>Your Acolytes</span></div>
         <nav class="section-nav" aria-label="Portal sections">
           <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
@@ -3208,7 +3208,7 @@ function renderRoster() {
       <p class="credit-small"><strong>Game creators:</strong> Dark Heresy originally designed by Owen Barnes, Kate Flack, and Mike Mason. Dark Heresy Second Edition designed by Andrew Fischer and produced by Tim Huckelbery.</p>
       ${hostedEdition ? "" : `<p class="credit-small"><strong>Soundtrack:</strong> “Dark Heresy — Roleplaying Game Ambient Music Mix,” supplied by the user for local playback.</p>`}
       <p class="credit-small">Sourcebook illustrations remain the work of their credited artists. Individual image, artist, book, and page provenance is recorded in the local project notes.</p>
-      <p class="credit-small"><strong>Header emblem:</strong> Inquisition icon artwork © Games Workshop; reference image preserved by Lexicanum.</p>
+      <p class="credit-small"><strong>Header emblem:</strong> Pax Historia Inquisitorial emblem supplied by the GM for this portal. Warhammer 40,000 imagery and marks belong to Games Workshop.</p>
       <p class="credit-small"><strong>Display type:</strong> Caslon Antique when available through a licensed local installation; bundled fallback IM FELL English by Igino Marini, licensed under the SIL Open Font License 1.1.</p>
       <details class="artist-credits">
         <summary>View credited Core Rulebook interior artists</summary>
@@ -3589,7 +3589,7 @@ function render() {
       <div class="grain" aria-hidden="true"></div>
 
       <header class="topbar">
-        ${inquisitionEmblem}
+        ${portalEmblem}
         <div class="brand">
           <strong>Dark Heresy Character Creation</strong>
           <span>Create Your Acolyte</span>
