@@ -671,11 +671,14 @@ function applyTextScale(scope = root) {
       const computedSize = Number.parseFloat(getComputedStyle(element).fontSize);
       if (!Number.isFinite(computedSize) || computedSize <= 0) return;
       const compact = element.matches(compactTextSelector);
-      const minimumSize = isPhone
-        ? (compact ? 13 : 16)
-        : isCompactViewport
-          ? (compact ? 14 : 16)
-          : (compact ? 14 : 18);
+      const secondaryDetail = element.matches(".item-origin");
+      const minimumSize = secondaryDetail
+        ? (isPhone ? 13 : 12)
+        : isPhone
+          ? (compact ? 13 : 16)
+          : isCompactViewport
+            ? (compact ? 14 : 16)
+            : (compact ? 14 : 18);
       const baseSize = Math.max(computedSize, minimumSize);
       const scaledSize = baseSize * textScale;
       const phoneHeadingCap = Math.max(56, Math.min(78, window.innerWidth * 0.145));
@@ -1851,7 +1854,7 @@ function renderEquipment() {
               <span class="item-category">${item.category}</span>
               <span>${effectiveAvailability(item) || "Availability not recorded"}${effectiveAvailability(item) !== item.availability ? ` (base ${item.availability})` : ""} · ${displayWeight(item)}</span>
               ${grantedByItemId.has(item.id)
-                ? `<em class="granted">Included · ${grantedByItemId.get(item.id).sourceName}</em>`
+                ? `<em class="granted item-origin">Included · ${grantedByItemId.get(item.id).sourceName}</em>`
                 : isStartingAcquisitionLegal(item)
                   ? `<em>Eligible starting acquisition</em>`
                   : `<em class="restricted">Requires acquisition test</em>`}
@@ -1901,11 +1904,11 @@ function renderEquipment() {
             </div>
             <div class="inventory-strip">${inventoryItems.map((item) => {
               const source = equipmentProvenance(item.id, grantedEquipment);
-              return `<button class="${selected.id === item.id ? "selected" : ""}" type="button" data-equipment-item="${item.id}" data-source-type="${source.type}" aria-pressed="${selected.id === item.id}" title="View ${escapeHtmlAttribute(item.name)} details"><strong>${item.name}</strong><small>${source.label}</small></button>`;
+              return `<button class="${selected.id === item.id ? "selected" : ""}" type="button" data-equipment-item="${item.id}" data-source-type="${source.type}" aria-pressed="${selected.id === item.id}" title="View ${escapeHtmlAttribute(item.name)} details"><strong>${item.name}</strong><small class="item-origin">${source.label}</small></button>`;
             }).join("")}${unlinkedGrantedItems.map((entry) => `
               <div class="inventory-entry ${entry.unresolvedChoice ? "unresolved" : "unlinked"}">
                 <strong>${entry.label}</strong>
-                <small>${entry.unresolvedChoice ? "Background choice unresolved" : `Granted by ${entry.sourceName}`}</small>
+                <small class="item-origin">${entry.unresolvedChoice ? "Background choice unresolved" : `Granted by ${entry.sourceName}`}</small>
                 <em>${entry.unresolvedChoice ? "Return to Starting Abilities and choose one option." : "Recorded as written · Armoury details not yet linked."}</em>
               </div>`).join("")}${!inventoryItems.length && !unlinkedGrantedItems.length ? "<span>No equipment recorded yet.</span>" : ""}</div>
           </section>

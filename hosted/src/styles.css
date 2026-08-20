@@ -584,6 +584,7 @@ html[data-text-size="extra-large"] .scene-equipment .armoury-layout { margin-top
 .armoury-item > span:not(.item-category),.armoury-item em { grid-column: 1 / -1; }
 .armoury-item em { color: #b9ce9f; }
 .armoury-item em.granted { color: #9ed8c1; }
+.armoury-item em.granted.item-origin { color: #8fb8a8; font-weight: 400; letter-spacing: .01em; }
 .armoury-item em.restricted { color: #d7a395; }
 .item-inspector { display: grid; grid-template-columns: minmax(300px,1.15fr) minmax(340px,.9fr); min-height: 0; overflow: hidden; }
 .item-inspector > div { min-height: 0; overflow-y: auto; padding: clamp(17px,1.6vw,24px); }
@@ -627,6 +628,8 @@ html[data-text-size="extra-large"] .scene-equipment .armoury-layout { margin-top
 .inventory-strip button { display: grid; gap: 2px; border: 1px solid rgba(225,187,118,.3); padding: 6px 8px; background: rgba(151,100,37,.13); color: #dfd6c6; font-size: 8px; text-align: left; cursor: pointer; }
 .inventory-strip button strong { color: #efe4d1; font: 600 1em "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .inventory-strip button small { color: #a9cbbb; font-size: .82em; letter-spacing: .05em; text-transform: uppercase; }
+.inventory-strip button small.item-origin,
+.inventory-entry small.item-origin { color: #91aaa0; font-family: "Barlow",sans-serif; font-size: 8px; font-weight: 400; letter-spacing: .015em; line-height: 1.35; text-transform: none; }
 .inventory-strip button:hover,.inventory-strip button:focus-visible,.inventory-strip button.selected { border-color: #e1bb76; background: rgba(151,100,37,.3); outline: none; }
 .inventory-strip button.selected { box-shadow: inset 2px 0 #e1bb76; }
 .inventory-entry { display: grid; gap: 2px; border: 1px solid rgba(155,139,101,.42); padding: 6px 8px; background: rgba(74,61,36,.15); color: #dfd6c6; font-size: 8px; text-align: left; }
