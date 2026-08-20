@@ -630,8 +630,13 @@ function applyTextScale(scope = root) {
       const compact = element.matches(compactTextSelector);
       const minimumSize = isPhone ? (compact ? 12 : 16) : (compact ? 14 : 18);
       const baseSize = Math.max(computedSize, minimumSize);
+      const scaledSize = baseSize * textScale;
+      const phoneHeadingCap = Math.max(56, Math.min(78, window.innerWidth * 0.145));
+      const finalSize = isPhone && element.matches("h1")
+        ? Math.min(scaledSize, phoneHeadingCap)
+        : scaledSize;
       element.dataset.accessFont = "";
-      element.style.fontSize = `${(baseSize * textScale).toFixed(2)}px`;
+      element.style.fontSize = `${finalSize.toFixed(2)}px`;
     });
 
   requestAnimationFrame(() => {
@@ -3219,6 +3224,7 @@ function renderRoster() {
       <h2 id="credits-dialog-title">Source & credits</h2>
       <p>Dark Heresy, Warhammer 40,000, and associated settings and sourcebook material belong to their respective rights holders. Original universe by Games Workshop; Dark Heresy Second Edition published by Fantasy Flight Games.</p>
       <p class="credit-small">Sourcebook illustrations remain the work of their credited artists. Individual image, artist, book, and page provenance is recorded in the local project notes.</p>
+      <p class="credit-small"><strong>Display type:</strong> Caslon Antique when available through a licensed local installation; bundled fallback IM FELL English by Igino Marini, licensed under the SIL Open Font License 1.1.</p>
     </dialog>
     <dialog id="shared-dialog" aria-labelledby="shared-dialog-title">
       <button class="dialog-close" aria-label="Close shared campaign">×</button>
@@ -3676,6 +3682,7 @@ function render() {
       <p>Dark Heresy, Warhammer 40,000, and all associated marks, settings, and sourcebook material belong to their respective rights holders. Original game and universe by Games Workshop; Dark Heresy Second Edition published by Fantasy Flight Games.</p>
       <p class="credit-small"><strong>Game creators:</strong> Dark Heresy originally designed by Owen Barnes, Kate Flack, and Mike Mason. Dark Heresy Second Edition designed by Andrew Fischer and produced by Tim Huckelbery.</p>
       ${hostedEdition ? "" : `<p class="credit-small"><strong>Soundtrack:</strong> “Dark Heresy — Roleplaying Game Ambient Music Mix,” supplied by the user for local playback.</p>`}
+      <p class="credit-small"><strong>Display type:</strong> Caslon Antique when available through a licensed local installation; bundled fallback IM FELL English by Igino Marini, licensed under the SIL Open Font License 1.1.</p>
       <p class="credit-small">Sourcebook illustrations remain the work of their credited artists. Individual image, artist, book, and page credits are recorded in the local project notes as artwork is added. This unofficial prototype is not endorsed by or affiliated with Games Workshop or Fantasy Flight Games.</p>
       <details class="artist-credits">
         <summary>View credited Core Rulebook interior artists</summary>

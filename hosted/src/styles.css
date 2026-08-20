@@ -1,5 +1,15 @@
 @import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap");
 
+@font-face {
+  font-family: "IM FELL English";
+  src:
+    local("IM FELL English"),
+    url("../public/assets/fonts/im-fell-english/IMFeENrm28P.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
   font-family: Inter, system-ui, sans-serif;
@@ -9,6 +19,7 @@
   --accent-hot: #efb15e;
   --muted: #b8b5ad;
   --line: rgba(235, 226, 208, 0.34);
+  --font-antique: "Caslon Antique", "CaslonAntique", "IM FELL English", Georgia, serif;
 }
 
 * { box-sizing: border-box; }
@@ -1590,6 +1601,29 @@ dialog > p:not(.eyebrow) { color: #b8b4aa; line-height: 1.7; }
 }
 .footer-credit-button:hover,
 .footer-credit-button:focus-visible { color: #f0d8ac; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Caslon Antique is used when a licensed local installation is available.
+   IM FELL English provides a bundled, open-licensed period fallback. Dense
+   rules, controls, and numerical records retain the more legible sans faces. */
+h1,
+.choice-card h2,
+.ceremony-card h2,
+.grant-panel h2,
+.advance-shop h2,
+.validation-panel h2,
+.divination-card h2,
+.item-inspector h2,
+.talent-inspector h3,
+.review-dossier h2,
+dialog h2,
+.compendium-reader h2,
+.sourcebook-connect-copy strong,
+.compendium-section-heading h3,
+.empty-roster h2 {
+  font-family: var(--font-antique);
+  font-weight: 400;
+  letter-spacing: .015em;
+}
 
 @media (max-width: 1080px) {
   .roster-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
