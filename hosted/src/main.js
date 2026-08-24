@@ -726,11 +726,9 @@ function applyTextScale(scope = root) {
     ".talent-cost span",
     ".talent-inspector dt",
     ".other-advances label",
-    ".elite-advances summary span",
-    ".elite-advances summary em",
-    ".elite-explanation p",
-    ".automatic-elite span",
-    ".elite-path-list span",
+    ".elite-select-copy p",
+    ".elite-select-control span",
+    ".automatic-elite-compact span",
     ".review-characteristics span",
     ".calculation-note",
     ".review-meta",
@@ -1242,6 +1240,10 @@ function automaticEliteAdvances() {
   return character.role === "mystic"
     ? [{ id: "psyker", name: "Psyker", source: "Mystic Role — Stare into the Warp", cost: 0, automatic: true }]
     : [];
+}
+
+function selectedEliteAdvance() {
+  return character.advances.eliteAdvances.find((entry) => entry?.id || entry?.name) || null;
 }
 
 function automaticTraits() {
@@ -2440,7 +2442,7 @@ function renderAdvances() {
       </aside>
       <section class="advance-shop">
         ${unresolved.length ? `<div class="advance-warning"><strong>Starting choices incomplete</strong><span>Return to Starting Abilities and resolve ${unresolved.length} granted alternative${unresolved.length === 1 ? "" : "s"} before purchasing advances.</span></div>` : ""}
-        <nav class="advance-nav"><button type="button" data-advance-jump="advance-characteristics">Characteristics</button><button type="button" data-advance-jump="advance-skills">Skills</button><button type="button" data-advance-jump="advance-talents">Talents</button>${hasPsykerAccess() ? `<button type="button" data-advance-jump="advance-psychic">Psychic</button>` : ""}<button type="button" data-advance-jump="advance-elite">Optional Elite Paths</button></nav>
+        <nav class="advance-nav"><button type="button" data-advance-jump="advance-characteristics">Characteristics</button><button type="button" data-advance-jump="advance-skills">Skills</button><button type="button" data-advance-jump="advance-talents">Talents</button>${hasPsykerAccess() ? `<button type="button" data-advance-jump="advance-psychic">Psychic</button>` : ""}</nav>
         <h2 id="advance-characteristics">Characteristic Advances</h2>
         <div class="advance-rows">
           ${characteristics.filter((entry) => entry.id !== "influence").map((entry) => {
@@ -2485,17 +2487,18 @@ function renderAdvances() {
               }).join("")}
             </div>
           </section>` : ""}
-        <details class="elite-advances" id="advance-elite">
-          <summary><span>Optional — most characters skip this</span><strong>Elite Advances</strong><em>Special character paths, not a required creation step.</em></summary>
-          <div class="elite-explanation">
-            <p>Elite Advances are exceptional packages with their own prerequisites and costs. Do not select one merely to finish the character.</p>
-            ${automaticEliteAdvances().length ? `<div class="automatic-elite"><strong>Granted automatically</strong>${automaticEliteAdvances().map((entry) => `<span>${entry.name} · 0 XP<br><small>${entry.source}</small></span>`).join("")}</div>` : `<p class="elite-none">This character has no automatically granted Elite Advance.</p>`}
-            <div class="elite-path-list">
-              ${catalogs.eliteAdvances.map((entry) => `<span>${entry.name}<small>${entry.source}</small></span>`).join("")}
-            </div>
-            ${character.advances.eliteAdvances.length ? `<div class="legacy-warning"><strong>Previously entered Elite Advance:</strong> ${character.advances.eliteAdvances.map((entry) => `${entry.name || "Unnamed"} (${entry.cost || 0} XP)`).join("; ")}.</div>` : ""}
+        <section class="elite-select-row" id="advance-elite">
+          <div class="elite-select-copy">
+            <span>Optional</span>
+            <strong>Elite Advance</strong>
+            <p>Only select one with GM approval. Its complete cost, prerequisites, and instant changes will be configured in a later expansion.</p>
           </div>
-        </details>
+          ${automaticEliteAdvances().length ? `<div class="automatic-elite-compact"><span>Granted automatically</span>${automaticEliteAdvances().map((entry) => `<strong>${entry.name}</strong><small>${entry.source}</small>`).join("")}</div>` : ""}
+          <label class="elite-select-control"><span>Add an optional Elite Advance?</span><select data-elite-advance-select aria-label="Optional Elite Advance">
+            <option value="">No optional Elite Advance</option>
+            ${catalogs.eliteAdvances.filter((entry) => !automaticEliteAdvances().some((automatic) => automatic.id === entry.id)).map((entry) => `<option value="${entry.id}" ${selectedEliteAdvance()?.id === entry.id || selectedEliteAdvance()?.name === entry.name ? "selected" : ""}>${entry.name}</option>`).join("")}
+          </select></label>
+        </section>
       </section>
     </div>`;
 }
@@ -3954,6 +3957,7 @@ function renderReview() {
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
   const ownedWeapons = inventoryItems.filter((item) => item.category === "Weapons");
   const psychicPowers = character.advances.psychicPowers.filter((entry) => entry?.name);
+  const eliteAdvances = [...automaticEliteAdvances(), ...character.advances.eliteAdvances.filter((entry) => entry?.name)];
   const equipmentState = equipmentRulesState(inventoryItems);
   const grantedEquipment = resolvedGrantedEquipment();
   const unlinkedGrantedEquipment = character.equipment.unlinkedCharacterCreationGrants || [];
@@ -3962,7 +3966,7 @@ function renderReview() {
     ...ownedSkills.filter((record) => skillXpCost(record.skill.id, record.speciality) > 0).map((record) => [`${record.displayName} · ${rankNames[record.rank - 1]}`, skillXpCost(record.skill.id, record.speciality)]),
     ...purchasedTalents.map((talent) => [talent.name, talentCost(talent)]),
     ...character.advances.psychicPowers.filter((entry) => entry?.name).map((entry) => [entry.name, Number(entry.cost || 0)]),
-    ...character.advances.eliteAdvances.filter((entry) => entry?.name).map((entry) => [entry.name, Number(entry.cost || 0)]),
+    ...character.advances.eliteAdvances.filter((entry) => entry?.name && !entry.pendingSetup).map((entry) => [entry.name, Number(entry.cost || 0)]),
   ];
   const abilityEntries = [
     ["Home World", ruleValue(character.homeWorld, "Home World Bonus")],
@@ -4079,13 +4083,10 @@ function renderReview() {
               rows: [["Psy Rating", foundryPsyRating()], ["XP Cost", Number(power.cost || 0)]],
             })).join("")}</div>
           </section>` : ""}
-          <section>
+          ${eliteAdvances.length ? `<section>
             <h3>Elite Advances</h3>
-            <div class="dossier-list">${[
-              ...automaticEliteAdvances().map((entry) => `<div><strong>${entry.name}</strong><span>${entry.source}</span><em>Automatic · 0 XP</em></div>`),
-              ...character.advances.eliteAdvances.filter((entry) => entry?.name).map((entry) => `<div><strong>${entry.name}</strong><span>Optional Elite Advance</span><em>${entry.cost || 0} XP</em></div>`),
-            ].join("") || "<p>None. Elite Advances are optional and are not required to complete this character.</p>"}</div>
-          </section>
+            <div class="dossier-list">${eliteAdvances.map((entry) => `<div><strong>${entry.name}</strong><span>${entry.automatic ? entry.source : "Optional Elite Advance · detailed setup pending"}</span><em>${entry.automatic ? "Automatic · 0 XP" : "GM approval required"}</em></div>`).join("")}</div>
+          </section>` : ""}
           <section class="review-skills-section">
             <h3>Skills</h3>
             <div class="dossier-list review-skills-list">${ownedSkills.map((record) => {
@@ -4659,6 +4660,15 @@ function wireEvents() {
       save();
       rerenderAdvancesPreservingScroll(`[data-characteristic-advance="${characteristicId}"]`, "#advance-characteristics");
     });
+  });
+  document.querySelector("[data-elite-advance-select]")?.addEventListener("change", (event) => {
+    const selected = catalogs.eliteAdvances.find((entry) => entry.id === event.target.value);
+    character.advances.eliteAdvances = selected
+      ? [{ id: selected.id, name: selected.name, source: selected.source, cost: 0, pendingSetup: true }]
+      : [];
+    playMechanicalLock();
+    save();
+    rerenderAdvancesPreservingScroll("[data-elite-advance-select]", "#advance-elite");
   });
   document.querySelectorAll("[data-skill-advance]").forEach((select) => {
     select.addEventListener("change", () => {
