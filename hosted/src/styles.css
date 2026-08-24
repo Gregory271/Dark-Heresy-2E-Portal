@@ -807,6 +807,31 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
 .review-sections section { display: inline-block; width: 100%; min-width: 0; margin: 0 0 9px; break-inside: avoid; border: 1px solid rgba(255,255,255,.11); padding: 9px; background: rgba(3,6,6,.38); vertical-align: top; }
 .review-sections section h3 { margin: 0 0 8px; color: #e3bd7c; font: 600 14px "Barlow Condensed",sans-serif; letter-spacing: .06em; text-transform: uppercase; }
 .review-sections .tag-list { margin-top: 0; }
+.review-skill-label {
+  display: inline;
+  max-width: 100%;
+  border-color: currentColor;
+  padding: 0 1px;
+  color: #78cf9a;
+  font: 700 9px/1.25 "Inter",sans-serif;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.review-skill-label:hover,
+.review-skill-label:focus-visible { color: #a5e5bc; }
+.review-skills-section {
+  display: block !important;
+  column-span: all;
+}
+.review-skills-list {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  column-gap: 16px;
+}
+.review-sections .dossier-list.review-skills-list > div {
+  grid-template-columns: minmax(130px,.9fr) minmax(130px,1.1fr) minmax(105px,auto);
+  gap: 8px;
+  padding: 7px 0;
+}
 .dossier-list { display: grid; gap: 5px; }
 .dossier-list > div { display: grid; grid-template-columns: minmax(78px,.62fr) minmax(100px,1.38fr) auto; gap: 6px; align-items: start; border-bottom: 1px solid rgba(255,255,255,.075); padding: 4px 0; }
 .dossier-list strong { color: #e8e1d5; font-size: 9px; }
@@ -963,6 +988,8 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
 .validation-panel button { width: 100%; margin-top: 10px; }
 
 html[data-text-size="large"] .review-sections { column-count: 2; }
+html[data-text-size="large"] .review-skills-list,
+html[data-text-size="extra-large"] .review-skills-list { grid-template-columns: 1fr; }
 html[data-text-size="extra-large"] .review-layout { grid-template-columns: minmax(0,1fr) 330px; }
 html[data-text-size="extra-large"] .review-sections { column-count: 1; }
 html[data-text-size="extra-large"] .review-sections section { padding: 13px; }
@@ -2585,4 +2612,5 @@ dialog h2,
     grid-column: 1 / -1;
     min-width: 0;
   }
+  .review-skills-list { grid-template-columns: 1fr; }
 }

@@ -230,6 +230,36 @@ export const characteristicRuleTerms = [
   { id: "characteristic-influence", term: "Influence", aliases: [], category: "Characteristic", summary: "Measures reputation, connections, and resources, and is central to obtaining goods and aid.", book: "Core Rulebook", page: "22" },
 ];
 
+export const skillRuleTerms = [
+  { id: "skill-acrobatics", term: "Acrobatics", aliases: [], category: "Skill", summary: "Covers agile movement, balance, controlled falls, and moving past obstacles or opponents without breaking stride.", book: "Core Rulebook", page: "98" },
+  { id: "skill-athletics", term: "Athletics", aliases: [], category: "Skill", summary: "Covers climbing, swimming, crossing rough ground, lifting, and pushing through physical exhaustion.", book: "Core Rulebook", page: "99" },
+  { id: "skill-awareness", term: "Awareness", aliases: [], category: "Skill", summary: "Notices hidden people, threats, clues, sounds, and other changes in the character's surroundings; it opposes Stealth.", book: "Core Rulebook", page: "100" },
+  { id: "skill-charm", term: "Charm", aliases: [], category: "Skill", summary: "Influences another person's attitude through persuasion, generosity, and apparent good intentions rather than threats.", book: "Core Rulebook", page: "100" },
+  { id: "skill-command", term: "Command", aliases: [], category: "Skill", summary: "Motivates, organises, and directs allies, including rallying groups and issuing orders in dangerous situations.", book: "Core Rulebook", page: "101" },
+  { id: "skill-commerce", term: "Commerce", aliases: [], category: "Skill", summary: "Assesses trade, value, and exchange; it can locate goods, judge prices, and assist with Requisition Tests.", book: "Core Rulebook", page: "102" },
+  { id: "skill-common-lore", term: "Common Lore", aliases: [], category: "Skill", summary: "Recalls generally available information about a chosen organisation, culture, region, or field of Imperial life.", book: "Core Rulebook", page: "102" },
+  { id: "skill-deceive", term: "Deceive", aliases: [], category: "Skill", summary: "Convinces others of a deliberate falsehood, creates distractions, and supports disguises; it is opposed by Scrutiny.", book: "Core Rulebook", page: "103" },
+  { id: "skill-dodge", term: "Dodge", aliases: [], category: "Skill", summary: "A Reaction used to avoid a successful melee or ranged attack; Degrees of Success can cancel additional hits.", book: "Core Rulebook", page: "104" },
+  { id: "skill-forbidden-lore", term: "Forbidden Lore", aliases: [], category: "Skill", summary: "Recalls proscribed or secret knowledge in a chosen field, where possessing the information can itself be dangerous.", book: "Core Rulebook", page: "104" },
+  { id: "skill-inquiry", term: "Inquiry", aliases: [], category: "Skill", summary: "Gathers information from individuals or groups through questions, conversation, and eavesdropping, usually over an extended period.", book: "Core Rulebook", page: "105" },
+  { id: "skill-interrogation", term: "Interrogation", aliases: [], category: "Skill", summary: "Extracts information from an unwilling subject through controlled psychological pressure, devices, or serums in an Opposed Test against Willpower.", book: "Core Rulebook", page: "105" },
+  { id: "skill-intimidate", term: "Intimidate", aliases: [], category: "Skill", summary: "Uses fear and coercion to force compliance, extract information, or make an opponent back down; it is opposed by Willpower.", book: "Core Rulebook", page: "106" },
+  { id: "skill-linguistics", term: "Linguistics", aliases: [], category: "Skill", summary: "Speaks, reads, writes, translates, and deciphers languages, codes, and ciphers, with a chosen speciality for each trained language.", book: "Core Rulebook", page: "106" },
+  { id: "skill-logic", term: "Logic", aliases: [], category: "Skill", summary: "Applies rational analysis, mathematics, and inference to puzzles, complex information, statistics, and likely outcomes.", book: "Core Rulebook", page: "107" },
+  { id: "skill-medicae", term: "Medicae", aliases: [], category: "Skill", summary: "Treats injuries and ailments, performs first aid and extended care, diagnoses conditions, and supports surgery or chemical treatment.", book: "Core Rulebook", page: "108" },
+  { id: "skill-navigate", term: "Navigate", aliases: [], category: "Skill", summary: "Plots and follows routes, creates maps, and gives directions within the trained surface, stellar, or Warp speciality.", book: "Core Rulebook", page: "110" },
+  { id: "skill-operate", term: "Operate", aliases: [], category: "Skill", summary: "Pilots, drives, or operates vehicles and large machines within the trained Surface, Aeronautica, or Voidship speciality.", book: "Core Rulebook", page: "111" },
+  { id: "skill-parry", term: "Parry", aliases: [], category: "Skill", summary: "A Reaction used to deflect a melee attack; Degrees of Success can cancel additional melee hits.", book: "Core Rulebook", page: "112" },
+  { id: "skill-psyniscience", term: "Psyniscience", aliases: [], category: "Skill", summary: "Senses the currents of the Warp, psychic activity, disturbances, and the presence or effects of immaterial phenomena.", book: "Core Rulebook", page: "112" },
+  { id: "skill-scrutiny", term: "Scrutiny", aliases: [], category: "Skill", summary: "Analyses people, objects, reports, and readings to uncover lies, motives, inconsistencies, or details requiring careful interpretation.", book: "Core Rulebook", page: "114" },
+  { id: "skill-security", term: "Security", aliases: [], category: "Skill", summary: "Bypasses or reinforces locks, codes, cogitator safeguards, physical defences, and traps.", book: "Core Rulebook", page: "115" },
+  { id: "skill-sleight-of-hand", term: "Sleight of Hand", aliases: [], category: "Skill", summary: "Uses deception and dexterity to conceal actions, palm or plant objects, pick pockets, and hide items in plain sight.", book: "Core Rulebook", page: "115" },
+  { id: "skill-stealth", term: "Stealth", aliases: [], category: "Skill", summary: "Hides, moves silently, blends into crowds, shadows targets, and avoids detection; it is opposed by Awareness.", book: "Core Rulebook", page: "115" },
+  { id: "skill-survival", term: "Survival", aliases: [], category: "Skill", summary: "Finds food and water, tracks prey, predicts weather, handles beasts, and creates primitive necessities away from civilisation.", book: "Core Rulebook", page: "116" },
+  { id: "skill-tech-use", term: "Tech-Use", aliases: [], category: "Skill", summary: "Operates, repairs, studies, and constructs technological devices through the rites and practical knowledge of the Machine Cult.", book: "Core Rulebook", page: "117" },
+  { id: "skill-trade", term: "Trade", aliases: [], category: "Skill", summary: "Practises a chosen craft, identifies its workmanship, recalls trade knowledge, and creates appropriate goods over the required time.", book: "Core Rulebook", page: "118" },
+];
+
 export const aptitudeRuleTerms = [
   { id: "aptitude-general", term: "General", aliases: [], category: "Aptitude", summary: "A broad aptitude paired with many common skills and talents when calculating XP costs.", book: "Core Rulebook", page: "78" },
   { id: "aptitude-defence", term: "Defence", aliases: [], category: "Aptitude", summary: "An aptitude associated with avoiding, resisting, and surviving harm.", book: "Core Rulebook", page: "78" },
@@ -243,7 +273,7 @@ export const aptitudeRuleTerms = [
   { id: "aptitude-tech", term: "Tech", aliases: [], category: "Aptitude", summary: "An aptitude associated with machinery, security systems, cybernetics, and technical work.", book: "Core Rulebook", page: "78" },
 ];
 
-export const creatorRuleTerms = [...coreRuleTerms, ...characteristicRuleTerms, ...aptitudeRuleTerms];
+export const creatorRuleTerms = [...coreRuleTerms, ...characteristicRuleTerms, ...skillRuleTerms, ...aptitudeRuleTerms];
 
 export const ruleTermsById = Object.fromEntries(creatorRuleTerms.map((entry) => [entry.id, entry]));
 

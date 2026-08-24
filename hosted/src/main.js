@@ -1,7 +1,7 @@
 import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.3";
 import { armoury } from "./armoury-data.js?v=0.8.1";
 import { talentCatalogue } from "./talent-data.js?v=0.9.1";
-import { characteristicRuleTerms, contextualRuleTerms, coreRuleTerms, creatorRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.4.0";
+import { characteristicRuleTerms, contextualRuleTerms, coreRuleTerms, creatorRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.4.1";
 import {
   buildSourcebookLibrary,
   clearStoredSourcebookLibrary,
@@ -725,6 +725,7 @@ function applyTextScale(scope = root) {
     ".review-characteristics span",
     ".calculation-note",
     ".review-meta",
+    ".review-skill-label",
     ".dossier-list strong",
     ".dossier-list span",
     ".dossier-list em",
@@ -2797,7 +2798,7 @@ function compendiumSectionMatches() {
   return [...matches.values()].sort((a, b) => b.score - a.score || a.page.heading.localeCompare(b.page.heading));
 }
 
-const compendiumTooltipTerms = [...contextualRuleTerms, ...coreRuleTerms, ...characteristicRuleTerms]
+const compendiumTooltipTerms = [...contextualRuleTerms, ...creatorRuleTerms]
   .flatMap((entry) => [entry.term, ...entry.aliases].map((alias) => ({ alias, entry })))
   .filter(({ alias }) => alias.length > 1)
   .sort((a, b) => b.alias.length - a.alias.length);
@@ -3888,13 +3889,6 @@ function renderReview() {
             <div class="tag-list final">${resolvedAptitudes().aptitudes.map((aptitude) => `<span>${aptitude}</span>`).join("")}</div>
           </section>
           <section>
-            <h3>Skills</h3>
-            <div class="dossier-list">${ownedSkills.map((skill) => {
-              const grant = resolvedGrantedSkills()[skill.id];
-              return `<div><strong>${grant?.displayName || skill.name}</strong><span>${rankNames[skillRank(skill.id) - 1]} · Test ${skillTestTarget(skill)}</span><em>${grant ? `Initial · ${grant.source}` : `${skillXpCost(skill.id)} XP`}</em></div>`;
-            }).join("") || "<p>None recorded.</p>"}</div>
-          </section>
-          <section>
             <h3>Talents</h3>
             <div class="dossier-list">${[
               ...initialTalents.map((talent) => renderSheetEntry({
@@ -3951,6 +3945,19 @@ function renderReview() {
               ...automaticEliteAdvances().map((entry) => `<div><strong>${entry.name}</strong><span>${entry.source}</span><em>Automatic · 0 XP</em></div>`),
               ...character.advances.eliteAdvances.filter((entry) => entry?.name).map((entry) => `<div><strong>${entry.name}</strong><span>Optional Elite Advance</span><em>${entry.cost || 0} XP</em></div>`),
             ].join("") || "<p>None. Elite Advances are optional and are not required to complete this character.</p>"}</div>
+          </section>
+          <section class="review-skills-section">
+            <h3>Skills</h3>
+            <div class="dossier-list review-skills-list">${ownedSkills.map((skill) => {
+              const grant = resolvedGrantedSkills()[skill.id];
+              const displayName = grant?.displayName || skill.name;
+              const rule = ruleTermsById[`skill-${skill.id}`];
+              const tooltip = rule ? `${rule.category}: ${rule.summary} Source: ${rule.book}, page ${rule.page}.` : "";
+              const label = rule
+                ? `<button type="button" class="review-skill-label rule-term lore-term lore-term-skill" data-rule-term="${rule.id}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${displayName}. ${tooltip}`)}">${escapeHtmlAttribute(displayName)}</button>`
+                : `<strong>${escapeHtmlAttribute(displayName)}</strong>`;
+              return `<div>${label}<span>${rankNames[skillRank(skill.id) - 1]} · ${skill.characteristic} target ${skillTestTarget(skill)}</span><em>${grant ? `Initial · ${grant.source}` : `${skillXpCost(skill.id)} XP`}</em></div>`;
+            }).join("") || "<p>None recorded.</p>"}</div>
           </section>
           <section class="review-inventory-section">
             <div class="review-section-heading">
