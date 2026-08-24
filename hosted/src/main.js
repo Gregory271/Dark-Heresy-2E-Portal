@@ -1,6 +1,6 @@
 import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.3";
-import { armoury } from "./armoury-data.js?v=0.8.0";
-import { talentCatalogue } from "./talent-data.js?v=0.9.0";
+import { armoury } from "./armoury-data.js?v=0.8.1";
+import { talentCatalogue } from "./talent-data.js?v=0.9.1";
 import { characteristicRuleTerms, contextualRuleTerms, coreRuleTerms, creatorRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.4.0";
 import {
   buildSourcebookLibrary,
@@ -44,6 +44,8 @@ const cloudSaveTimers = new Map();
 let repositoryStatus = "connecting";
 let cloudStatus = cloudIsConfigured() ? "disconnected" : "unconfigured";
 let cloudRefreshTimer = null;
+const sheetDetailRecords = new Map();
+let sheetDetailCounter = 0;
 
 function characterId() {
   return globalThis.crypto?.randomUUID?.() || `acolyte-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -385,6 +387,49 @@ function normaliseItemName(value = "") {
 
 function escapeHtmlAttribute(value = "") {
   return String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function cleanRulesSummary(value = "") {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/^Consult .+? for the complete rules text\.?$/i, "Rules summary is not yet recorded.")
+    .trim();
+}
+
+function visibleSheetSummary(value = "", maximumLength = 220) {
+  const text = cleanRulesSummary(value);
+  if (text.length <= maximumLength) return text;
+  const candidate = text.slice(0, maximumLength + 1);
+  const sentenceEnd = candidate.lastIndexOf(". ");
+  const wordEnd = candidate.lastIndexOf(" ");
+  const cut = sentenceEnd >= maximumLength * 0.55 ? sentenceEnd + 1 : wordEnd;
+  return `${candidate.slice(0, Math.max(1, cut)).trim()}…`;
+}
+
+function registerSheetDetail({ kind = "Character Record", name, summary = "", source = "", rows = [] }) {
+  const id = `sheet-detail-${sheetDetailCounter += 1}`;
+  sheetDetailRecords.set(id, {
+    kind,
+    name: String(name || "Record Details"),
+    summary: cleanRulesSummary(summary),
+    source: String(source || ""),
+    rows: rows.filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== ""),
+  });
+  return id;
+}
+
+function sheetDetailButton(record) {
+  const id = registerSheetDetail(record);
+  return `<button class="sheet-entry-details" type="button" data-sheet-detail="${id}" aria-label="View ${escapeHtmlAttribute(record.name)} details">Details</button>`;
+}
+
+function renderSheetEntry({ kind, name, summary, meta = "", source = "", rows = [] }) {
+  const safeSummary = cleanRulesSummary(summary) || "No additional effect is recorded.";
+  return `<div class="sheet-entry">
+    <strong>${escapeHtmlAttribute(name)}</strong>
+    <span class="sheet-entry-summary">${escapeHtmlAttribute(visibleSheetSummary(safeSummary))}</span>
+    <span class="sheet-entry-meta">${meta ? `<em>${escapeHtmlAttribute(meta)}</em>` : ""}${sheetDetailButton({ kind, name, summary: safeSummary, source, rows })}</span>
+  </div>`;
 }
 
 function findLegacyArmouryItem(value) {
@@ -1041,7 +1086,7 @@ function resolvedGrantedTalents() {
     if (!label) return;
     const talent = talentByName(label);
     if (!talent) return;
-    grants[talent.id] = { ...talent, displayName: label, source, initial: true, cost: 0 };
+    grants[talent.id] = { ...talent, displayName: label, ruleSource: talent.source, source, initial: true, cost: 0 };
   };
   splitGrant(ruleValue(character.background, "Talents / Traits")).forEach((label) => addGrant(label, "Background"));
   addGrant(character.grantChoices["role-talent-0"], "Role");
@@ -1102,8 +1147,16 @@ function automaticEliteAdvances() {
 
 function automaticTraits() {
   const traits = [];
-  if (automaticEliteAdvances().some((entry) => entry.id === "psyker")) traits.push({ name: "Psyker", source: "Psyker Elite Advance" });
-  if (character.background === "astra-telepathica" && traits.some((entry) => entry.name === "Psyker")) traits.push({ name: "Sanctioned", source: "Adeptus Astra Telepathica — Tested on Terra" });
+  if (automaticEliteAdvances().some((entry) => entry.id === "psyker")) traits.push({
+    name: "Psyker",
+    summary: "The character has a Psy Rating and can manifest psychic powers, with the attendant risk of Psychic Phenomena.",
+    source: "Psyker Elite Advance",
+  });
+  if (character.background === "astra-telepathica" && traits.some((entry) => entry.name === "Psyker")) traits.push({
+    name: "Sanctioned",
+    summary: "The character is an Imperial-sanctioned psyker and begins the Psyker elite advance at Psy Rating 2 rather than 1.",
+    source: "Adeptus Astra Telepathica — Tested on Terra",
+  });
   return traits;
 }
 
@@ -1117,6 +1170,7 @@ function equipmentGrantedTraits() {
   if (activeIds.has("core-gear-photo-visors-contacts")) {
     traits.push({
       name: "Dark-sight",
+      summary: "The character can see normally in darkness while the photo-visors or contacts are active.",
       source: "Photo-Visors/Contacts - active only while this item is equipped",
       conditional: true,
     });
@@ -1633,6 +1687,18 @@ function itemProfileRows(item) {
     .map(([key, value]) => [key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase()), value]);
 }
 
+function itemRulesSummary(item) {
+  if (!item) return "";
+  const description = cleanRulesSummary(item.description || item.profile?.description || "");
+  if (description && description !== "Rules summary is not yet recorded.") return description;
+  const profile = itemProfileRows(item)
+    .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "" && value !== "—")
+    .slice(0, 6)
+    .map(([label, value]) => `${label}: ${value}`)
+    .join(" · ");
+  return profile || `${item.category}; ${effectiveAvailability(item)} availability; ${displayWeight(item)}.`;
+}
+
 function equipmentItem(itemId) {
   return armoury.find((item) => item.id === itemId) || null;
 }
@@ -1833,10 +1899,15 @@ function foundryPsyRating() {
   return character.background === "astra-telepathica" ? 2 : 1;
 }
 
-function foundrySpecialAbility([source, value]) {
+function parseSpecialAbility([source, value]) {
   const [namePart, ...benefitParts] = String(value || "").split(/\s*(?:·|—|:)\s*/);
   const name = benefitParts.length && namePart.length <= 80 ? namePart : `${source} Ability`;
   const benefit = benefitParts.length ? benefitParts.join(" — ") : String(value || "");
+  return { name, benefit, source };
+}
+
+function foundrySpecialAbility(entry) {
+  const { name, benefit, source } = parseSpecialAbility(entry);
   return {
     name,
     type: "specialAbility",
@@ -3228,16 +3299,18 @@ function applyRuleHighlights() {
   const content = document.querySelector("#scene-content");
   if (!content || content.closest(".scene-identity")) return;
   const aliases = creatorRuleTerms
+    .filter((entry) => entry.id !== "test")
     .flatMap((entry) => [entry.term, ...entry.aliases].map((alias) => ({ alias, id: entry.id })))
     .sort((a, b) => b.alias.length - a.alias.length);
-  const pattern = new RegExp(`\\b(${aliases.map(({ alias }) => alias.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")).join("|")})\\b`, "gi");
+  const pattern = new RegExp(`(?<![A-Za-z0-9-])(${aliases.map(({ alias }) => alias.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")).join("|")})(?![A-Za-z0-9-])`, "gi");
   const aliasMap = new Map(aliases.map(({ alias, id }) => [alias.toLowerCase(), id]));
+  const reviewPage = Boolean(content.closest(".scene-review"));
   const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
   for (const node of nodes) {
     if (!node.nodeValue?.trim()) continue;
-    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term,.loadout-panel,.review-sections strong,.review-sections h1,.review-sections h2,.review-sections h3")) continue;
+    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term,.review-characteristics,.review-meta,.xp-ledger,.loadout-panel,.loadout-review,.validation-panel,.review-sections strong,.review-sections h1,.review-sections h2,.review-sections h3")) continue;
     const matches = [...node.nodeValue.matchAll(pattern)];
     if (!matches.length) continue;
     const fragment = document.createDocumentFragment();
@@ -3247,6 +3320,11 @@ function applyRuleHighlights() {
       const entry = ruleTermsById[id];
       if (!entry || match.index < cursor) continue;
       fragment.append(node.nodeValue.slice(cursor, match.index));
+      if (reviewPage && entry.category === "Characteristic") {
+        fragment.append(match[0]);
+        cursor = match.index + match[0].length;
+        continue;
+      }
       const button = document.createElement("button");
       const tooltip = `${entry.category}: ${entry.summary} Source: ${entry.book}, page ${entry.page}.`;
       button.type = "button";
@@ -3674,6 +3752,8 @@ function wireRosterEvents() {
 }
 
 function renderReview() {
+  sheetDetailRecords.clear();
+  sheetDetailCounter = 0;
   const spent = xpSpent();
   const missingCharacteristics = characteristics.filter((entry) => !character.rolls[entry.id]?.value);
   const unresolvedAptitudes = resolvedAptitudes().duplicateCount - character.aptitudeReplacements.filter(Boolean).length;
@@ -3685,6 +3765,7 @@ function renderReview() {
   const initialTalents = Object.values(resolvedGrantedTalents());
   const purchasedTalents = character.advances.talents.map((entry) => talentCatalogue.find((talent) => talent.id === entry.id)).filter(Boolean);
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
+  const psychicPowers = character.advances.psychicPowers.filter((entry) => entry?.name);
   const equipmentState = equipmentRulesState(inventoryItems);
   const grantedEquipment = resolvedGrantedEquipment();
   const unlinkedGrantedEquipment = character.equipment.unlinkedCharacterCreationGrants || [];
@@ -3699,8 +3780,8 @@ function renderReview() {
     ["Home World", ruleValue(character.homeWorld, "Home World Bonus")],
     ["Background", ruleValue(character.background, "Background Bonus")],
     ["Role", ruleValue(character.role, "Role Bonus")],
-    ["Talents / Traits", ruleValue(character.background, "Talents / Traits")],
   ].filter(([, value]) => value);
+  const parsedAbilityEntries = abilityEntries.map(parseSpecialAbility);
   const warnings = [
     missingCharacteristics.length ? `${missingCharacteristics.length} characteristics have no result.` : "",
     !character.fate.roll ? "Fate roll has not been recorded." : "",
@@ -3719,12 +3800,18 @@ function renderReview() {
         <h2>${catalogs.homeWorlds.find((entry) => entry.id === character.homeWorld).name} · ${catalogs.backgrounds.find((entry) => entry.id === character.background).name} · ${catalogs.roles.find((entry) => entry.id === character.role).name}</h2>
         <div class="review-characteristics">${characteristics.map((entry) => {
           const breakdown = characteristicBreakdown(entry.id);
+          const characteristicRuleId = `characteristic-${entry.id.replace(/([A-Z])/g, "-$1").toLowerCase()}`;
+          const rule = ruleTermsById[characteristicRuleId];
+          const tooltip = rule ? `${rule.term}: ${rule.summary}` : entry.name;
           const parts = [
             breakdown.generated ? `Generated ${breakdown.generated}` : "",
             breakdown.advancement ? `Advances +${breakdown.advancement}` : "",
             breakdown.divination ? `Divination ${breakdown.divination > 0 ? "+" : ""}${breakdown.divination}` : "",
           ].filter(Boolean);
-          return `<div class="${breakdown.divination ? "modified" : ""}" title="${parts.join(" · ")}"><span>${entry.abbreviation}</span><strong>${breakdown.total || "—"}</strong>${parts.length > 1 ? `<small>${parts.slice(1).join(" · ")}</small>` : ""}</div>`;
+          return `<div class="${breakdown.divination ? "modified" : ""}" title="${escapeHtmlAttribute(parts.join(" · "))}">
+            <button type="button" class="review-characteristic-label rule-term lore-term lore-term-stat" data-rule-term="${characteristicRuleId}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${entry.name}. ${tooltip}`)}">${entry.abbreviation}</button>
+            <strong>${breakdown.total || "—"}</strong>${parts.length > 1 ? `<small>${escapeHtmlAttribute(parts.slice(1).join(" · "))}</small>` : ""}
+          </div>`;
         }).join("")}</div>
         ${Object.keys(divinationModifiers).length || currentDivination()?.fateChange ? `<div class="calculation-note"><strong>Divination applied:</strong> ${[
           ...Object.entries(divinationModifiers).map(([id, amount]) => `${characteristics.find((entry) => entry.id === id)?.name || id} ${amount > 0 ? "+" : ""}${amount}`),
@@ -3763,17 +3850,54 @@ function renderReview() {
           <section>
             <h3>Talents</h3>
             <div class="dossier-list">${[
-              ...initialTalents.map((talent) => `<div><strong>${talent.displayName}</strong><span>${talent.benefit}</span><em>Initial · ${talent.source}</em></div>`),
-              ...purchasedTalents.map((talent) => `<div><strong>${talent.name}</strong><span>${talent.benefit}</span><em>${talentCost(talent)} XP</em></div>`),
+              ...initialTalents.map((talent) => renderSheetEntry({
+                kind: "Talent",
+                name: talent.displayName,
+                summary: talent.benefit,
+                meta: `Initial · ${talent.source}`,
+                source: talent.ruleSource || talent.source,
+                rows: [["Tier", talent.tier], ["Aptitudes", talent.aptitudes?.join(", ")], ["Prerequisites", talent.prerequisites || "None"]],
+              })),
+              ...purchasedTalents.map((talent) => renderSheetEntry({
+                kind: "Talent",
+                name: talent.name,
+                summary: talent.benefit,
+                meta: `${talentCost(talent)} XP`,
+                source: talent.source,
+                rows: [["Tier", talent.tier], ["Aptitudes", talent.aptitudes?.join(", ")], ["Prerequisites", talent.prerequisites || "None"]],
+              })),
             ].join("") || "<p>None recorded.</p>"}</div>
           </section>
           <section>
             <h3>Traits and Special Abilities</h3>
             <div class="dossier-list">${[
-              ...[...automaticTraits(), ...equipmentGrantedTraits()].map((trait) => `<div><strong>${trait.name}</strong><span>${trait.source}</span><em>${trait.conditional ? "Equipment Trait" : "Automatic Trait"}</em></div>`),
-              ...abilityEntries.map(([source, value]) => `<div><strong>${source}</strong><span>${value}</span></div>`),
+              ...[...automaticTraits(), ...equipmentGrantedTraits()].map((trait) => renderSheetEntry({
+                kind: trait.conditional ? "Equipment Trait" : "Trait",
+                name: trait.name,
+                summary: trait.summary,
+                meta: trait.conditional ? "Equipment Trait" : "Automatic Trait",
+                source: trait.source,
+              })),
+              ...parsedAbilityEntries.map((ability) => renderSheetEntry({
+                kind: "Special Ability",
+                name: ability.name,
+                summary: ability.benefit,
+                meta: ability.source,
+                source: ability.source,
+              })),
             ].join("")}</div>
           </section>
+          ${psychicPowers.length ? `<section>
+            <h3>Psychic Powers</h3>
+            <div class="dossier-list">${psychicPowers.map((power) => renderSheetEntry({
+              kind: "Psychic Power",
+              name: power.name,
+              summary: power.description || "Psychic power selected during advancement.",
+              meta: `${Number(power.cost || 0)} XP`,
+              source: power.source || "Character advancement",
+              rows: [["Psy Rating", foundryPsyRating()], ["XP Cost", Number(power.cost || 0)]],
+            })).join("")}</div>
+          </section>` : ""}
           <section>
             <h3>Elite Advances</h3>
             <div class="dossier-list">${[
@@ -3791,19 +3915,51 @@ function renderReview() {
             </div>
             <div class="dossier-list compact">${equipmentState.assignedModifications.map((modification) => {
               const weapon = equipmentItem(character.equipment.weaponModAssignments[modification.id]);
-              return `<div><strong>${modification.name}</strong><span>Installed on ${weapon?.name || "unresolved weapon"}</span><em>Weapon Modification</em></div>`;
+              return renderSheetEntry({
+                kind: "Weapon Modification",
+                name: modification.name,
+                summary: itemRulesSummary(modification),
+                meta: `Installed on ${weapon?.name || "unresolved weapon"}`,
+                source: modification.source,
+                rows: itemProfileRows(modification),
+              });
             }).join("") || "<p>No weapon modifications installed.</p>"}</div>
             <div class="dossier-list compact">${[
               ...inventoryItems.map((item) => {
                 const source = equipmentProvenance(item.id, grantedEquipment);
-                return `<div><strong>${item.name}</strong><span>${item.category} · ${effectiveAvailability(item)} · ${displayWeight(item)}</span><em>${source.label}</em></div>`;
+                return renderSheetEntry({
+                  kind: item.category,
+                  name: item.name,
+                  summary: itemRulesSummary(item),
+                  meta: source.label,
+                  source: item.source,
+                  rows: [
+                    ["Category", item.category],
+                    ["Availability", effectiveAvailability(item)],
+                    ["Craftsmanship", item.craftsmanship],
+                    ["Weight", displayWeight(item)],
+                    ...itemProfileRows(item),
+                  ],
+                });
               }),
-              ...unlinkedGrantedEquipment.map((entry) => `<div><strong>${entry.label}</strong><span>Starting equipment · Armoury record pending</span><em>${entry.sourceType === "background-choice" ? `Chosen from ${entry.sourceName}` : `Granted by ${entry.sourceName}`}</em></div>`),
+              ...unlinkedGrantedEquipment.map((entry) => renderSheetEntry({
+                kind: "Starting Equipment",
+                name: entry.label,
+                summary: "This starting item is recorded, but its Armoury profile has not yet been linked.",
+                meta: entry.sourceType === "background-choice" ? `Chosen from ${entry.sourceName}` : `Granted by ${entry.sourceName}`,
+                source: entry.sourceName,
+              })),
             ].join("") || "<p>No inventory recorded.</p>"}</div>
           </section>
           <section>
             <h3>Divination</h3>
-            <div class="dossier-list"><div><strong>${currentDivination()?.title || "Not recorded"}</strong><span>${currentDivination()?.effect || ""}</span><em>${character.divination.roll ? `Roll ${character.divination.roll}` : ""}</em></div></div>
+            <div class="dossier-list">${renderSheetEntry({
+              kind: "Divination",
+              name: currentDivination()?.title || "Not recorded",
+              summary: currentDivination()?.effect || "No effect recorded.",
+              meta: character.divination.roll ? `Roll ${character.divination.roll}` : "",
+              source: currentDivination()?.source || "Core Rulebook — Divinations",
+            })}</div>
           </section>
           <section>
             <h3>XP Ledger</h3>
@@ -3942,6 +4098,15 @@ function render() {
       <p id="rule-dialog-summary"></p>
       <p class="source-note" id="rule-dialog-source"></p>
       <button class="primary-button" id="rule-dialog-open" type="button">Open in Compendium <span>›</span></button>
+    </dialog>
+
+    <dialog id="sheet-detail-dialog" class="sheet-detail-dialog" aria-labelledby="sheet-detail-title">
+      <button class="dialog-close" aria-label="Close character capability details">×</button>
+      <p class="eyebrow" id="sheet-detail-kind">Character Record</p>
+      <h2 id="sheet-detail-title">Record details</h2>
+      <p id="sheet-detail-summary"></p>
+      <dl class="sheet-detail-profile" id="sheet-detail-profile"></dl>
+      <p class="source-note" id="sheet-detail-source"></p>
     </dialog>`;
 
   wireEvents();
@@ -4505,7 +4670,7 @@ function wireEvents() {
         ...[...automaticTraits(), ...equipmentGrantedTraits()].map((entry) => ({
           name: entry.name,
           type: "trait",
-          system: { description: entry.source, level: 0 },
+          system: { description: entry.summary || entry.source, level: 0 },
           flags: { dh2CharacterBuilder: { initial: true, conditional: Boolean(entry.conditional) } },
         })),
         ...abilityEntries.filter(([source]) => source !== "Talents / Traits").map(foundrySpecialAbility),
@@ -4536,6 +4701,10 @@ function wireEvents() {
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
   });
+  const sheetDetailDialog = document.querySelector("#sheet-detail-dialog");
+  sheetDetailDialog?.addEventListener("click", (event) => {
+    if (event.target === sheetDetailDialog) sheetDetailDialog.close();
+  });
   document.addEventListener("keydown", keyboardNavigation, { once: true });
 }
 
@@ -4562,6 +4731,32 @@ function keyboardNavigation(event) {
 }
 
 root.addEventListener("click", (event) => {
+  const sheetDetailButton = event.target.closest("[data-sheet-detail]");
+  if (sheetDetailButton) {
+    const record = sheetDetailRecords.get(sheetDetailButton.dataset.sheetDetail);
+    const dialog = document.querySelector("#sheet-detail-dialog");
+    if (!record || !dialog) return;
+    dialog.querySelector("#sheet-detail-kind").textContent = record.kind;
+    dialog.querySelector("#sheet-detail-title").textContent = record.name;
+    dialog.querySelector("#sheet-detail-summary").textContent = record.summary;
+    const profile = dialog.querySelector("#sheet-detail-profile");
+    profile.replaceChildren();
+    for (const [label, value] of record.rows) {
+      const row = document.createElement("div");
+      const term = document.createElement("dt");
+      const definition = document.createElement("dd");
+      term.textContent = label;
+      definition.textContent = value;
+      row.append(term, definition);
+      profile.append(row);
+    }
+    profile.hidden = record.rows.length === 0;
+    const source = dialog.querySelector("#sheet-detail-source");
+    source.textContent = record.source ? `Source: ${record.source}` : "";
+    source.hidden = !record.source;
+    dialog.showModal();
+    return;
+  }
   const termButton = event.target.closest("[data-rule-term]");
   if (termButton) {
     const entry = ruleTermsById[termButton.dataset.ruleTerm];
@@ -4590,6 +4785,8 @@ root.addEventListener("click", (event) => {
   }
   const close = event.target.closest("#rule-dialog .dialog-close");
   if (close) close.closest("dialog")?.close();
+  const sheetClose = event.target.closest("#sheet-detail-dialog .dialog-close");
+  if (sheetClose) sheetClose.closest("dialog")?.close();
 });
 
 await initialiseLocalRepository();

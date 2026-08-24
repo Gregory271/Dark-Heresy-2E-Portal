@@ -1,4 +1,4 @@
-// Public player edition: structured game data with sourcebook prose omitted.
+// Hosted player edition: structured profiles and concise gameplay summaries.
 export const armoury = [
   {
     "id": "core-gear-backpack",
@@ -6,7 +6,7 @@ export const armoury = [
     "availability": "Abundant",
     "weight": 2,
     "source": "Core Rulebook, p. 170",
-    "description": "Consult Core Rulebook, p. 170 for the complete rules text.",
+    "description": "Allows the wearer to carry roughly 30 kg of extra weight. Removing an object from the pack requires a Full Action. Only one backpack or combat vest can be worn at a time.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -22,7 +22,7 @@ export const armoury = [
     "availability": "Rare",
     "weight": 0.5,
     "source": "Core Rulebook, p. 170",
-    "description": "Consult Core Rulebook, p. 170 for the complete rules text.",
+    "description": "The wearer gains +20 to Stealth tests. If stationary during the turn, Ballistic Skill tests targeting the wearer suffer -30 until the beginning of the wearer's next turn.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -38,7 +38,7 @@ export const armoury = [
     "availability": "Plentiful",
     "weight": 0,
     "source": "Core Rulebook, p. 170",
-    "description": "Consult Core Rulebook, p. 170 for the complete rules text.",
+    "description": "A small timepiece used to coordinate actions. Finer models can synchronise with external datastreams.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -54,7 +54,7 @@ export const armoury = [
     "availability": "Abundant",
     "weight": 2,
     "source": "Core Rulebook, p. 170",
-    "description": "Consult Core Rulebook, p. 170 for the complete rules text.",
+    "description": "Ordinary clothing appropriate to the setting. Elaborate, high-status, or specialised clothing can have a different Availability at the GM's discretion.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -70,7 +70,7 @@ export const armoury = [
     "availability": "Scarce",
     "weight": 2,
     "source": "Core Rulebook, p. 170",
-    "description": "Consult Core Rulebook, p. 170 for the complete rules text.",
+    "description": "Holds up to 15 kg of clips, sidearms, grenades, and similar gear. Items in the vest can be drawn as a Free Action. Only one backpack or combat vest can be worn at a time.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -86,7 +86,7 @@ export const armoury = [
     "availability": "Average",
     "weight": 1,
     "source": "Core Rulebook, p. 170",
-    "description": "Consult Core Rulebook, p. 170 for the complete rules text.",
+    "description": "Holds a small pistol beneath clothing. Attempts to detect the weapon suffer -20, but Ready actions for it take one action category longer.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -102,7 +102,7 @@ export const armoury = [
     "availability": "Very Rare",
     "weight": null,
     "source": "Core Rulebook, p. 170",
-    "description": "Consult Core Rulebook, p. 170 for the complete rules text.",
+    "description": "Grants +20 to Toughness tests against sonic effects and against the auditory effects of Concussive weapons.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -118,7 +118,7 @@ export const armoury = [
     "availability": "Scarce",
     "weight": 3,
     "source": "Core Rulebook, p. 170",
-    "description": "Consult Core Rulebook, p. 170 for the complete rules text.",
+    "description": "A remotely controlled restraint, normally with a 1 km range. Detonation instantly kills the wearer and counts as a frag grenade exploding at that location.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -134,7 +134,7 @@ export const armoury = [
     "availability": "Common",
     "weight": null,
     "source": "Core Rulebook, p. 171",
-    "description": "Consult Core Rulebook, p. 171 for the complete rules text.",
+    "description": "Grants +20 to Toughness tests made to resist damaging gases. Good craftsmanship adds another +10; Poor models become unusable after five hours.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -150,7 +150,7 @@ export const armoury = [
     "availability": "Scarce",
     "weight": 0.5,
     "source": "Core Rulebook, p. 171",
-    "description": "Consult Core Rulebook, p. 171 for the complete rules text.",
+    "description": "Amplifies low-level light and grants the Dark-sight trait while worn. Good craftsmanship models also make the wearer immune to photon flash grenade effects.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -166,7 +166,7 @@ export const armoury = [
     "availability": "Very Rare",
     "weight": 0.5,
     "source": "Core Rulebook, p. 171",
-    "description": "Consult Core Rulebook, p. 171 for the complete rules text.",
+    "description": "The wearer suffers no penalties due to darkness and gains +20 to vision-based Perception tests at night.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -182,7 +182,7 @@ export const armoury = [
     "availability": "Scarce",
     "weight": 1,
     "source": "Core Rulebook, p. 171",
-    "description": "Consult Core Rulebook, p. 171 for the complete rules text.",
+    "description": "Makes the wearer immune to toxic atmospheres and allows survival underwater. A Common canister lasts one hour and takes a Full Action to replace.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -198,7 +198,7 @@ export const armoury = [
     "availability": "Rare",
     "weight": 0.5,
     "source": "Core Rulebook, p. 171",
-    "description": "Consult Core Rulebook, p. 171 for the complete rules text.",
+    "description": "Allows a Basic weapon to be fired one-handed without the normal -20 penalty and permits two-handed pistols to be used one-handed. Weapon Training is still required.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -214,7 +214,7 @@ export const armoury = [
     "availability": "Average",
     "weight": 0.5,
     "source": "Core Rulebook, p. 171",
-    "description": "Consult Core Rulebook, p. 171 for the complete rules text.",
+    "description": "Grants +30 to Toughness tests made to resist gas and allows a failed test to be re-rolled. Good craftsmanship adds another +10.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -230,7 +230,7 @@ export const armoury = [
     "availability": "Average",
     "weight": null,
     "source": "Core Rulebook, p. 172",
-    "description": "Consult Core Rulebook, p. 172 for the complete rules text.",
+    "description": "Grants +20 to tests made to withstand extreme environments. Good and Best craftsmanship increase this to +25 and +30 respectively.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -246,7 +246,7 @@ export const armoury = [
     "availability": "Very Rare",
     "weight": 2,
     "source": "Core Rulebook, p. 172",
-    "description": "Consult Core Rulebook, p. 172 for the complete rules text.",
+    "description": "Grants 2 Armour points to locations not already armoured and +10 to Stealth tests. The wearer is invisible to preysense goggles and the Dark-sight trait.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -262,7 +262,7 @@ export const armoury = [
     "availability": "Scarce",
     "weight": 8,
     "source": "Core Rulebook, p. 172",
-    "description": "Consult Core Rulebook, p. 172 for the complete rules text.",
+    "description": "A sealed suit for vacuum or hostile environments. Common models carry 12 hours of air and impose -10 to Agility tests; Good and Best models remove that penalty.",
     "category": "Clothing & Personal Gear",
     "documentType": "tool",
     "craftsmanship": "Common",
@@ -281,7 +281,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Beyond, p. 40",
-    "description": "Consult Enemies Beyond, p. 40 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Thrown",
@@ -321,7 +321,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 8,
     "source": "Enemies Beyond, p. 42",
-    "description": "Consult Enemies Beyond, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Melee",
@@ -362,7 +362,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Beyond, p. 40",
-    "description": "Consult Enemies Beyond, p. 40 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Thrown",
@@ -402,7 +402,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 8,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Basic",
@@ -442,7 +442,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 40,
     "source": "Core Rulebook, p. 155",
-    "description": "Consult Core Rulebook, p. 155 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Heavy",
@@ -480,7 +480,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "Core Rulebook, p. 155",
-    "description": "Consult Core Rulebook, p. 155 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Average",
       "class": "Basic",
@@ -516,7 +516,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 155",
-    "description": "Consult Core Rulebook, p. 155 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Average",
       "class": "Pistol",
@@ -552,7 +552,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 8,
     "source": "Enemies Within, p. 45",
-    "description": "Consult Enemies Within, p. 45 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Melee",
@@ -591,7 +591,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 157",
-    "description": "Consult Core Rulebook, p. 157 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Thrown",
@@ -629,7 +629,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 154",
-    "description": "Consult Core Rulebook, p. 154 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Average",
       "class": "Thrown",
@@ -668,7 +668,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "Core Rulebook, p. 151",
-    "description": "Consult Core Rulebook, p. 151 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Pistol",
@@ -706,7 +706,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 7,
     "source": "Core Rulebook, p. 151",
-    "description": "Consult Core Rulebook, p. 151 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Basic",
@@ -744,7 +744,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 154",
-    "description": "Consult Core Rulebook, p. 154 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Basic",
@@ -783,7 +783,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Enemies Within, p. 45",
-    "description": "Consult Enemies Within, p. 45 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -822,7 +822,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 12,
     "source": "Enemies Within, p. 44",
-    "description": "Consult Enemies Within, p. 44 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Heavy",
@@ -861,7 +861,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 40,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Heavy",
@@ -901,7 +901,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 13,
     "source": "Core Rulebook, p. 158",
-    "description": "Consult Core Rulebook, p. 158 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Melee",
@@ -940,7 +940,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 158",
-    "description": "Consult Core Rulebook, p. 158 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Melee",
@@ -978,7 +978,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Core Rulebook, p. 158",
-    "description": "Consult Core Rulebook, p. 158 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Average",
       "class": "Melee",
@@ -1017,7 +1017,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 157",
-    "description": "Consult Core Rulebook, p. 157 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Thrown",
@@ -1055,7 +1055,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 8,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Basic",
@@ -1094,7 +1094,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Core Rulebook, p. 154",
-    "description": "Consult Core Rulebook, p. 154 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Basic",
@@ -1132,7 +1132,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Pistol",
@@ -1170,7 +1170,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Enemies Without, p. 42",
-    "description": "Consult Enemies Without, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -1208,7 +1208,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Enemies Without, p. 42",
-    "description": "Consult Enemies Without, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -1246,7 +1246,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Without, p. 42",
-    "description": "Consult Enemies Without, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Pistol",
@@ -1282,7 +1282,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Heavy",
@@ -1324,7 +1324,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 16,
     "source": "Enemies Beyond, p. 43",
-    "description": "Consult Enemies Beyond, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Melee",
@@ -1364,7 +1364,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "Enemies Within, p. 45",
-    "description": "Consult Enemies Within, p. 45 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Melee",
@@ -1403,7 +1403,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 15,
     "source": "Core Rulebook, p. 159",
-    "description": "Consult Core Rulebook, p. 159 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -1444,7 +1444,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 157",
-    "description": "Consult Core Rulebook, p. 157 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Plentiful",
       "class": "Thrown",
@@ -1483,7 +1483,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Within, p. 46",
-    "description": "Consult Enemies Within, p. 46 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -1522,7 +1522,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Enemies Without, p. 42",
-    "description": "Consult Enemies Without, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Pistol",
@@ -1561,7 +1561,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Enemies Within, p. 45",
-    "description": "Consult Enemies Within, p. 45 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Melee",
@@ -1602,7 +1602,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Core Rulebook, p. 152",
-    "description": "Consult Core Rulebook, p. 152 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Basic",
@@ -1641,7 +1641,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Pistol",
@@ -1681,7 +1681,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 10,
     "source": "Enemies Beyond, p. 42",
-    "description": "Consult Enemies Beyond, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Melee",
@@ -1720,7 +1720,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Melee",
@@ -1759,7 +1759,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Melee",
@@ -1798,7 +1798,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 157",
-    "description": "Consult Core Rulebook, p. 157 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Thrown",
@@ -1836,7 +1836,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 157",
-    "description": "Consult Core Rulebook, p. 157 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Average",
       "class": "",
@@ -1874,7 +1874,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Enemies Without, p. 43",
-    "description": "Consult Enemies Without, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Melee",
@@ -1914,7 +1914,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Pistol",
@@ -1953,7 +1953,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Basic",
@@ -1992,7 +1992,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 35,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Heavy",
@@ -2031,7 +2031,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 8,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Basic",
@@ -2071,7 +2071,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 8,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Basic",
@@ -2113,7 +2113,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Pistol",
@@ -2152,7 +2152,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Without, p. 43",
-    "description": "Consult Enemies Without, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Thrown",
@@ -2192,7 +2192,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Basic",
@@ -2231,7 +2231,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 8,
     "source": "Enemies Without, p. 43",
-    "description": "Consult Enemies Without, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Melee",
@@ -2270,7 +2270,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 7,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Melee",
@@ -2309,7 +2309,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 12,
     "source": "Core Rulebook, p. 154",
-    "description": "Consult Core Rulebook, p. 154 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Average",
       "class": "Basic",
@@ -2345,7 +2345,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 157",
-    "description": "Consult Core Rulebook, p. 157 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Thrown",
@@ -2384,7 +2384,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Core Rulebook, p. 155",
-    "description": "Consult Core Rulebook, p. 155 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Pistol",
@@ -2422,7 +2422,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "Core Rulebook, p. 152",
-    "description": "Consult Core Rulebook, p. 152 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Pistol",
@@ -2461,7 +2461,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 157",
-    "description": "Consult Core Rulebook, p. 157 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Thrown",
@@ -2499,7 +2499,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 40,
     "source": "Core Rulebook, p. 151",
-    "description": "Consult Core Rulebook, p. 151 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Heavy",
@@ -2537,7 +2537,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 45,
     "source": "Core Rulebook, p. 152",
-    "description": "Consult Core Rulebook, p. 152 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Heavy",
@@ -2576,7 +2576,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 30,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Heavy",
@@ -2612,7 +2612,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 10,
     "source": "Enemies Beyond, p. 40",
-    "description": "Consult Enemies Beyond, p. 40 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Basic",
@@ -2650,7 +2650,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Core Rulebook, p. 154",
-    "description": "Consult Core Rulebook, p. 154 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Basic",
@@ -2686,7 +2686,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "Core Rulebook, p. 154",
-    "description": "Consult Core Rulebook, p. 154 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Pistol",
@@ -2722,7 +2722,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Melee",
@@ -2760,7 +2760,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 10,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Basic",
@@ -2800,7 +2800,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "",
       "class": "Melee",
@@ -2839,7 +2839,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Enemies Beyond, p. 40",
-    "description": "Consult Enemies Beyond, p. 40 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Basic",
@@ -2879,7 +2879,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Core Rulebook, p. 155",
-    "description": "Consult Core Rulebook, p. 155 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Pistol",
@@ -2917,7 +2917,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 65,
     "source": "Enemies Without, p. 43",
-    "description": "Consult Enemies Without, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Heavy",
@@ -2957,7 +2957,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Beyond, p. 41",
-    "description": "Consult Enemies Beyond, p. 41 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Thrown",
@@ -2997,7 +2997,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Plentiful",
       "class": "Melee",
@@ -3033,7 +3033,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Plentiful",
       "class": "Thrown",
@@ -3069,7 +3069,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 157",
-    "description": "Consult Core Rulebook, p. 157 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Thrown",
@@ -3107,7 +3107,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 157",
-    "description": "Consult Core Rulebook, p. 157 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "",
@@ -3146,7 +3146,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "Core Rulebook, p. 153",
-    "description": "Consult Core Rulebook, p. 153 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Basic",
@@ -3184,7 +3184,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "Core Rulebook, p. 153",
-    "description": "Consult Core Rulebook, p. 153 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Plentiful",
       "class": "Basic",
@@ -3222,7 +3222,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 153",
-    "description": "Consult Core Rulebook, p. 153 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Pistol",
@@ -3260,7 +3260,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "Core Rulebook, p. 154",
-    "description": "Consult Core Rulebook, p. 154 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Basic",
@@ -3300,7 +3300,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Enemies Within, p. 42",
-    "description": "Consult Enemies Within, p. 42 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Heavy",
@@ -3341,7 +3341,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 8,
     "source": "Enemies Within, p. 46",
-    "description": "Consult Enemies Within, p. 46 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Melee",
@@ -3380,7 +3380,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 12,
     "source": "Core Rulebook, p. 157",
-    "description": "Consult Core Rulebook, p. 157 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "",
@@ -3420,7 +3420,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 15,
     "source": "Core Rulebook, p. 155",
-    "description": "Consult Core Rulebook, p. 155 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Basic",
@@ -3458,7 +3458,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 35,
     "source": "Core Rulebook, p. 154",
-    "description": "Consult Core Rulebook, p. 154 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Heavy",
@@ -3494,7 +3494,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 7,
     "source": "Enemies Within, p. 44",
-    "description": "Consult Enemies Within, p. 44 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Basic",
@@ -3534,7 +3534,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Pistol",
@@ -3574,7 +3574,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Basic",
@@ -3614,7 +3614,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 10,
     "source": "Enemies Beyond, p. 43",
-    "description": "Consult Enemies Beyond, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Melee",
@@ -3655,7 +3655,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 8,
     "source": "Core Rulebook, p. 161",
-    "description": "Consult Core Rulebook, p. 161 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Melee",
@@ -3695,7 +3695,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "Enemies Beyond, p. 43",
-    "description": "Consult Enemies Beyond, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Melee",
@@ -3736,7 +3736,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 158",
-    "description": "Consult Core Rulebook, p. 158 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Thrown",
@@ -3774,7 +3774,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 18,
     "source": "Core Rulebook, p. 155",
-    "description": "Consult Core Rulebook, p. 155 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Basic",
@@ -3813,7 +3813,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "Core Rulebook, p. 155",
-    "description": "Consult Core Rulebook, p. 155 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Pistol",
@@ -3852,7 +3852,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Core Rulebook, p. 161",
-    "description": "Consult Core Rulebook, p. 161 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -3892,7 +3892,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 13,
     "source": "Core Rulebook, p. 161",
-    "description": "Consult Core Rulebook, p. 161 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -3931,7 +3931,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "Core Rulebook, p. 161",
-    "description": "Consult Core Rulebook, p. 161 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -3970,7 +3970,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "Core Rulebook, p. 161",
-    "description": "Consult Core Rulebook, p. 161 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -4008,7 +4008,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Enemies Beyond, p. 43",
-    "description": "Consult Enemies Beyond, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Melee",
@@ -4047,7 +4047,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Within, p. 46",
-    "description": "Consult Enemies Within, p. 46 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -4087,7 +4087,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Core Rulebook, p. 161",
-    "description": "Consult Core Rulebook, p. 161 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -4126,7 +4126,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 14,
     "source": "Enemies Within, p. 46",
-    "description": "Consult Enemies Within, p. 46 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -4164,7 +4164,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 20,
     "source": "Enemies Beyond, p. 41",
-    "description": "Consult Enemies Beyond, p. 41 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Heavy",
@@ -4204,7 +4204,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "Enemies Within, p. 44",
-    "description": "Consult Enemies Within, p. 44 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Thrown",
@@ -4243,7 +4243,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Within, p. 44",
-    "description": "Consult Enemies Within, p. 44 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Thrown",
@@ -4282,7 +4282,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Beyond, p. 41",
-    "description": "Consult Enemies Beyond, p. 41 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Thrown",
@@ -4321,7 +4321,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 16,
     "source": "Enemies Within, p. 44",
-    "description": "Consult Enemies Within, p. 44 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Basic",
@@ -4359,7 +4359,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Enemies Without, p. 43",
-    "description": "Consult Enemies Without, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Basic",
@@ -4395,7 +4395,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Within, p. 44",
-    "description": "Consult Enemies Within, p. 44 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Thrown",
@@ -4433,7 +4433,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Enemies Beyond, p. 43",
-    "description": "Consult Enemies Beyond, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Melee",
@@ -4474,7 +4474,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "Enemies Beyond, p. 43",
-    "description": "Consult Enemies Beyond, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Melee",
@@ -4516,7 +4516,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 20,
     "source": "Enemies Within, p. 44",
-    "description": "Consult Enemies Within, p. 44 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Basic",
@@ -4554,7 +4554,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Melee",
@@ -4592,7 +4592,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Core Rulebook, p. 161",
-    "description": "Consult Core Rulebook, p. 161 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Melee",
@@ -4630,7 +4630,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Core Rulebook, p. 161",
-    "description": "Consult Core Rulebook, p. 161 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Melee",
@@ -4669,7 +4669,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Average",
       "class": "Basic",
@@ -4707,7 +4707,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 7,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Basic",
@@ -4745,7 +4745,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "Enemies Without, p. 43",
-    "description": "Consult Enemies Without, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Melee",
@@ -4783,7 +4783,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 25,
     "source": "Enemies Beyond, p. 41",
-    "description": "Consult Enemies Beyond, p. 41 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Heavy",
@@ -4824,7 +4824,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 158",
-    "description": "Consult Core Rulebook, p. 158 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Thrown",
@@ -4862,7 +4862,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 45,
     "source": "Enemies Within, p. 44",
-    "description": "Consult Enemies Within, p. 44 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Basic",
@@ -4903,7 +4903,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Basic",
@@ -4942,7 +4942,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Melee",
@@ -4981,7 +4981,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Enemies Within, p. 45",
-    "description": "Consult Enemies Within, p. 45 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Thrown",
@@ -5019,7 +5019,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Plentiful",
       "class": "Melee",
@@ -5059,7 +5059,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Enemies Beyond, p. 43",
-    "description": "Consult Enemies Beyond, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -5099,7 +5099,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 9,
     "source": "Core Rulebook, p. 151",
-    "description": "Consult Core Rulebook, p. 151 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Basic",
@@ -5138,7 +5138,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Average",
       "class": "Pistol",
@@ -5174,7 +5174,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Plentiful",
       "class": "Pistol",
@@ -5212,7 +5212,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 158",
-    "description": "Consult Core Rulebook, p. 158 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Thrown",
@@ -5251,7 +5251,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Common",
       "class": "Melee",
@@ -5289,7 +5289,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "Enemies Within, p. 45",
-    "description": "Consult Enemies Within, p. 45 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Thrown",
@@ -5328,7 +5328,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 14,
     "source": "Enemies Beyond, p. 43",
-    "description": "Consult Enemies Beyond, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "class": "Melee",
@@ -5369,7 +5369,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 16,
     "source": "Enemies Beyond, p. 43",
-    "description": "Consult Enemies Beyond, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee",
@@ -5409,7 +5409,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Plentiful",
       "class": "Melee",
@@ -5447,7 +5447,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "Core Rulebook, p. 226",
-    "description": "Consult Core Rulebook, p. 226 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "",
       "class": "Melee",
@@ -5483,7 +5483,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 9,
     "source": "Enemies Beyond, p. 43",
-    "description": "Consult Enemies Beyond, p. 43 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Melee/ Thrown",
@@ -5524,7 +5524,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "class": "Melee",
@@ -5564,7 +5564,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Core Rulebook, p. 158",
-    "description": "Consult Core Rulebook, p. 158 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Thrown",
@@ -5603,7 +5603,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "class": "Pistol",
@@ -5641,7 +5641,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 8,
     "source": "Core Rulebook, p. 156",
-    "description": "Consult Core Rulebook, p. 156 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "class": "Basic",
@@ -5680,7 +5680,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "Core Rulebook, p. 160",
-    "description": "Consult Core Rulebook, p. 160 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Average",
       "class": "Melee",
@@ -5719,7 +5719,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "Enemies Within, p. 45",
-    "description": "Consult Enemies Within, p. 45 for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "class": "Thrown",
@@ -5761,7 +5761,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 35,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants Unnatural Strength (1) trait and always counts as Braced.",
     "profile": {
       "armourPoints": {
         "body": 7,
@@ -5787,7 +5787,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 2,
@@ -5813,7 +5813,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 7,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 6,
@@ -5839,7 +5839,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -5865,7 +5865,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -5891,7 +5891,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -5917,7 +5917,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 15,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 3,
@@ -5943,7 +5943,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "If blocks more than 12 points of damage from a single attack, counts as a Photon Flash Grenade. User not affected.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -5969,7 +5969,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "When successfully blocks an attack, user jumps in a random direction. Roll 3d10 for meters travelled. If all 3 numbers rolled are the same then user dose not re-emerge for 1d5 rounds and gains 1 Corruption for each round.If activated when unexpected, user can not act for one round.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -5995,7 +5995,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 15,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 5,
@@ -6021,7 +6021,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 30,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 5,
@@ -6047,7 +6047,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 18,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "consists of two or more generators. Turning on or off a generator requires a Full Action, which also activates all other linked generators. A linear force field then forms between each generator, 1.5 metres high and up to 8 metres in length. The barrier acts as cover, so only parts of the body protected by the field wall gain force field protection. If a wall section overloads, then only that portion between the two generators shuts down",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -6073,7 +6073,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 8,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Counts 1 AP higher against Blast.",
     "profile": {
       "armourPoints": {
         "body": 3,
@@ -6099,7 +6099,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Counts 1 AP higher against Blast.",
     "profile": {
       "armourPoints": {
         "body": 3,
@@ -6125,7 +6125,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Counts 1 AP higher against Blast.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -6151,7 +6151,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Counts 1 AP higher against Blast.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -6177,7 +6177,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Counts 1 AP higher against Blast.",
     "profile": {
       "armourPoints": {
         "body": 3,
@@ -6203,7 +6203,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Protection rating doubled against weapons with the Blast or Spray qualities. If the shield overloads, it inflicts 1d10 Energy damage to the wearer that ignores Toughness bonus and Armour.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -6229,7 +6229,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 5,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 1,
@@ -6255,7 +6255,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 65,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants the wearer the Auto-Stabilised and Unnatural Strength (1) trait, and increases the value of his Size (X) trait by 1. When used with the detachable helmet, it is environmentally sealed with its own oxygen supply and voxcaster systems. Its power supply can operate for 2d5 hours before recharging or refueling is needed, and while powered the suits weight does not count towards the users carry limit",
     "profile": {
       "armourPoints": {
         "body": 8,
@@ -6281,7 +6281,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Opponents with the Daemonic trait suffer a 10 penalty to attack tests and Focus Power tests against the wearer.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -6307,7 +6307,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 11,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Counts 1 AP higher against Blast.",
     "profile": {
       "armourPoints": {
         "body": 4,
@@ -6333,7 +6333,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 1,
@@ -6359,7 +6359,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Counts 1 AP higher against Blast.",
     "profile": {
       "armourPoints": {
         "body": 2,
@@ -6385,7 +6385,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 40,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants Unnatural Strength (1) trait and increases Size by 1 level. Power supply functions for 1d5 hours before needing recharging.",
     "profile": {
       "armourPoints": {
         "body": 7,
@@ -6411,7 +6411,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 4,
@@ -6437,7 +6437,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 4,
@@ -6463,7 +6463,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 15,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 6,
@@ -6489,7 +6489,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 10,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants a +40 bonus to any Toughness test made to resist the effects of gasses, as well as a +10 bonus for resisting extreme temperatures and being set on fire. Contains rebreather for 5 hours. If takes more than 5 points of damage in a single round, the suit becomes damaged and require repair.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -6515,7 +6515,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 35,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Gains the Resistance (Psychic Powers) talent, or an additional +10 to tests to resist psychic powers if the character already has this talent. Obsidian plate counts it's listed Armour points as triple against hits inflicted by Psychic Bolts. A psyker wearing obsidian plate cannot push his psychic powers, and reduces his psy-rating by 3 (to a minimum of 1)",
     "profile": {
       "armourPoints": {
         "body": 6,
@@ -6541,7 +6541,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 50,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Bulky. Imposes -20 to stealth tests and dose not defend against ranged attacks made within 1 metre or melee.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -6567,7 +6567,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 500,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Bulky. Imposes -20 to stealth tests and dose not defend against ranged attacks made within 1 metre or melee.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -6593,7 +6593,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 16,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Contains an integral respirator, commlink, photo-visor, targeter, and recoil suppression sleeves, as well as a magnetic harness on the back capable of holding a single basic weapon. Any Acolyte without the Adeptus Mechanicus background gains the Enemy (Adeptus Mechanicus) talent while wearing or displaying Praetor Armour.",
     "profile": {
       "armourPoints": {
         "body": 6,
@@ -6619,7 +6619,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Imposes a -20onStealth tests when active.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -6645,7 +6645,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Allies who can draw a line of sight to a character with a rosarius gain a +10 bonus to Fear and Pinning tests; this is lost if the wearer dies or suffers any Critical damage.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -6671,7 +6671,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 20,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "armourPoints": {
         "body": 6,
@@ -6697,7 +6697,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "effect": "",
@@ -6719,7 +6719,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "damage": 2,
@@ -6737,7 +6737,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "effect": "",
@@ -6757,7 +6757,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "effect": "If target suffers damage, they also suffer Blood Loss for [[1d5]] rounds or until treated.",
@@ -6774,7 +6774,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "damage": 2,
@@ -6792,7 +6792,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "damage": "1d10",
@@ -6816,7 +6816,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "effect": "",
@@ -6835,7 +6835,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "damage": 1,
@@ -6854,7 +6854,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "damageType": "explosive",
@@ -6875,7 +6875,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "effect": "",
@@ -6896,7 +6896,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "damage": 1,
@@ -6918,7 +6918,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "effect": "",
@@ -6937,7 +6937,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "effect": "",
@@ -6955,7 +6955,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "effect": "When a psyker suffers damage from this weapon, he must make a Difficult (10) Willpower test or be Stunned for a number of rounds equal to his degrees of failure. When a target with the Warp Instability trait suffers damage from this weapon, it must immediately test for Instability with a 10 penalty.",
@@ -6972,7 +6972,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "effect": "Add +1 damage for every point of the users psy rating. Ignores all protective benefits granded by psychic powers.",
@@ -6992,7 +6992,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "effect": "Ignores any protective benefits granted by psychic powers. Targets in its area of effect suffer a penalty to the Agility test to avoid being hit equal to 5 times the psykers psy rating.",
@@ -7011,7 +7011,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Extremely Rare",
       "effect": "Whenever a target with either the Psyker or Daemon trait is struck by a Purgatus stake-bolt, it must make a Challenging (+0) Willpower test. If it fails, it must immediately roll on Table 62: Psychic Phenomena.",
@@ -7030,7 +7030,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "effect": "",
@@ -7049,7 +7049,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "effect": "",
@@ -7068,7 +7068,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Rare",
       "effect": "",
@@ -7088,7 +7088,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "effect": "Daemonic or Psyker entities take an additional [[1d10]] damage.",
@@ -7107,7 +7107,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Near Unique",
       "damageType": "energy",
@@ -7127,7 +7127,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "effect": "Anyone within the blast radius must pass a Hard (20) Strength test or be thrown 1d5 metres away from the centre of the blast and knocked Prone.",
@@ -7147,7 +7147,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Very Rare",
       "effect": "If the target fails its Toughness test from the Shocking effect by three or more degrees, it becomes Unconscious instead of Stunned for a number of rounds equal to his degrees of failure.",
@@ -7166,7 +7166,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "damage": -2,
@@ -7186,7 +7186,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "",
     "profile": {
       "availability": "Scarce",
       "effect": "",
@@ -7206,7 +7206,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Place it onto the alien computer, lock, or other interface device that he wishes to crack, and make a Hard (20) Security (Int) test. If successful, the engine accesses the alien device, and treats it like any other electronic lock for the purposes of additional tests. An Adaptive Logis-Engine takes 5 minutes to access a basic alien system, less 30 seconds for each degree of success on the users Security test (to a minimum of 30 seconds).",
     "profile": {
       "availability": "Extremely Rare",
       "craftsmanship": "Common",
@@ -7222,7 +7222,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "When used grants +20 to awareness tests and counts as a Free Action once per turn. With aTech-Usecan see through walls less than 50 cm, has a range of 50 meters.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -7238,7 +7238,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants +10 to recording data",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -7254,7 +7254,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants +30 to Climb tests and cannot fall if failed.",
     "profile": {
       "availability": "Common",
       "craftsmanship": "Common",
@@ -7270,7 +7270,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants +10 to Tech-Use",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -7286,7 +7286,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Can hack a transmission with Tech-Use. Usable for minutes equal to Degrees of Success",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -7302,7 +7302,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "The iPad's of the future.",
     "profile": {
       "availability": "Common",
       "craftsmanship": "Common",
@@ -7318,7 +7318,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Allows for setup of demo devices. Contains: Five demolition charges (count as Krak Grenades), 100 meter det-cord (burns at 10 sec per meter), and pressure detonator.",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -7334,7 +7334,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants +20 to Medicae or Perception to determine proper treatment.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -7350,7 +7350,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Make you look like someone else. +10 to deceive tests.",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -7366,7 +7366,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants +20 to Interrogation tests.",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -7382,7 +7382,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Provides +30 to Medicae tests to stop Blood Loss.",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -7398,7 +7398,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "It's a Flashlight.",
     "profile": {
       "availability": "Abundant",
       "craftsmanship": "Common",
@@ -7414,7 +7414,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "A Clip-harness and Gas powered pistol to shoot a hook and line 100 m away.",
     "profile": {
       "availability": "Common",
       "craftsmanship": "Common",
@@ -7430,7 +7430,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 15,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Pass a Challenging (+0) Agility test or Routine (+20) Operate (Aeronautica) test, and allows for a safe, guided fall from any height; otherwise counts as having fallen two metres for each degree of failure",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -7446,7 +7446,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants another +20 to their next Ballistic Skill when using weapons with Indirect quality.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -7462,7 +7462,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Firing a holo-spectus into the air requires a Challenging (+0) Tech-Use test, after which the user gains a visual representation of the area below the hovering pict-recorder out for several kilometres. Can zoom and highlight parts allowing to survey the area around in great detail, and grants a +20 bonus to Navigate (Surface), Survival (Tracking), and Scrutiny tests. The recorder can stay airborne for 5 hours before its power cell is exhausted",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -7478,7 +7478,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Holds drugs that can be administered as a Half Action.",
     "profile": {
       "availability": "Common",
       "craftsmanship": "Common",
@@ -7494,7 +7494,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Cuts or welds 10 cm of metal and counts as a Heavy weapon on targets within 2 meters.",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -7510,7 +7510,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Megaphone of space.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -7526,7 +7526,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Reduces Agility bonus by 2 but allows to grip to metallic surfaces.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -7542,7 +7542,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Telescope.",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -7558,7 +7558,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Handcuffs.",
     "profile": {
       "availability": "Plentiful",
       "craftsmanship": "Common",
@@ -7574,7 +7574,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants +10 bonus to Medicae tests.",
     "profile": {
       "availability": "Common",
       "craftsmanship": "Common",
@@ -7590,7 +7590,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Can talk to others up to 1 km away.",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -7606,7 +7606,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Floating skulls that have a single function. Auger: Grants benefits of a Auspex Illumination: Lights up a 20 meter area.Land Hailer: Records speech and amplifies voice.Medicae: Counts as a Medi-kit. Utility: Counts as a Combi-tool",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -7622,7 +7622,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants a +20 bonus to all Survival and Navigation (Surface) tests.",
     "profile": {
       "availability": "Near Unique",
       "craftsmanship": "Common",
@@ -7638,7 +7638,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Gains a +30 bonus to Security test when trying to open locks.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -7654,7 +7654,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Dampen the powers of any psykers within 2d10 metres, causing them to take all tests to use any of their psychic powers with a 30 penalty. Also offer protection from psychic attacks by a +30 bonus to resist any psychic power that directly affects him.",
     "profile": {
       "availability": "Near Unique",
       "craftsmanship": "Common",
@@ -7670,7 +7670,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Camcorder",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -7686,7 +7686,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants +10 to Focus Power Tests",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -7702,7 +7702,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Chess in the future and takes 1d5 hours. Can grant +10 to fellowship with the opponent the following day.",
     "profile": {
       "availability": "Plentiful",
       "craftsmanship": "Common",
@@ -7718,7 +7718,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Activate by Tech-use test. It has a perception of 75 for detecting movement and when triggered sounds an alarm.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -7734,7 +7734,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Jams other transmissions within 1km.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -7750,7 +7750,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 6,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Hold anything with a Size trait of 7 or lower that does not possess the Incorporeal trait for five hours (if using the battery pack. Inside cannot take any actions, and outside of cannot attack or interact with anything inside. Compacts into a flat plate 3 meters across.",
     "profile": {
       "availability": "Extremely Rare",
       "craftsmanship": "Common",
@@ -7766,7 +7766,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 3,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Broadcast static to all comm systems within 30 meters",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -7782,7 +7782,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Dampens sound and grants +30 to Stealth test. Last for 20 minutes before needing to be recharged.",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -7798,7 +7798,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 4,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Offers communication to up to 100 km",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -7814,7 +7814,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Pen and paper.",
     "profile": {
       "availability": "Plentiful",
       "craftsmanship": "Common",
@@ -7830,7 +7830,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "This refreshment is made from distilled wine or other fermented beverages, and is popular in many regions of the Imperium. It is usually a fine-quality product, with some well-aged vintages renowned across the sector for bouquet and flavour.",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -7846,7 +7846,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "A dose immediately ends the effects, both positive and negative, for any chemicals the subject has inhaled, ingested, or injected, unless the item specifically states de-tox cannot work against it. Its use is extremely unpleasant, however, with common side-effects so extreme (excessive vomiting and diarrhoea being the mildest) that many would rather abide their current woes. Upon taking this drug, a character is Stunned for a number of rounds equal to 1d10 minus his Toughness bonus.…",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -7862,7 +7862,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "A dose of lasts 1d10 rounds, and the user immediately suffers 1 Fatigue as his body spins wildly. A character under the effects of the drug can take advantage of the skewed perspective this gives him: once during this time, he may invert the result of any 1d100 roll, exchanging the tens digit for the ones digit (turning a 73 into a 37 or a 91 into a 19, etc.).",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -7878,7 +7878,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "A character using frenzon gains the Frenzy talent and immediately becomes Frenzied. These effects last for the duration of the drug; a single dose of which lasts for 1d10 minutes. Frenzon is Addictive.",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -7894,7 +7894,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "A mild narcotic, each stick contains dried and cured plant leaves that release a scented, stimulating smoke when ignited and inhaled through a cheap tube that burns away with the drug. As the leaves vary with the planet, lho-sticks can vary from world to world as well, often making them useful trade items.",
     "profile": {
       "availability": "Common",
       "craftsmanship": "Common",
@@ -7910,7 +7910,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Obscura-users enter a dream-like state for 1d5 hours (if required to engage in combat, consider them under the effects of a hallucinogen grenade). For 1d10 hours after the effects wear off, they enter a deep depression, unless another dose of obscura is taken. Obscura is Addictive.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -7926,7 +7926,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 2,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Besides the benefits of holding off starvation, ration packs can help to keep an Acolyte effective in the field. Eating one or more ration packs (or other, comparable meals) during a period of rest of at least two hours removes one additional level of Fatigue.",
     "profile": {
       "availability": "Plentiful",
       "craftsmanship": "Common",
@@ -7942,7 +7942,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Consuming recaf helps to hone senses dulled by exhaustion, and a dose removes one level of Fatigue from the character. The cumulative penalty to Toughness tests taken for consuming additional doses of recaf is –20 instead of the normal –10.",
     "profile": {
       "availability": "Abundant",
       "craftsmanship": "Common",
@@ -7958,7 +7958,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "If applied to a weapon— which requires a Full Action—the weapon becomes immune to jamming (see page 224) for a number of shots equal to its clip size. If the unguent is applied to an already jammed weapon, the jam immediately clears, but there is no further effect.",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -7974,7 +7974,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Taking a dose increases the user’s Agility bonus and Perception bonus by 3 for 2d10 minutes. Note this does not increase the actual characteristic values. When the drug runs its course, the user must pass a Challenging (+0) Toughness test or suffer a –20 penalty to Agility tests and Perception tests for 1d5 hours. Slaught is Addictive.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -7990,7 +7990,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "If a character without any psy rating takes a dose of this drug, he must successfully make a Challenging (+0) Willpower test or gain 1d5 Insanity points due to his mind being filled with terrifying visions of the Warp. If he succeeds, the user gains a psychic power from Table 5–16: Spook Effects (see descriptions in Chapter VI: Psychic Powers). The power lasts for 1d5 hours, and the user makes all Focus Power tests during this time as if he had a psy rating of 1.…",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -8006,7 +8006,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "A dose of stimm is enough to energise the weary and mask pain with short-term vitality, often enough to finally bring a protracted combat to a successful conclusion. Each dose lasts for 3d10 rounds. During this time, a character ignores any negative effects to his characteristics from damage, Critical damage, and Fatigue, and cannot be Stunned. When the stimm wears off, the character suffers a –20 penalty to Strength, Toughness, and Agility tests for one hour and gains one level of Fatigue. Stimm is Addictive.",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -8022,7 +8022,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 1,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "The drug tranq covers an array of artificial, alcoholic chem- distillates brewed by underhive scum, criminals, and even Guardsmen desperate for respite from their wretched lots. It numbs the body and mind, which provides a very different feeling than being drunk on amasec, rotgut, or other spirits. Though similar in the end result, the effects of tranq are unpleasant, depressive, and require an acquired taste.",
     "profile": {
       "availability": "Abundant",
       "craftsmanship": "Common",
@@ -8038,7 +8038,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "These implanted devices duplicate the effects of sensor systems that go beyond normal human senses. In all cases, their use requires concentration and a Half Action. Common systems function identically to a standard hand-held auspex device. Poor systems possess only a single detection ability (heat, radiation, electromagnetics, or very rarely daemonic taint) and have the limited range of 20 metres.…",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8063,7 +8063,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "This ancient and blessed microscopic technology flows as a metallic liquid within the character’s bloodstream, repairing minor injuries and accelerating healing. It repairs minor injuries and speeds recovery. When applying healing, the character is always considered Lightly Damaged, and heals at an increased rate, removing 2 points of damage per day instead of 1.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8088,7 +8088,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "A character with this implant has a weapon in his eye that counts as a hot-shot laspistol (see page 154) with a range of 10m. The baleful eye can be fired even if the character’s hands are full. It has no clip size, however a jam result causes the character to lose sight in the eye for a number of rounds equal to the degrees of failure on the attack.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8113,7 +8113,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Bionic arms are a common replacement, and Common models can mimic normal hand and arm functions, including dexterity and even sense of touch. Poor craftsmanship versions are more cumbersome and visibly artificial; halve the owner’s Agility characteristic (rounded up) where matters of fine dexterity are involved. In addition, Weapon Skill and Ballistic Skill tests made when using the limb suffer a –5 penalty.…",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8138,7 +8138,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "The paranoid (or the prepared) are ever-willing to replace crude flesh with more durable, armoured materials—the light armour shielding of a bionic heart provides a last line of defence. Superior models can be triggered to pump more rapidly to increase physical capacity, though this risks bodily strain as the rest of the circulatory system is put under pressure. A character with this implant gains +1 Armour point to the Body location—this bonus stacks with any armour worn—and gains the Sprint talent.",
     "profile": {
       "armourPoints": {
         "body": 1,
@@ -8163,7 +8163,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "These bionics are fully integrated into the hip with a spinal link, and Common versions allow the user to walk, run, and climb at normal human levels. Poor craftsmanship models are lumbering affairs that reduce a character’s Movement rate by 1, and when running, the user must succeed on an Ordinary (+10) Agility test or fall Prone at the end of his movement. Good craftsmanship bionic legs grant the owner the Sprint talent, and add a +20 bonus to Agility tests that he makes when attempting to jump or leap.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8188,7 +8188,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Common bionic lungs and implanted respiratory systems mimic the action of human lungs and keep the body supplied with oxygen. Such characters gain a +20 bonus to Toughness tests made to resist airborne toxins and gas weapons. Poor bionic lungs offer the same benefits as the Common system, but are raucously loud affairs and characters suffer a –20 penalty to Stealth tests. Their generally poor oxygen supply to the body means that the character suffers a –10 penalty on all tests involving strenuous physical activity.…",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8213,7 +8213,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Eyes, ears, and even noses are often lost through combat or accident, and replacement versions use cranial interfaces to allow a very close approximation to natural senses. Bionic eyes in particular are frequently seen amongst senior Imperial Guard officers, Rogue Traders, and other powerful individuals. Common systems, while usually clearly artificial and often oversized, manage to more or less duplicate the approximate human range of senses adequately and have no further game effects.…",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8238,7 +8238,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "These bionics are internal cogitator implants which aid in data retention and processing. The user can rapidly sift through stacked dataslates and parchments, applying intuition to vast reams of data far beyond the capabilities of a normal man. This implant grants the user a +10 bonus to Literacy, Logic, and Scholastic Lore tests.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8263,7 +8263,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Commonly used to repair a severely damaged brain or (hopefully) augment its abilities, these often-risky implant systems represent a major step from simply replacing a limb to altering a character from human to mechanism. Common-level implants can restore paralysed and brain-damaged users to a semblance of normality, but with a permanent loss of 1d10 points from the character’s Weapon Skill, Ballistic Skill, Agility, Intelligence, and Fellowship characteristics.…",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8288,7 +8288,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "This augmentation covers or replaces most of the skull with layers of plasteel and gel padding to better prevent concussion and other brain injuries. This implant adds +1 Armour point to the Head, and stacks with any worn armour on that location.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8313,7 +8313,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Powerful electromagnets are implanted in the Acolyte, allowing him to cast forth a net of invisible energy as a Full Action after a successful Challenging (+0) Willpower test. He can call an unsecured metal object into his hand; the object cannot mass more than 1 kg per point of Willpower bonus, and must be within 20 metres. He must already have Mechanicus Implants trait (see page 137) for this system to function, and it can be improved through certain talents as described in Chapter IV: Talents & Traits.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8338,7 +8338,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "The Acolyte now has a mechanical port implanted in his body, commonly in the rear of the neck, which can be connected to machines via a data cable. This allows the user faster and smoother access to the valuable information within, and grants a +10 bonus to Common Lore, Inquiry, or Tech-Use tests whilst connected to a relevant mechanism or data spool.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8363,7 +8363,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "This implant acts as a powerful battery, storing energy for various implants and (especially) for functions that require energy to be expended in rapid or violent fashions. When it is fully charged, the Acolyte no longer gains Fatigue from using Luminen Capacitors either to recharge or attack something, but each use of those implants drains the reservoir by half. The battery fully recharges after one day of resting.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8388,7 +8388,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Micro-cogitators implanted at the base of the skull allow the user to be aware of the direction of the planetary poles, the Acolyte’s present location to within a few metres, relative velocity, altitude, time of day, and other valuable information. The user must still have access to maps and other planetary data in order to benefit from this information, however—knowing one is at a specific location on a planetary surface has little meaning without knowing what is over the next rise, or what is the direction needed…",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8413,7 +8413,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "This implanted energy source charges internal capacitors, allowing the character to recharge devices or even unleash powerful energy blasts. With a successful Toughness test, the character recharges or powers machinery. This requires one minute of mental focus and meditation. The difficulty of the Toughness test varies depending on the nature of the powered system.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8438,7 +8438,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Archaeotech systems of powerful gravimetric coils are implanted in the body, allowing the user to become unshackled from gravity’s grasp for short periods. Using a Half Action, the user may hover 20-30 centimetres off the ground for a number of minutes equal to 1d10 plus the character’s Toughness bonus. The character must employ a Half Action each round to concentrate on operating this implant and may use the other action to move normally.…",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8463,7 +8463,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Mechadendrites are mechanical attachments of brass and steel that act as additional arms. They are normally mounted on the shoulders or back, though some within the Mechanicum also project these cybernetics from their waists or chests. Each is usually 2 metres in length when fully extended, and has a specialised function based around the mechanisms affixed at their end.…",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8488,7 +8488,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "This implant is a neurally-linked datavault and pict-capture array, often incorporating augmetic replacement of one or both eyes, that records information on people or scenes viewed. It can then later replay that information, or overlay the present view with additional data on people and objects viewed. It is a tool of chroniclers, loremancers, and masters of ceremonies, as well as factors or nobles who like to see the secrets of their rivals overlaid upon their view of the negotiating table.…",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8513,7 +8513,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "These devices, also known as sense-links, allow the owner to interface directly with a machine or technological device. MIUs see widespread use among the Adeptus Mechanicus, who regard them as objects of divine communion. A basic model involves a single spinal or cortex connector, while advanced variants include wrist connector probes—and possibly mechadendrite connectors—in addition to the spinal plug.…",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8538,7 +8538,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Unlike the more advanced MIU version normally only granted to priests of the Adeptus Mechanicus, this model is more simplified, allowing the user to remotely operate a single weapon which is attached user’s body. While not as elaborate, it is easier to use and a favourite of many militant professions. This system allows the user to fire the linked ranged weapon as a Free Action during his turn. Note that he can still only take a single Action with the Attack subtype during his turn.…",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8563,7 +8563,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "These are implanted inside the lungs or involve masses of tubes, wires, vox-grills, or other augmetic parts replacing the neck and upper chest. The implant sifts out most toxic gases; inhaled particulate matter is also filtered, making breathing easier in heavily polluted atmospheres. This implant grants the user a +20 bonus to resist inhaled poisons, gas weapons, or atmospheric toxins.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8588,7 +8588,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "The hand and lower forearm are replaced with specialised and sensitive tools ideal for manipulating parchment, autoscribing, dataslate tuning, and other efforts to record and preserve information. While somewhat disquieting in appearance, they are viewed with favour by hive-world scholars and lexmechanics. This implant gives the user a +10 bonus to all Lore skill tests.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8613,7 +8613,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Thin carapace plating is inserted under the skin in various locations, giving the user added protection against damage. While not as impressive as most augmentations and sometimes uncomfortable, subskin armour is very reliable. This implant adds +2 Armour points to the Arms, Body, and Legs locations, which stacks with any other Armour points for these locations.",
     "profile": {
       "armourPoints": {
         "body": 2,
@@ -8638,7 +8638,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Ropey strands of vat-grown muscle tissue, thick with slurried nutrients and laced with flakweave, are woven into existing muscle groups, granting increased strength of varying levels. This implant grants the Unnatural Strength (1) trait; Best craftsmanship grafts instead grant the Unnatural Strength (4) trait but also impose a –10 penalty on Agility tests due to the newly misshapen and unnatural body form.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8663,7 +8663,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "This implant is usually found with those who use their voice to project commands or proclamations, such as Ecclesiarchy Preachers or Adeptus Arbites Crowd Dispersal Officers. This implant works to amplify the vocal cords to an inhuman range in order to shout commands over the noise of a raging battle, and counts as using a laud hailer.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8688,7 +8688,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "The subject has cranial surgery to implant neural receptors and artificial nerve routing, and can be compelled not to reveal a certain item of information, remain within a set area, or perform a specific task. If the subject attempts—or is forced—to counter this compulsion, his brain shuts down into unconsciousness, or even death for some severe volitor patterns.",
     "profile": {
       "armourPoints": {
         "body": 0,
@@ -8713,7 +8713,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Canfire either the launcher or the weaponattached to, but not both. Range of 45 meters with Damg and Pen ofthe loaded grenade, and can be fired Indirectly. Cannot reload during combat.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -8731,7 +8731,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Increases the clip size of the weapon to five times its current clip size, but it cannot be reloaded in combat.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -8749,7 +8749,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Halves the weight, Clip size, and range and reduces damage by 1. 20 to attempt to find.",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -8767,7 +8767,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants +5 to any BS or WS for owner and -5 of all others.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -8785,7 +8785,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "May Ready another weapon or draw another item as part of the same action.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -8803,7 +8803,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Increasesclip sizeby half (rounded up)",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -8821,7 +8821,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Rather than firing the weapon as normal, can use as a half action. Counts as a Standard Attack with a flamer",
     "profile": {
       "availability": "Common",
       "craftsmanship": "Common",
@@ -8839,7 +8839,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Swap ammotypes withoutreloading. Can hold 3 different ammo's",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -8857,7 +8857,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "When using Semi-Auto Burst, counts as scoring one additional DoS. Also reload increased by Half Action.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -8875,7 +8875,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Upgrade reduces range by 1/3.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -8893,7 +8893,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "The ranged weapon counts as a spear when used in melee combat.",
     "profile": {
       "availability": "Plentiful",
       "craftsmanship": "Common",
@@ -8911,7 +8911,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Gains +2 bonus on a Half Action or +4 bonus for a Full Action for aim.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -8929,7 +8929,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Loses the Primitive quality (if it had it) and has its penetration increased by 2. No effect when power field is active.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -8947,7 +8947,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Gains +10 BS to Semi-Auto Burst or Full Auto.",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -8965,7 +8965,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Combines the benefits of a preysense sight, red-dot laser sight, and telescopic sight.",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -8983,7 +8983,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "No penalties due to darkness.",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -9001,7 +9001,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Can be wielded in one hand without -20 penalty. Range is halved.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -9019,7 +9019,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Suffers no penalties due to darkness and gains a +20 bonus to vision-based Perception tests in the dark.",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -9037,7 +9037,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "The weapon reduced by a Half Action,to a minimum of a Half Action.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -9055,7 +9055,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Gains +10 to BS when firing a single shot.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -9073,7 +9073,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Weapon weight increased by 20%. Ranged weapons receives +1 bonus to damage when used as an improvised weapon. Only destroyed on a result of 41 or higher when Parried by a weapon with the Power Field quality.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -9091,7 +9091,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Gains a +10 bonus to Pinning tests.",
     "profile": {
       "availability": "Scarce",
       "craftsmanship": "Common",
@@ -9109,7 +9109,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Tests to hear shots made suffer -20 and can only attempt at half the normal distance.",
     "profile": {
       "availability": "Plentiful",
       "craftsmanship": "Common",
@@ -9127,7 +9127,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Counts as having the Auto-stabilized traitand so always counts as being braced.",
     "profile": {
       "availability": "Extremely Rare",
       "craftsmanship": "Common",
@@ -9145,7 +9145,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "If there is a final penalty to a BS test when using a weapon with a targeter, it is reduced by ten.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -9163,7 +9163,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Ignores penalties for Long and Extreme range, as long as the shooter is benefitting from a Full Action to Aim.",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -9181,7 +9181,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Gain the Toxic (2) quality for one round. A tox dispenser can be used 10 times before requiring refilling.",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -9199,7 +9199,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Bipods and tripods allow a weapon to be braced anywhere there is a reasonably flat surface. A weapon braced on a bipod has a 90 fire arc, while one on a tripod has a 180 arc.",
     "profile": {
       "availability": "Average",
       "craftsmanship": "Common",
@@ -9217,7 +9217,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Grants its wielder a bonus to tests to Parry the attacks of foes with the Daemonic trait equal to 5 times the wielders Willpower bonus.",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
@@ -9235,7 +9235,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Does not upgrade the weapon, but the ammunition the weapon uses. The modification requires a skilled artisan and upgrades one clip at a time. Whenever a target with the Daemonic trait attempts to Dodge an attack made with a weapon using ammunition upgraded with Truesilver weaving, the target suffers a penalty to the Dodge test equal to 5 times the attackers Willpower bonus.",
     "profile": {
       "availability": "Extremely Rare",
       "craftsmanship": "Common",
@@ -9253,7 +9253,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "With spoken commands, the operator can fire his gun, switch firing modes, and also change ammunition (should it be fitted with a fire selector).",
     "profile": {
       "availability": "Rare",
       "craftsmanship": "Common",
@@ -9271,7 +9271,7 @@ export const armoury = [
     "craftsmanship": "Common",
     "weight": 0,
     "source": "",
-    "description": "Consult the cited sourcebook for the complete rules text.",
+    "description": "Gains the Crippling (2) quality against targets with the Daemonic trait. Each canister contains enough liquid to last for 40 rounds.",
     "profile": {
       "availability": "Very Rare",
       "craftsmanship": "Common",
