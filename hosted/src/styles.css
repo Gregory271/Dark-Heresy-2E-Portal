@@ -1019,6 +1019,8 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
 .xp-ledger .total { margin-top: 4px; border-top: 1px solid #a77a3e; border-bottom: 0; padding-top: 7px; color: #e9e0d1; text-transform: uppercase; }
 .validation-panel .warning { border-left: 2px solid #c45d46; padding-left: 8px; color: #e8b3a7; font-size: 11px; }
 .validation-panel .valid { color: #bdd49e; }
+.validation-panel .export-status { margin: 8px 0 0; color: #bdd49e; font-size: 9px; line-height: 1.35; overflow-wrap: anywhere; }
+.validation-panel .export-status:empty { display: none; }
 .validation-panel button { width: 100%; margin-top: 10px; }
 
 html[data-text-size="large"] .review-sections { column-count: 2; }

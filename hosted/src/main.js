@@ -2509,8 +2509,11 @@ function downloadJson(filename, data) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  anchor.hidden = true;
+  document.body.append(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  anchor.remove();
+  globalThis.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function rosterChoiceName(catalogue, id) {
@@ -4141,6 +4144,7 @@ function renderReview() {
         ${warnings.length ? warnings.map((warning) => `<p class="warning">${warning}</p>`).join("") : `<p class="valid">Character creation record is complete.</p>`}
         <button class="primary-button export-builder" type="button">Export Builder JSON <span>›</span></button>
         <button class="compact-button export-foundry" type="button">Export Foundry Actor</button>
+        <p class="export-status" id="export-status" role="status" aria-live="polite"></p>
       </aside>
     </div>`;
 }
@@ -4244,7 +4248,7 @@ function render() {
         </div>
         <div class="actions">
           ${isIdentity ? "" : `<button class="text-button" id="details">Rules</button>`}
-          <button class="primary-button" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : scene.action}<span>›</span></button>
+          <button class="primary-button" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : scene.id === "review" ? "Export Character JSON" : scene.action}<span>›</span></button>
         </div>
       </footer>
     </main>
@@ -4352,7 +4356,7 @@ function wireEvents() {
       save();
       render();
     } else {
-      document.querySelector("#detail-dialog").showModal();
+      document.querySelector(".export-builder")?.click();
     }
   });
 
@@ -4776,9 +4780,10 @@ function wireEvents() {
     });
   });
   document.querySelector(".export-builder")?.addEventListener("click", () => {
-    downloadJson(`${character.name || "acolyte"}.dh2-character.json`, {
+    const filename = `${character.name || "acolyte"}.dh2-character.json`;
+    downloadJson(filename, {
       format: "dh2-character-builder",
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       character,
       calculated: {
@@ -4806,6 +4811,8 @@ function wireEvents() {
         xpSpent: xpSpent(),
       },
     });
+    const status = document.querySelector("#export-status");
+    if (status) status.textContent = `Download started: ${filename}`;
   });
   document.querySelector(".save-to-roster")?.addEventListener("click", () => {
     playMechanicalLock();
@@ -4815,7 +4822,13 @@ function wireEvents() {
   });
   document.querySelector(".export-foundry")?.addEventListener("click", () => {
     const eliteAdvances = [...automaticEliteAdvances(), ...character.advances.eliteAdvances];
-    downloadJson(`${character.name || "acolyte"}.foundry-actor.json`, {
+    const foundryAbilities = [
+      ["Home World", ruleValue(character.homeWorld, "Home World Bonus")],
+      ["Background", ruleValue(character.background, "Background Bonus")],
+      ["Role", ruleValue(character.role, "Role Bonus")],
+    ].filter(([, value]) => value);
+    const filename = `${character.name || "acolyte"}.foundry-actor.json`;
+    downloadJson(filename, {
       name: character.name || "Unnamed Acolyte",
       type: "acolyte",
       system: {
@@ -4885,7 +4898,7 @@ function wireEvents() {
           system: { description: entry.summary || entry.source, level: 0 },
           flags: { dh2CharacterBuilder: { initial: true, conditional: Boolean(entry.conditional) } },
         })),
-        ...abilityEntries.filter(([source]) => source !== "Talents / Traits").map(foundrySpecialAbility),
+        ...foundryAbilities.map(foundrySpecialAbility),
         ...character.advances.psychicPowers.filter((entry) => entry?.name).map((entry) => ({
           name: entry.name,
           type: "psychicPower",
@@ -4905,6 +4918,8 @@ function wireEvents() {
         },
       },
     });
+    const status = document.querySelector("#export-status");
+    if (status) status.textContent = `Download started: ${filename}`;
   });
 
   const dialog = document.querySelector("#detail-dialog");
