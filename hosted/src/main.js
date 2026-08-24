@@ -432,6 +432,22 @@ function renderSheetEntry({ kind, name, summary, meta = "", source = "", rows = 
   </div>`;
 }
 
+function renderInventorySheetEntry(item, provenance, ownedWeapons) {
+  const safeSummary = itemRulesSummary(item) || "No additional effect is recorded.";
+  const rows = [
+    ["Category", item.category],
+    ["Availability", effectiveAvailability(item)],
+    ["Craftsmanship", item.craftsmanship],
+    ["Weight", displayWeight(item)],
+    ...itemProfileRows(item),
+  ];
+  return `<div class="sheet-entry inventory-sheet-entry">
+    <span class="inventory-item-identity"><strong>${escapeHtmlAttribute(item.name)}</strong><small>${escapeHtmlAttribute(item.category)}</small><em>${escapeHtmlAttribute(provenance.label)}</em></span>
+    <span class="sheet-entry-summary">${escapeHtmlAttribute(visibleSheetSummary(safeSummary))}</span>
+    <span class="sheet-entry-meta">${reviewInventoryControl(item, ownedWeapons)}${sheetDetailButton({ kind: item.category, name: item.name, summary: safeSummary, source: item.source, rows })}</span>
+  </div>`;
+}
+
 function findLegacyArmouryItem(value) {
   const target = normaliseItemName(value);
   if (!target) return null;
@@ -709,8 +725,6 @@ function applyTextScale(scope = root) {
     ".review-characteristics span",
     ".calculation-note",
     ".review-meta",
-    ".loadout-review span",
-    ".loadout-review strong",
     ".dossier-list strong",
     ".dossier-list span",
     ".dossier-list em",
@@ -1248,6 +1262,18 @@ function rerenderAdvancesPreservingScroll() {
   });
 }
 
+function rerenderEquipmentStatePreservingScroll() {
+  const scrollPositions = [".inventory-list", ".loadout-panel", ".management-content"]
+    .map((selector) => ({ selector, top: document.querySelector(selector)?.scrollTop || 0 }));
+  render();
+  requestAnimationFrame(() => {
+    scrollPositions.forEach(({ selector, top }) => {
+      const target = document.querySelector(selector);
+      if (target) target.scrollTop = top;
+    });
+  });
+}
+
 function refreshCharacteristicDisplay(characteristicId) {
   const input = document.querySelector(`[data-manual-characteristic="${characteristicId}"]`);
   const article = input?.closest(".characteristic-entry");
@@ -1718,6 +1744,26 @@ function equipmentItemIsActive(itemId) {
     || character.equipment.wornArmour.includes(itemId)
     || character.equipment.activeGear.includes(itemId)
     || Boolean(character.equipment.weaponModAssignments[itemId]);
+}
+
+function reviewInventoryControl(item, ownedWeapons = []) {
+  if (item.category === "Weapons") {
+    const checked = character.equipment.readiedWeapons.includes(item.id) ? "checked" : "";
+    return `<label class="inventory-state-control"><input type="checkbox" data-ready-weapon="${item.id}" ${checked} /><span>Readied</span></label>`;
+  }
+  if (item.category === "Armour") {
+    const checked = character.equipment.wornArmour.includes(item.id) ? "checked" : "";
+    return `<label class="inventory-state-control"><input type="checkbox" data-wear-armour="${item.id}" ${checked} /><span>Worn</span></label>`;
+  }
+  if (item.category === "Weapon Mods") {
+    const assignedWeaponId = character.equipment.weaponModAssignments[item.id] || "";
+    return `<label class="inventory-modification-control"><span>Installed on</span><select data-modification-target="${item.id}" aria-label="Weapon for ${escapeHtmlAttribute(item.name)}"><option value="">Not installed</option>${ownedWeapons.map((weapon) => {
+      const compatibility = modificationCompatibility(item, weapon);
+      return `<option value="${weapon.id}" ${assignedWeaponId === weapon.id ? "selected" : ""}>${escapeHtmlAttribute(weapon.name)}${compatibility.compatible ? "" : " · check eligibility"}</option>`;
+    }).join("")}</select></label>`;
+  }
+  const checked = character.equipment.activeGear.includes(item.id) ? "checked" : "";
+  return `<label class="inventory-state-control"><input type="checkbox" data-active-gear="${item.id}" ${checked} /><span>Worn / in use</span></label>`;
 }
 
 function modificationCompatibility(modification, weapon) {
@@ -3310,7 +3356,7 @@ function applyRuleHighlights() {
   while (walker.nextNode()) nodes.push(walker.currentNode);
   for (const node of nodes) {
     if (!node.nodeValue?.trim()) continue;
-    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term,.review-characteristics,.review-meta,.xp-ledger,.loadout-panel,.loadout-review,.validation-panel,.review-sections strong,.review-sections h1,.review-sections h2,.review-sections h3")) continue;
+    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term,.review-characteristics,.review-meta,.xp-ledger,.loadout-panel,.validation-panel,.review-section-heading,.inventory-item-identity,.review-sections strong,.review-sections h1,.review-sections h2,.review-sections h3")) continue;
     const matches = [...node.nodeValue.matchAll(pattern)];
     if (!matches.length) continue;
     const fragment = document.createDocumentFragment();
@@ -3765,6 +3811,7 @@ function renderReview() {
   const initialTalents = Object.values(resolvedGrantedTalents());
   const purchasedTalents = character.advances.talents.map((entry) => talentCatalogue.find((talent) => talent.id === entry.id)).filter(Boolean);
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
+  const ownedWeapons = inventoryItems.filter((item) => item.category === "Weapons");
   const psychicPowers = character.advances.psychicPowers.filter((entry) => entry?.name);
   const equipmentState = equipmentRulesState(inventoryItems);
   const grantedEquipment = resolvedGrantedEquipment();
@@ -3905,42 +3952,16 @@ function renderReview() {
               ...character.advances.eliteAdvances.filter((entry) => entry?.name).map((entry) => `<div><strong>${entry.name}</strong><span>Optional Elite Advance</span><em>${entry.cost || 0} XP</em></div>`),
             ].join("") || "<p>None. Elite Advances are optional and are not required to complete this character.</p>"}</div>
           </section>
-          <section>
-            <h3>Equipment and Loadout</h3>
-            <div class="loadout-review">
-              <div><span>Weapons Readied</span><strong>${equipmentState.readiedWeapons.map((item) => item.name).join(", ") || "None"}</strong></div>
-              <div><span>Armour Worn</span><strong>${equipmentState.wornArmour.map((item) => item.name).join(", ") || "None"}</strong></div>
-              <div><span>Active Gear</span><strong>${equipmentState.activeGear.map((item) => item.name).join(", ") || "None"}</strong></div>
-              <div><span>Known Weight</span><strong>${equipmentState.carryingStatsRecorded ? `${equipmentState.knownWeight.toFixed(1)} / ${equipmentState.carryingCapacity} kg` : `${equipmentState.knownWeight.toFixed(1)} kg · capacity pending`}</strong></div>
+          <section class="review-inventory-section">
+            <div class="review-section-heading">
+              <div><h3>Inventory</h3><p>All owned weapons, armour, modifications, and carried gear. Change an item's current state here at any time.</p></div>
+              <div class="inventory-totals" aria-label="Inventory totals"><span>${inventoryItems.length + unlinkedGrantedEquipment.length} items</span><strong>${equipmentState.carryingStatsRecorded ? `${equipmentState.knownWeight.toFixed(1)} / ${equipmentState.carryingCapacity} kg` : `${equipmentState.knownWeight.toFixed(1)} kg`}</strong></div>
             </div>
-            <div class="dossier-list compact">${equipmentState.assignedModifications.map((modification) => {
-              const weapon = equipmentItem(character.equipment.weaponModAssignments[modification.id]);
-              return renderSheetEntry({
-                kind: "Weapon Modification",
-                name: modification.name,
-                summary: itemRulesSummary(modification),
-                meta: `Installed on ${weapon?.name || "unresolved weapon"}`,
-                source: modification.source,
-                rows: itemProfileRows(modification),
-              });
-            }).join("") || "<p>No weapon modifications installed.</p>"}</div>
-            <div class="dossier-list compact">${[
+            <div class="inventory-column-labels" aria-hidden="true"><span>Item</span><span>Rules summary</span><span>Current state</span></div>
+            <div class="dossier-list inventory-list">${[
               ...inventoryItems.map((item) => {
                 const source = equipmentProvenance(item.id, grantedEquipment);
-                return renderSheetEntry({
-                  kind: item.category,
-                  name: item.name,
-                  summary: itemRulesSummary(item),
-                  meta: source.label,
-                  source: item.source,
-                  rows: [
-                    ["Category", item.category],
-                    ["Availability", effectiveAvailability(item)],
-                    ["Craftsmanship", item.craftsmanship],
-                    ["Weight", displayWeight(item)],
-                    ...itemProfileRows(item),
-                  ],
-                });
+                return renderInventorySheetEntry(item, source, ownedWeapons);
               }),
               ...unlinkedGrantedEquipment.map((entry) => renderSheetEntry({
                 kind: "Starting Equipment",
@@ -4446,7 +4467,7 @@ function wireEvents() {
         : character.equipment.readiedWeapons.filter((entry) => entry !== id);
       pendingFocusSelector = `[data-ready-weapon="${id}"]`;
       save();
-      render();
+      rerenderEquipmentStatePreservingScroll();
     });
   });
   document.querySelectorAll("[data-wear-armour]").forEach((input) => {
@@ -4458,7 +4479,7 @@ function wireEvents() {
         : character.equipment.wornArmour.filter((entry) => entry !== id);
       pendingFocusSelector = `[data-wear-armour="${id}"]`;
       save();
-      render();
+      rerenderEquipmentStatePreservingScroll();
     });
   });
   document.querySelectorAll("[data-active-gear]").forEach((input) => {
@@ -4470,7 +4491,7 @@ function wireEvents() {
         : character.equipment.activeGear.filter((entry) => entry !== id);
       pendingFocusSelector = `[data-active-gear="${id}"]`;
       save();
-      render();
+      rerenderEquipmentStatePreservingScroll();
     });
   });
   document.querySelectorAll("[data-modification-target]").forEach((select) => {
@@ -4481,7 +4502,7 @@ function wireEvents() {
       else delete character.equipment.weaponModAssignments[modificationId];
       pendingFocusSelector = `[data-modification-target="${modificationId}"]`;
       save();
-      render();
+      rerenderEquipmentStatePreservingScroll();
     });
   });
   document.querySelectorAll("[data-characteristic-advance]").forEach((select) => {
