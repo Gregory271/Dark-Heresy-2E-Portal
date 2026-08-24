@@ -25,6 +25,44 @@ export const skillAdvanceCosts = {
   2: [100, 200, 300, 400],
 };
 
+const commonLoreSpecialities = [
+  "Adepta Sororitas", "Adeptus Arbites", "Adeptus Astartes", "Adeptus Astra Telepathica",
+  "Adeptus Mechanicus", "Administratum", "Askellon Sector", "Chartist Captains",
+  "Collegia Titanicus", "Ecclesiarchy", "Imperial Creed", "Imperial Guard", "Imperial Navy",
+  "Imperium", "Navigators", "Planetary Defence Forces", "Rogue Traders", "Schola Progenium",
+  "Tech", "Underworld", "War",
+];
+
+const scholasticLoreSpecialities = [
+  ...commonLoreSpecialities,
+  "Astromancy", "Beasts", "Bureaucracy", "Chymistry", "Cryptology", "Heraldry",
+  "Imperial Warrants", "Judgement", "Legend", "Numerology", "Occult", "Philosophy",
+  "Tactica Imperialis",
+];
+
+export const skillSpecialities = {
+  "common-lore": commonLoreSpecialities,
+  "forbidden-lore": [
+    "Archaeotech", "Chaos Space Marines", "Criminal Cartels and Smugglers", "Daemonology",
+    "Heresy", "The Horus Heresy and the Long War", "Inquisition", "Mutants", "Pirates",
+    "Psykers", "The Warp", "Xenos", ...commonLoreSpecialities, ...scholasticLoreSpecialities,
+  ].filter((entry, index, list) => list.indexOf(entry) === index),
+  linguistics: [
+    "High Gothic", "Low Gothic", "Techna-Lingua", "Chapter Runes", "Mercenary Cant",
+    "Underworld Cant", "Eldar", "Kroot", "Ork", "Tau",
+  ],
+  navigate: ["Surface", "Stellar", "Warp"],
+  operate: ["Aeronautica", "Surface", "Voidship"],
+  "scholastic-lore": scholasticLoreSpecialities,
+  trade: [
+    "Agri", "Archaeologist", "Armourer", "Astrographer", "Chymist", "Cryptographer", "Cook",
+    "Explorator", "Linguist", "Loremancer", "Morticator", "Performancer", "Prospector",
+    "Scrimshawer", "Sculptor", "Shipwright", "Soothsayer", "Technomat", "Voidfarer",
+  ],
+};
+
+export const specialistSkillIds = Object.freeze(Object.keys(skillSpecialities));
+
 export const skills = [
   ["acrobatics", "Acrobatics", "Agility", "General"],
   ["athletics", "Athletics", "Strength", "General"],
@@ -46,6 +84,7 @@ export const skills = [
   ["operate", "Operate", "Agility", "Fieldcraft"],
   ["parry", "Parry", "Weapon Skill", "Defence"],
   ["psyniscience", "Psyniscience", "Perception", "Psyker"],
+  ["scholastic-lore", "Scholastic Lore", "Intelligence", "Knowledge"],
   ["scrutiny", "Scrutiny", "Perception", "General"],
   ["security", "Security", "Intelligence", "Tech"],
   ["sleight-of-hand", "Sleight of Hand", "Agility", "Knowledge"],

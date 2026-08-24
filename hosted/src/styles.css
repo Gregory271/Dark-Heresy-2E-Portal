@@ -661,6 +661,17 @@ html[data-text-size="extra-large"] .scene-equipment .armoury-layout { margin-top
 .carried-equipment-entry > span { grid-column: 1; min-width: 0; color: #979289; font-size: 7px; overflow-wrap: anywhere; }
 .carried-equipment-entry > label { grid-column: 1; grid-row: auto; display: flex; align-items: center; justify-content: flex-start; gap: 7px; min-width: 0; max-width: 100%; border-top: 1px solid rgba(255,255,255,.07); padding-top: 5px; color: #a9b9af; font-size: 7px; line-height: 1.25; text-align: left; cursor: pointer; }
 .carried-equipment-entry > label span { min-width: 0; white-space: normal; overflow-wrap: normal; word-break: normal; }
+.unified-equipment-record { margin-top: 10px; }
+.unified-equipment-list { grid-template-columns: 1fr; }
+.unified-equipment-list .carried-equipment-entry { grid-template-columns: minmax(0,1fr) minmax(118px,.55fr); align-items: center; column-gap: 10px; }
+.unified-equipment-list .carried-equipment-entry > button,
+.unified-equipment-list .carried-equipment-entry > span { grid-column: 1; }
+.unified-equipment-list .inventory-state-control,
+.unified-equipment-list .inventory-mod-control { grid-column: 2; grid-row: 1 / span 2; align-self: stretch; border-top: 0; border-left: 1px solid rgba(255,255,255,.07); padding: 3px 0 3px 9px; }
+.unified-equipment-list .inventory-state-control { justify-content: flex-start; }
+.unified-equipment-list .inventory-mod-control { display: grid; align-content: center; gap: 4px; cursor: default; }
+.unified-equipment-list .inventory-mod-control > span { color: #9ea89f; font-size: 7px; letter-spacing: .05em; text-transform: uppercase; }
+.unified-equipment-list .inventory-mod-control select { width: 100%; min-width: 0; min-height: 34px; padding: 5px 7px; text-overflow: ellipsis; }
 .inventory-entry { display: grid; gap: 2px; border: 1px solid rgba(155,139,101,.42); padding: 6px 8px; background: rgba(74,61,36,.15); color: #dfd6c6; font-size: 8px; text-align: left; }
 .inventory-entry strong { color: #efe4d1; font: 600 1em "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .inventory-entry small { color: #c6b68f; font-size: .82em; letter-spacing: .05em; text-transform: uppercase; }
@@ -681,6 +692,8 @@ html[data-text-size="large"] .equipment-state-grid,
 html[data-text-size="extra-large"] .equipment-state-grid,
 html[data-text-size="large"] .carried-equipment-list,
 html[data-text-size="extra-large"] .carried-equipment-list { grid-template-columns: 1fr; }
+html[data-text-size="large"] .specialist-skill-families,
+html[data-text-size="extra-large"] .specialist-skill-families { grid-template-columns: 1fr; }
 html[data-text-size="extra-large"] .scene-equipment .management-content > .kicker,
 html[data-text-size="extra-large"] .scene-equipment .management-content > .lede { display: none; }
 html[data-text-size="extra-large"] .scene-equipment .management-content > h1 { font-size: 36px; }
@@ -742,6 +755,28 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
 .talent-inspector dd.missing-prerequisite { color: #ffad98; }
 .talent-inspector .primary-button { width: 100%; min-width: 0; padding: 10px 12px; font-size: 10px; }
 .skill-shop { max-height: none; overflow: visible; }
+.specialist-skill-shop { margin-top: 14px; scroll-margin-top: 44px; }
+.specialist-skill-intro { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 8px; }
+.specialist-skill-intro h3 { margin: 2px 0 0; color: #ead7b7; font: 600 20px "Barlow Condensed",sans-serif; letter-spacing: .04em; text-transform: uppercase; }
+.specialist-skill-intro > p { max-width: 560px; margin: 0; color: #aaa49a; font-size: 9px; line-height: 1.45; text-align: right; }
+.specialist-skill-families { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.specialist-skill-family { min-width: 0; border: 1px solid rgba(255,255,255,.12); background: rgba(5,9,8,.56); }
+.specialist-family-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid rgba(255,255,255,.09); padding: 8px 10px; }
+.specialist-family-heading > div { display: grid; gap: 2px; min-width: 0; }
+.specialist-family-heading strong { color: #ead8b8; font: 600 13px "Barlow Condensed",sans-serif; letter-spacing: .04em; text-transform: uppercase; }
+.specialist-family-heading small,.specialist-family-heading > span { color: #9e988f; font-size: 8px; line-height: 1.35; }
+.specialist-family-heading > span { flex: 0 0 auto; color: #90b5a3; text-transform: uppercase; }
+.specialist-skill-records { display: grid; }
+.specialist-skill-records > p { margin: 0; padding: 9px 10px; color: #8f8a82; font-size: 9px; }
+.specialist-skill-records > label { display: grid; grid-template-columns: minmax(0,1fr) 145px; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.075); padding: 7px 9px; }
+.specialist-skill-records > label.initial-advance { background: linear-gradient(90deg,rgba(101,126,70,.16),transparent); box-shadow: inset 2px 0 #91ae68; }
+.specialist-skill-records > label > span { display: grid; gap: 2px; min-width: 0; }
+.specialist-skill-records strong { color: #e7dfd1; font-size: 10px; overflow-wrap: anywhere; }
+.specialist-skill-records small { color: #99948b; font-size: 8px; line-height: 1.35; }
+.specialist-skill-add { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,.8fr) auto; align-items: end; gap: 6px; padding: 8px; background: rgba(151,100,37,.08); }
+.specialist-skill-add label { display: grid; gap: 3px; min-width: 0; color: #aaa49a; font-size: 7px; letter-spacing: .05em; text-transform: uppercase; }
+.specialist-skill-add select,.specialist-skill-add input { width: 100%; min-width: 0; min-height: 34px; padding: 5px 7px; }
+.specialist-skill-add .compact-button { min-height: 34px; padding: 6px 9px; white-space: nowrap; }
 .other-advances { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border: 1px solid rgba(255,255,255,.11); }
 .other-advances label { display: grid; grid-template-columns: minmax(80px,.6fr) minmax(120px,1.4fr) 62px; align-items: center; gap: 6px; padding: 7px; border-right: 1px solid rgba(255,255,255,.1); color: #d8d3c8; font-size: 10px; }
 .other-advances input { min-width: 0; border: 1px solid rgba(255,255,255,.18); padding: 6px; background: #080c0b; color: #eee7d9; }
@@ -2155,8 +2190,15 @@ dialog h2,
     height: auto;
     overflow: visible;
   }
-  .equipment-state-grid, .carried-equipment-list { grid-template-columns: 1fr; }
+  .equipment-state-grid, .carried-equipment-list, .specialist-skill-families { grid-template-columns: 1fr; }
+  .unified-equipment-list .carried-equipment-entry { grid-template-columns: 1fr; }
+  .unified-equipment-list .inventory-state-control,
+  .unified-equipment-list .inventory-mod-control { grid-column: 1; grid-row: auto; border-top: 1px solid rgba(255,255,255,.07); border-left: 0; padding: 7px 0 0; }
   .modification-entry { grid-template-columns: 1fr; }
+  .specialist-skill-intro { align-items: flex-start; flex-direction: column; }
+  .specialist-skill-intro > p { text-align: left; }
+  .specialist-skill-add { grid-template-columns: 1fr; }
+  .specialist-skill-records > label { grid-template-columns: 1fr; }
   .inventory-record-heading { align-items: flex-start; flex-direction: column; }
   .inventory-record-heading span { text-align: left; }
   .acquisition-heading { align-items: flex-start; flex-direction: column; }
@@ -2507,7 +2549,7 @@ dialog h2,
   .advance-rows label { padding: 4px 7px; }
   .advance-shop select { padding: 4px 6px; font-size: 10px; }
   .advance-rows small { font-size: 7px; line-height: 1.05; }
-  .skill-shop { max-height: 80px; }
+  .skill-shop { max-height: none; }
   .other-advances label { grid-template-columns: 70px 1fr 48px; padding: 4px; font-size: 8px; }
   .other-advances input { padding: 4px; font-size: 8px; }
 }

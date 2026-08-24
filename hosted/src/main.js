@@ -1,7 +1,7 @@
 import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.3";
 import { armoury } from "./armoury-data.js?v=0.8.1";
 import { talentCatalogue } from "./talent-data.js?v=0.9.1";
-import { characteristicRuleTerms, contextualRuleTerms, coreRuleTerms, creatorRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.4.1";
+import { characteristicRuleTerms, contextualRuleTerms, coreRuleTerms, creatorRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.4.2";
 import {
   buildSourcebookLibrary,
   clearStoredSourcebookLibrary,
@@ -26,11 +26,13 @@ import {
   characteristics,
   rankNames,
   skillAdvanceCosts,
+  skillSpecialities,
+  specialistSkillIds,
   skills,
   parseCharacteristicModifiers,
   parseFate,
   parseWounds,
-} from "./creation-data.js?v=0.7.0";
+} from "./creation-data.js?v=0.8.0";
 
 const root = document.querySelector("#app");
 const portalEmblem = `<img class="sigil" src="./public/assets/brand/pax-historia-emblem.png?v=0.1.0" alt="" aria-hidden="true" />`;
@@ -111,6 +113,7 @@ function prepareCharacter(input = {}) {
   prepared.advances ||= { characteristics: {}, skills: {}, talents: [] };
   prepared.advances.characteristics ||= {};
   prepared.advances.skills ||= {};
+  prepared.advances.specialistSkills ||= {};
   prepared.advances.talents ||= [];
   prepared.advances.psychicPowers ||= [];
   prepared.advances.eliteAdvances ||= [];
@@ -711,6 +714,12 @@ function applyTextScale(scope = root) {
     ".advance-warning span",
     ".advance-nav button",
     ".advance-rows label",
+    ".specialist-skill-intro > p",
+    ".specialist-family-heading small",
+    ".specialist-family-heading > span",
+    ".specialist-skill-records strong",
+    ".specialist-skill-records small",
+    ".specialist-skill-add label",
     ".talent-filters button",
     ".talent-row span",
     ".talent-row em",
@@ -1064,22 +1073,50 @@ function skillForGrant(label = "") {
     .sort((a, b) => b.name.length - a.name.length)[0] || null;
 }
 
+const specialistSkillIdSet = new Set(specialistSkillIds);
+
+function isSpecialistSkill(skillId) {
+  return specialistSkillIdSet.has(skillId);
+}
+
+function normaliseSpeciality(value = "") {
+  return String(value).trim().replace(/\s+/g, " ");
+}
+
+function specialistSkillKey(skillId, speciality = "") {
+  const key = normaliseSpeciality(speciality).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "unspecified";
+  return `${skillId}::${key}`;
+}
+
+function skillRecordKey(skillId, speciality = "") {
+  return isSpecialistSkill(skillId) ? specialistSkillKey(skillId, speciality) : skillId;
+}
+
 function backgroundGrantedSkills() {
   const grants = {};
   splitGrant(ruleValue(character.background, "Starting Skills")).forEach((entry, index) => {
     const choiceId = `background-skills-${index}`;
-    const selected = /\sor\s/i.test(entry) ? character.grantChoices[choiceId] : entry;
+    const needsSpecialityChoice = /pick one|^one\s+(?:forbidden lore|scholastic lore|trade|operate|navigate|common lore|linguistics)|^one\s+alien\s+language/i.test(entry);
+    const selected = /\sor\s/i.test(entry) || needsSpecialityChoice ? character.grantChoices[choiceId] : entry;
     if (!selected) return;
     const skill = skillForGrant(selected);
     if (!skill) return;
-    const speciality = selected.match(/\(([^)]+)\)/)?.[1] || "";
+    const source = catalogs.backgrounds.find((background) => background.id === character.background)?.name || "Background";
+    if (isSpecialistSkill(skill.id)) {
+      const specialityText = selected.match(/\(([^)]+)\)/)?.[1] || "";
+      if (!specialityText || /pick one|choose/i.test(specialityText)) return;
+      specialityText.split(/\s*,\s*/).map(normaliseSpeciality).filter(Boolean).forEach((speciality) => {
+        const key = specialistSkillKey(skill.id, speciality);
+        grants[key] = {
+          key, id: skill.id, name: skill.name, speciality,
+          displayName: `${skill.name} (${speciality})`, rank: 1, source,
+        };
+      });
+      return;
+    }
     grants[skill.id] = {
-      id: skill.id,
-      name: skill.name,
-      speciality,
-      displayName: speciality ? `${skill.name} (${speciality})` : skill.name,
-      rank: 1,
-      source: catalogs.backgrounds.find((entry) => entry.id === character.background)?.name || "Background",
+      key: skill.id, id: skill.id, name: skill.name, speciality: "",
+      displayName: skill.name, rank: 1, source,
     };
   });
   return grants;
@@ -1090,7 +1127,7 @@ function resolvedGrantedSkills() {
   const divinationGrant = currentDivination()?.skillGrant;
   if (divinationGrant && !grants[divinationGrant.id]) {
     const skill = skills.find((entry) => entry.id === divinationGrant.id);
-    if (skill) grants[skill.id] = { id: skill.id, name: skill.name, displayName: skill.name, speciality: "", rank: 1, source: "Divination" };
+    if (skill) grants[skill.id] = { key: skill.id, id: skill.id, name: skill.name, displayName: skill.name, speciality: "", rank: 1, source: "Divination" };
   }
   return grants;
 }
@@ -1129,13 +1166,31 @@ function talentPrerequisiteStatus(talent) {
   return { missing: [...new Set(missing)], parsed };
 }
 
-function skillRank(skillId) {
-  return Math.max(Number(character.advances.skills[skillId] || 0), resolvedGrantedSkills()[skillId]?.rank || 0);
+function specialistAdvanceRecords(skillId) {
+  const records = Object.entries(character.advances.specialistSkills || {})
+    .filter(([, entry]) => entry?.skillId === skillId && normaliseSpeciality(entry.speciality))
+    .map(([key, entry]) => ({ key, skillId, speciality: normaliseSpeciality(entry.speciality), rank: Number(entry.rank || 0) }));
+  const legacyRank = Number(character.advances.skills[skillId] || 0);
+  if (legacyRank > 0) {
+    const grants = Object.values(resolvedGrantedSkills()).filter((entry) => entry.id === skillId);
+    const speciality = grants.length === 1 ? grants[0].speciality : "Unspecified";
+    const key = specialistSkillKey(skillId, speciality);
+    if (!records.some((entry) => entry.key === key)) records.push({ key, skillId, speciality, rank: legacyRank, legacy: true });
+  }
+  return records;
 }
 
-function skillTestTarget(skill) {
+function skillRank(skillId, speciality = "") {
+  const key = skillRecordKey(skillId, speciality);
+  const purchasedRank = isSpecialistSkill(skillId)
+    ? Number(specialistAdvanceRecords(skillId).find((entry) => entry.key === key)?.rank || 0)
+    : Number(character.advances.skills[skillId] || 0);
+  return Math.max(purchasedRank, resolvedGrantedSkills()[key]?.rank || 0);
+}
+
+function skillTestTarget(skill, speciality = "") {
   const characteristic = characteristics.find((entry) => entry.name === skill.characteristic);
-  const rank = skillRank(skill.id);
+  const rank = skillRank(skill.id, speciality);
   return rank > 0 ? characteristicValue(characteristic?.id) + (rank - 1) * 10 : 0;
 }
 
@@ -1146,12 +1201,41 @@ function characteristicXpCost(characteristicId) {
   return Array.from({ length: rank }, (_, index) => characteristicAdvanceCosts[matches][index]).reduce((sum, cost) => sum + cost, 0);
 }
 
-function skillXpCost(skillId) {
+function skillXpCost(skillId, speciality = "") {
   const skill = skills.find((entry) => entry.id === skillId);
   const matches = aptitudeMatches(skill?.aptitudes || [], resolvedAptitudes().aptitudes);
-  const freeRank = resolvedGrantedSkills()[skillId]?.rank || 0;
-  const rank = skillRank(skillId);
+  const key = skillRecordKey(skillId, speciality);
+  const freeRank = resolvedGrantedSkills()[key]?.rank || 0;
+  const rank = skillRank(skillId, speciality);
   return Array.from({ length: Math.max(0, rank - freeRank) }, (_, offset) => skillAdvanceCosts[matches][freeRank + offset]).reduce((sum, cost) => sum + cost, 0);
+}
+
+function ownedSkillRecords() {
+  const grants = resolvedGrantedSkills();
+  const records = [];
+  for (const skill of skills) {
+    if (!isSpecialistSkill(skill.id)) {
+      const rank = skillRank(skill.id);
+      if (rank > 0) records.push({ key: skill.id, skill, speciality: "", displayName: skill.name, rank, grant: grants[skill.id] || null });
+      continue;
+    }
+    const family = new Map();
+    Object.values(grants).filter((entry) => entry.id === skill.id).forEach((grant) => {
+      family.set(grant.key, { key: grant.key, skill, speciality: grant.speciality, displayName: grant.displayName, grant });
+    });
+    specialistAdvanceRecords(skill.id).forEach((advance) => {
+      const existing = family.get(advance.key);
+      family.set(advance.key, {
+        key: advance.key, skill, speciality: advance.speciality,
+        displayName: `${skill.name} (${advance.speciality})`, grant: existing?.grant || null,
+      });
+    });
+    family.forEach((record) => {
+      const rank = skillRank(skill.id, record.speciality);
+      if (rank > 0) records.push({ ...record, rank });
+    });
+  }
+  return records.sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
 function automaticEliteAdvances() {
@@ -1162,6 +1246,11 @@ function automaticEliteAdvances() {
 
 function automaticTraits() {
   const traits = [];
+  if (["mechanicus", "heretek"].includes(character.background)) traits.push({
+    name: "Mechanicus Implants",
+    summary: "The character possesses the foundational cranial circuitry, cyber-mantle, electro-graft, electoo inductors, and Potentia Coil of a servant of the Machine-God.",
+    source: character.background === "mechanicus" ? "Adeptus Mechanicus Background" : "Heretek Background",
+  });
   if (automaticEliteAdvances().some((entry) => entry.id === "psyker")) traits.push({
     name: "Psyker",
     summary: "The character has a Psy Rating and can manifest psychic powers, with the attendant risk of Psychic Phenomena.",
@@ -1206,8 +1295,23 @@ function xpSpent() {
   for (const [id, rank] of Object.entries(character.advances.skills)) {
     const skill = skills.find((entry) => entry.id === id);
     const matches = aptitudeMatches(skill?.aptitudes || [], owned);
-    const freeRank = resolvedGrantedSkills()[id]?.rank || 0;
+    const legacySpeciality = isSpecialistSkill(id)
+      ? (Object.values(resolvedGrantedSkills()).filter((entry) => entry.id === id).length === 1
+        ? Object.values(resolvedGrantedSkills()).find((entry) => entry.id === id).speciality
+        : "Unspecified")
+      : "";
+    const freeRank = resolvedGrantedSkills()[skillRecordKey(id, legacySpeciality)]?.rank || 0;
     for (let index = freeRank; index < Number(rank || 0); index += 1) {
+      spent += skillAdvanceCosts[matches][index];
+    }
+  }
+  for (const entry of Object.values(character.advances.specialistSkills || {})) {
+    if (!entry?.skillId || !normaliseSpeciality(entry.speciality)) continue;
+    const skill = skills.find((candidate) => candidate.id === entry.skillId);
+    const matches = aptitudeMatches(skill?.aptitudes || [], owned);
+    const key = specialistSkillKey(entry.skillId, entry.speciality);
+    const freeRank = resolvedGrantedSkills()[key]?.rank || 0;
+    for (let index = freeRank; index < Number(entry.rank || 0); index += 1) {
       spent += skillAdvanceCosts[matches][index];
     }
   }
@@ -1246,25 +1350,31 @@ function save({ markComplete = false } = {}) {
   queueRepositorySave(record);
 }
 
-function rerenderAdvancesPreservingScroll() {
+function rerenderAdvancesPreservingScroll(focusSelector = "", anchorSelector = "#advance-talents") {
   const previousShop = document.querySelector(".advance-shop");
-  const previousAnchor = document.querySelector("#advance-talents");
+  const previousAnchor = document.querySelector(focusSelector || anchorSelector);
   const anchorViewportOffset = previousShop && previousAnchor
-    ? previousAnchor.offsetTop - previousShop.scrollTop
+    ? previousAnchor.getBoundingClientRect().top - previousShop.getBoundingClientRect().top
     : 0;
+  const previousScroll = previousShop?.scrollTop || 0;
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   render();
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       const shop = document.querySelector(".advance-shop");
-      const anchor = document.querySelector("#advance-talents");
-      if (shop && anchor) shop.scrollTop = Math.max(0, anchor.offsetTop - anchorViewportOffset);
+      const anchor = document.querySelector(focusSelector || anchorSelector);
+      if (shop) shop.scrollTop = previousScroll;
+      if (shop && anchor) {
+        const nextOffset = anchor.getBoundingClientRect().top - shop.getBoundingClientRect().top;
+        shop.scrollTop = Math.max(0, shop.scrollTop + nextOffset - anchorViewportOffset);
+      }
+      if (focusSelector && anchor instanceof HTMLElement) anchor.focus({ preventScroll: true });
     });
   });
 }
 
-function rerenderEquipmentStatePreservingScroll() {
-  const scrollPositions = [".inventory-list", ".loadout-panel", ".management-content"]
+function rerenderEquipmentStatePreservingScroll(focusSelector = "") {
+  const scrollPositions = [".armoury-list", ".loadout-panel", ".management-content", ".item-inspector > div"]
     .map((selector) => ({ selector, top: document.querySelector(selector)?.scrollTop || 0 }));
   render();
   requestAnimationFrame(() => {
@@ -1272,6 +1382,8 @@ function rerenderEquipmentStatePreservingScroll() {
       const target = document.querySelector(selector);
       if (target) target.scrollTop = top;
     });
+    const focusTarget = focusSelector ? document.querySelector(focusSelector) : null;
+    if (focusTarget instanceof HTMLElement) focusTarget.focus({ preventScroll: true });
   });
 }
 
@@ -1340,6 +1452,7 @@ function resetCreationDataFrom(sceneId) {
   character.advances = {
     characteristics: {},
     skills: {},
+    specialistSkills: {},
     talents: [],
     psychicPowers: [],
     eliteAdvances: [],
@@ -1902,37 +2015,30 @@ function foundryCharacteristicData(characteristicId) {
 
 function foundrySkillData() {
   const payload = {};
-  const specialistIds = new Set(["common-lore", "forbidden-lore", "linguistics", "navigate", "operate", "scholastic-lore", "trade"]);
+  const ownedRecords = ownedSkillRecords();
   for (const skill of skills) {
     const foundryKey = foundryCamelCase(skill.id);
-    const rank = skillRank(skill.id);
-    const cost = skillXpCost(skill.id);
-    const grant = resolvedGrantedSkills()[skill.id];
-    const speciality = grant?.speciality || "";
     const characteristic = characteristics.find((entry) => entry.name === skill.characteristic);
     const characteristicShort = characteristic?.abbreviation || "";
     const baseRecord = {
       label: skill.name,
       characteristics: characteristicShort ? [characteristicShort] : [],
       characteristic: characteristicShort,
-      advance: specialistIds.has(skill.id) ? 0 : rank,
-      isSpecialist: specialistIds.has(skill.id),
-      cost: specialistIds.has(skill.id) ? 0 : cost,
+      advance: isSpecialistSkill(skill.id) ? 0 : skillRank(skill.id),
+      isSpecialist: isSpecialistSkill(skill.id),
+      cost: isSpecialistSkill(skill.id) ? 0 : skillXpCost(skill.id),
     };
-    if (specialistIds.has(skill.id)) {
-      const specialityLabel = speciality || "Unspecified";
-      const specialityKey = foundryCamelCase(specialityLabel);
+    if (isSpecialistSkill(skill.id)) {
+      const familyRecords = ownedRecords.filter((record) => record.skill.id === skill.id);
       payload[foundryKey] = {
         ...baseRecord,
-        specialities: {
-          [specialityKey]: {
-            label: specialityLabel,
-            advance: rank,
-            cost,
+        specialities: Object.fromEntries(familyRecords.map((record) => [foundryCamelCase(record.speciality || "Unspecified"), {
+            label: record.speciality || "Unspecified",
+            advance: record.rank,
+            cost: skillXpCost(skill.id, record.speciality),
             taken: true,
-            custom: !speciality,
-          },
-        },
+            custom: !(skillSpecialities[skill.id] || []).includes(record.speciality),
+          }])),
       };
     } else {
       payload[foundryKey] = { ...baseRecord, specialities: {} };
@@ -2034,6 +2140,16 @@ function hasPsykerAccess() {
     || character.advances.eliteAdvances.some((entry) => /psyker|astropath/i.test(entry?.name || ""));
 }
 
+function expandSpecialistGrantOption(option) {
+  const cleaned = option.replace(/^.*?·\s*Gain\s+/i, "").replace(/\.$/, "").trim();
+  if (/^one\s+alien\s+language$/i.test(cleaned)) {
+    return ["Eldar", "Kroot", "Ork", "Tau"].map((speciality) => `Linguistics (${speciality})`);
+  }
+  const skill = skillForGrant(cleaned);
+  if (!skill || !isSpecialistSkill(skill.id) || (cleaned.includes("(") && !/pick one|choose/i.test(cleaned))) return [cleaned];
+  return (skillSpecialities[skill.id] || []).map((speciality) => `${skill.name} (${speciality})`);
+}
+
 function grantAlternatives() {
   const sources = [
     ["background-skills", "Background skill", ruleValue(character.background, "Starting Skills")],
@@ -2044,10 +2160,13 @@ function grantAlternatives() {
   const alternatives = [];
   for (const [sourceId, label, value] of sources) {
     splitGrant(value).forEach((entry, index) => {
-      if (!/\sor\s/i.test(entry)) return;
-      const options = entry.split(/\s+or\s+/i)
+      const hasEitherOr = /\sor\s/i.test(entry);
+      const specialistPlaceholder = sourceId === "background-skills" && (/pick one|^one\s+(?:forbidden lore|scholastic lore|trade|operate|navigate|common lore|linguistics)|^one\s+alien\s+language/i.test(entry));
+      if (!hasEitherOr && !specialistPlaceholder) return;
+      let options = (hasEitherOr ? entry.split(/\s+or\s+/i) : [entry])
         .map((option) => option.replace(/^.*?·\s*Gain\s+/i, "").replace(/\.$/, "").trim())
         .filter(Boolean);
+      if (sourceId === "background-skills") options = options.flatMap(expandSpecialistGrantOption);
       if (options.length < 2) return;
       alternatives.push({ id: `${sourceId}-${index}`, label, source: entry, options });
     });
@@ -2060,9 +2179,12 @@ function renderGrants() {
   const roleRows = mechanicsByChoice[character.role] || [];
   const homeRows = mechanicsByChoice[character.homeWorld] || [];
   const freeSkills = Object.values(resolvedGrantedSkills());
+  const freeTalents = Object.values(resolvedGrantedTalents());
+  const freeTraits = automaticTraits();
   const groups = [
     ["Initial Skills", freeSkills.map((skill) => `${skill.displayName} · Known · ${skill.source}`)],
-    ["Talents and Traits", splitGrant(backgroundRows.find(([label]) => label === "Talents / Traits")?.[1])],
+    ["Initial Talents", freeTalents.map((talent) => `${talent.displayName} · ${talent.source}`)],
+    ["Initial Traits", freeTraits.map((trait) => `${trait.name} · ${trait.source}`)],
     ["Home World Bonus", [homeRows.find(([label]) => label === "Home World Bonus")?.[1]].filter(Boolean)],
     ["Background Bonus", [backgroundRows.find(([label]) => label === "Background Bonus")?.[1]].filter(Boolean)],
     ["Role Talent", [roleRows.find(([label]) => label === "Talent Choice")?.[1]].filter(Boolean)],
@@ -2102,15 +2224,7 @@ function renderEquipment() {
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
   const unlinkedGrantedItems = grantedEquipment.entries.filter((entry) => !entry.item);
   const ownedWeapons = inventoryItems.filter((item) => item.category === "Weapons");
-  const ownedArmour = inventoryItems.filter((item) => item.category === "Armour");
-  const ownedModifications = inventoryItems.filter((item) => item.category === "Weapon Mods");
   const rulesState = equipmentRulesState(inventoryItems);
-  const carriedItems = inventoryItems.filter((item) => {
-    if (item.category === "Weapons") return !character.equipment.readiedWeapons.includes(item.id);
-    if (item.category === "Armour") return !character.equipment.wornArmour.includes(item.id);
-    if (item.category === "Weapon Mods") return !character.equipment.weaponModAssignments[item.id];
-    return true;
-  });
   const selectedInInventory = character.equipment.inventory.includes(selected.id);
   const selectedAcquisition = character.acquisitions.includes(selected.id);
   const selectedNoCostGrant = character.equipment.noCostGrants.includes(selected.id);
@@ -2184,50 +2298,35 @@ function renderEquipment() {
             <small>${rulesState.carryingStatsRecorded ? `Base ${rulesState.baseCapacity} kg${rulesState.containerCapacity ? ` · carrying gear +${rulesState.containerCapacity} kg` : ""}` : "Record Strength and Toughness to calculate carrying capacity."}</small>
           </div>
           ${rulesState.warnings.length ? `<div class="equipment-rule-alerts" aria-label="Equipment rules notices">${rulesState.warnings.map((warning) => `<p class="${warning.level}">${warning.message}</p>`).join("")}</div>` : ""}
-          <div class="equipment-state-grid">
-            <section class="equipment-state-panel">
-              <div class="equipment-state-heading"><strong>Weapons Readied</strong><span>Convenience only; this does not limit inventory.</span></div>
-              <div class="equipment-check-list">${ownedWeapons.map((item) => `
-                <label><input type="checkbox" data-ready-weapon="${item.id}" ${character.equipment.readiedWeapons.includes(item.id) ? "checked" : ""} /><span><strong>${item.name}</strong><small>${item.profile?.class || "Weapon"} · ${displayWeight(item)}</small></span></label>`).join("") || "<p>No weapons owned.</p>"}</div>
-            </section>
-            <section class="equipment-state-panel">
-              <div class="equipment-state-heading"><strong>Armour Worn</strong><span>Multiple pieces are allowed; AP does not stack.</span></div>
-              <div class="equipment-check-list">${ownedArmour.map((item) => `
-                <label><input type="checkbox" data-wear-armour="${item.id}" ${character.equipment.wornArmour.includes(item.id) ? "checked" : ""} /><span><strong>${item.name}</strong><small>${item.profile?.type || "Armour"} · ${displayWeight(item)}</small></span></label>`).join("") || "<p>No armour owned.</p>"}</div>
-            </section>
-          </div>
-          <section class="equipment-state-panel modification-panel">
-            <div class="equipment-state-heading"><strong>Weapon Modifications</strong><span>Install each owned modification on a specific weapon.</span></div>
-            <div class="modification-list">${ownedModifications.map((modification) => {
-              const assignedWeaponId = character.equipment.weaponModAssignments[modification.id] || "";
-              return `<div class="modification-entry">
-                <div><strong>${modification.name}</strong><small>${modification.profile?.upgrades || "Eligibility not recorded"}</small></div>
-                <label><span>Installed on</span><select data-modification-target="${modification.id}"><option value="">Not installed</option>${ownedWeapons.map((weapon) => {
-                  const compatibility = modificationCompatibility(modification, weapon);
-                  return `<option value="${weapon.id}" ${assignedWeaponId === weapon.id ? "selected" : ""}>${weapon.name}${compatibility.compatible ? "" : " · check eligibility"}</option>`;
-                }).join("")}</select></label>
-              </div>`;
-            }).join("") || "<p>No weapon modifications owned.</p>"}</div>
-          </section>
-          <section class="inventory-record" aria-labelledby="inventory-record-title">
+          <section class="inventory-record unified-equipment-record" aria-labelledby="inventory-record-title">
             <div class="inventory-record-heading">
-              <strong id="inventory-record-title">Carried Equipment</strong>
-              <span>All other owned items. Mark gear currently worn or in use; there is no two-item limit.</span>
+              <strong id="inventory-record-title">Your Inventory</strong>
+              <span>Every owned item appears once. Ready weapons, wear compatible armour, install modifications, or mark carried gear in use.</span>
             </div>
-            <div class="carried-equipment-list">${carriedItems.map((item) => {
+            <div class="carried-equipment-list unified-equipment-list">${inventoryItems.map((item) => {
               const source = equipmentProvenance(item.id, grantedEquipment);
-              const canActivate = !["Weapons", "Armour", "Weapon Mods"].includes(item.category);
+              const assignedWeaponId = item.category === "Weapon Mods" ? character.equipment.weaponModAssignments[item.id] || "" : "";
+              const stateControl = item.category === "Weapons"
+                ? `<label class="inventory-state-control"><input type="checkbox" data-ready-weapon="${item.id}" ${character.equipment.readiedWeapons.includes(item.id) ? "checked" : ""} /><span>Readied</span></label>`
+                : item.category === "Armour"
+                  ? `<label class="inventory-state-control"><input type="checkbox" data-wear-armour="${item.id}" ${character.equipment.wornArmour.includes(item.id) ? "checked" : ""} /><span>Worn</span></label>`
+                  : item.category === "Weapon Mods"
+                    ? `<label class="inventory-mod-control"><span>Installed on</span><select data-modification-target="${item.id}"><option value="">Not installed</option>${ownedWeapons.map((weapon) => {
+                        const compatibility = modificationCompatibility(item, weapon);
+                        return `<option value="${weapon.id}" ${assignedWeaponId === weapon.id ? "selected" : ""}>${weapon.name}${compatibility.compatible ? "" : " · check eligibility"}</option>`;
+                      }).join("")}</select></label>`
+                    : `<label class="inventory-state-control"><input type="checkbox" data-active-gear="${item.id}" ${character.equipment.activeGear.includes(item.id) ? "checked" : ""} /><span>Worn / in use</span></label>`;
               return `<div class="carried-equipment-entry ${selected.id === item.id ? "selected" : ""}">
                 <button type="button" data-equipment-item="${item.id}" title="View ${escapeHtmlAttribute(item.name)} details"><strong>${item.name}</strong><small class="item-origin">${source.label}</small></button>
                 <span>${item.category} · ${displayWeight(item)}</span>
-                ${canActivate ? `<label><input type="checkbox" data-active-gear="${item.id}" ${character.equipment.activeGear.includes(item.id) ? "checked" : ""} /><span>Worn / in use</span></label>` : ""}
+                ${stateControl}
               </div>`;
             }).join("")}${unlinkedGrantedItems.map((entry) => `
               <div class="inventory-entry ${entry.unresolvedChoice ? "unresolved" : "unlinked"}">
                 <strong>${entry.label}</strong>
                 <small class="item-origin">${entry.unresolvedChoice ? "Background choice unresolved" : `Granted by ${entry.sourceName}`}</small>
                 <em>${entry.unresolvedChoice ? "Return to Starting Abilities and choose one option." : "Recorded as written · Armoury details not yet linked."}</em>
-              </div>`).join("")}${!carriedItems.length && !unlinkedGrantedItems.length ? "<p>Nothing else is being carried.</p>" : ""}</div>
+              </div>`).join("")}${!inventoryItems.length && !unlinkedGrantedItems.length ? "<p>No equipment recorded yet.</p>" : ""}</div>
           </section>
         </aside>
       </section>
@@ -2288,6 +2387,46 @@ function renderTalentShop() {
     </section>`;
 }
 
+function renderSpecialistSkillShop(ownedAptitudes) {
+  const ownedRecords = ownedSkillRecords();
+  return `
+    <section class="specialist-skill-shop" aria-labelledby="specialist-skills-title">
+      <div class="specialist-skill-intro">
+        <div><p class="choice-source">Each speciality advances separately</p><h3 id="specialist-skills-title">Specialist Skills</h3></div>
+        <p>Choose a listed speciality, or record a GM-approved speciality when the rules allow one not shown here.</p>
+      </div>
+      <div class="specialist-skill-families">
+        ${skills.filter((skill) => isSpecialistSkill(skill.id)).map((skill) => {
+          const records = ownedRecords.filter((record) => record.skill.id === skill.id);
+          const matches = aptitudeMatches(skill.aptitudes, ownedAptitudes);
+          const existingKeys = new Set(records.map((record) => specialistSkillKey(skill.id, record.speciality)));
+          const available = (skillSpecialities[skill.id] || []).filter((speciality) => !existingKeys.has(specialistSkillKey(skill.id, speciality)));
+          return `<article class="specialist-skill-family" id="specialist-${skill.id}">
+            <div class="specialist-family-heading">
+              <div><strong>${skill.name}</strong><small>${skill.characteristic} · ${matches}/2 aptitudes</small></div>
+              <span>${records.length} recorded</span>
+            </div>
+            <div class="specialist-skill-records">${records.map((record) => {
+              const nextCost = record.rank < rankNames.length ? skillAdvanceCosts[matches][record.rank] : null;
+              return `<label class="${record.grant ? "initial-advance" : ""}">
+                <span><strong>${record.displayName}</strong><small>${record.rank ? `Target ${skillTestTarget(skill, record.speciality)}` : "Untrained"}${record.grant ? ` · Known granted by ${record.grant.source}` : ""}${nextCost ? ` · Next ${nextCost} XP` : ""}</small></span>
+                <select data-specialist-skill-advance="${escapeHtmlAttribute(record.key)}" data-specialist-skill-id="${skill.id}" data-specialist-skill-name="${escapeHtmlAttribute(record.speciality)}">
+                  <option value="0" ${record.rank === 0 ? "selected" : ""} ${record.grant ? "disabled" : ""}>Remove / Untrained</option>
+                  ${rankNames.map((name, index) => `<option value="${index + 1}" ${record.rank === index + 1 ? "selected" : ""}>${name}${record.grant && index === 0 ? " · Initial (0 XP)" : ""}</option>`).join("")}
+                </select>
+              </label>`;
+            }).join("") || "<p>No speciality recorded yet.</p>"}</div>
+            <div class="specialist-skill-add">
+              <label><span>Add a speciality</span><select data-specialist-skill-choice="${skill.id}"><option value="">Choose from the rulebook...</option>${available.map((speciality) => `<option value="${escapeHtmlAttribute(speciality)}">${speciality}</option>`).join("")}</select></label>
+              <label><span>Or GM-approved speciality</span><input data-specialist-skill-custom="${skill.id}" type="text" autocomplete="off" placeholder="Optional custom name" /></label>
+              <button class="compact-button" type="button" data-add-specialist-skill="${skill.id}">Add at Known</button>
+            </div>
+          </article>`;
+        }).join("")}
+      </div>
+    </section>`;
+}
+
 function renderAdvances() {
   const owned = resolvedAptitudes().aptitudes;
   const spent = xpSpent();
@@ -2321,7 +2460,7 @@ function renderAdvances() {
         </div>
         <h2 id="advance-skills">Skill Advances</h2>
         <div class="advance-rows skill-shop">
-          ${skills.map((skill) => {
+          ${skills.filter((skill) => !isSpecialistSkill(skill.id)).map((skill) => {
             const freeGrant = resolvedGrantedSkills()[skill.id];
             const rank = skillRank(skill.id);
             const matches = aptitudeMatches(skill.aptitudes, owned);
@@ -2333,6 +2472,7 @@ function renderAdvances() {
               </select></label>`;
           }).join("")}
         </div>
+        ${renderSpecialistSkillShop(owned)}
         ${renderTalentShop()}
         ${hasPsykerAccess() ? `
           <section id="advance-psychic" class="conditional-advances">
@@ -3808,7 +3948,7 @@ function renderReview() {
     .filter((change) => !change.target && !character.divination.statChoices?.[change.id]);
   const unresolvedGrantChoices = grantAlternatives().filter((choice) => !character.grantChoices[choice.id]);
   const divinationModifiers = divinationCharacteristicModifiers();
-  const ownedSkills = skills.filter((skill) => skillRank(skill.id) > 0);
+  const ownedSkills = ownedSkillRecords();
   const initialTalents = Object.values(resolvedGrantedTalents());
   const purchasedTalents = character.advances.talents.map((entry) => talentCatalogue.find((talent) => talent.id === entry.id)).filter(Boolean);
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
@@ -3819,7 +3959,7 @@ function renderReview() {
   const unlinkedGrantedEquipment = character.equipment.unlinkedCharacterCreationGrants || [];
   const xpLedger = [
     ...characteristics.filter((entry) => Number(character.advances.characteristics[entry.id] || 0) > 0).map((entry) => [`${entry.name} +${Number(character.advances.characteristics[entry.id]) * 5}`, characteristicXpCost(entry.id)]),
-    ...ownedSkills.filter((skill) => skillXpCost(skill.id) > 0).map((skill) => [`${skill.name} · ${rankNames[skillRank(skill.id) - 1]}`, skillXpCost(skill.id)]),
+    ...ownedSkills.filter((record) => skillXpCost(record.skill.id, record.speciality) > 0).map((record) => [`${record.displayName} · ${rankNames[record.rank - 1]}`, skillXpCost(record.skill.id, record.speciality)]),
     ...purchasedTalents.map((talent) => [talent.name, talentCost(talent)]),
     ...character.advances.psychicPowers.filter((entry) => entry?.name).map((entry) => [entry.name, Number(entry.cost || 0)]),
     ...character.advances.eliteAdvances.filter((entry) => entry?.name).map((entry) => [entry.name, Number(entry.cost || 0)]),
@@ -3948,15 +4088,14 @@ function renderReview() {
           </section>
           <section class="review-skills-section">
             <h3>Skills</h3>
-            <div class="dossier-list review-skills-list">${ownedSkills.map((skill) => {
-              const grant = resolvedGrantedSkills()[skill.id];
-              const displayName = grant?.displayName || skill.name;
+            <div class="dossier-list review-skills-list">${ownedSkills.map((record) => {
+              const { skill, grant, displayName, speciality, rank } = record;
               const rule = ruleTermsById[`skill-${skill.id}`];
               const tooltip = rule ? `${rule.category}: ${rule.summary} Source: ${rule.book}, page ${rule.page}.` : "";
               const label = rule
                 ? `<button type="button" class="review-skill-label rule-term lore-term lore-term-skill" data-rule-term="${rule.id}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${displayName}. ${tooltip}`)}">${escapeHtmlAttribute(displayName)}</button>`
                 : `<strong>${escapeHtmlAttribute(displayName)}</strong>`;
-              return `<div>${label}<span>${rankNames[skillRank(skill.id) - 1]} · ${skill.characteristic} target ${skillTestTarget(skill)}</span><em>${grant ? `Initial · ${grant.source}` : `${skillXpCost(skill.id)} XP`}</em></div>`;
+              return `<div>${label}<span>${rankNames[rank - 1]} · ${skill.characteristic} target ${skillTestTarget(skill, speciality)}</span><em>${grant ? `Initial · ${grant.source}` : `${skillXpCost(skill.id, speciality)} XP`}</em></div>`;
             }).join("") || "<p>None recorded.</p>"}</div>
           </section>
           <section class="review-inventory-section">
@@ -4423,7 +4562,7 @@ function wireEvents() {
       playMechanicalLock();
       character.equipment.selected = button.dataset.equipmentItem;
       save();
-      render();
+      rerenderEquipmentStatePreservingScroll(`[data-equipment-item="${button.dataset.equipmentItem}"]`);
     });
   });
   document.querySelector("[data-add-equipment]")?.addEventListener("click", (event) => {
@@ -4438,7 +4577,7 @@ function wireEvents() {
       character.equipment.noCostGrants.push(id);
     }
     save();
-    render();
+    rerenderEquipmentStatePreservingScroll();
   });
   document.querySelector("[data-acquire-equipment]")?.addEventListener("click", (event) => {
     playMechanicalLock();
@@ -4447,7 +4586,7 @@ function wireEvents() {
     if (!character.equipment.inventory.includes(id)) character.equipment.inventory.push(id);
     character.equipment.noCostGrants = character.equipment.noCostGrants.filter((entry) => entry !== id);
     save();
-    render();
+    rerenderEquipmentStatePreservingScroll();
   });
   document.querySelectorAll("[data-remove-acquisition]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -4457,13 +4596,13 @@ function wireEvents() {
       character.equipment.inventory = character.equipment.inventory.filter((entry) => entry !== id);
       removeEquipmentState(id);
       save();
-      render();
+      rerenderEquipmentStatePreservingScroll();
     });
   });
   document.querySelector("[data-clear-legacy]")?.addEventListener("click", () => {
     character.equipment.legacyAcquisitions = [];
     save();
-    render();
+    rerenderEquipmentStatePreservingScroll();
   });
   document.querySelectorAll("[data-ready-weapon]").forEach((input) => {
     input.addEventListener("change", () => {
@@ -4515,17 +4654,50 @@ function wireEvents() {
   document.querySelectorAll("[data-characteristic-advance]").forEach((select) => {
     select.addEventListener("change", () => {
       playMechanicalLock();
-      character.advances.characteristics[select.dataset.characteristicAdvance] = Number(select.value);
+      const characteristicId = select.dataset.characteristicAdvance;
+      character.advances.characteristics[characteristicId] = Number(select.value);
       save();
-      render();
+      rerenderAdvancesPreservingScroll(`[data-characteristic-advance="${characteristicId}"]`, "#advance-characteristics");
     });
   });
   document.querySelectorAll("[data-skill-advance]").forEach((select) => {
     select.addEventListener("change", () => {
       playMechanicalLock();
-      character.advances.skills[select.dataset.skillAdvance] = Number(select.value);
+      const skillId = select.dataset.skillAdvance;
+      character.advances.skills[skillId] = Number(select.value);
       save();
-      render();
+      rerenderAdvancesPreservingScroll(`[data-skill-advance="${skillId}"]`, "#advance-skills");
+    });
+  });
+  document.querySelectorAll("[data-specialist-skill-advance]").forEach((select) => {
+    select.addEventListener("change", () => {
+      playMechanicalLock();
+      character.advances.specialistSkills ||= {};
+      const key = select.dataset.specialistSkillAdvance;
+      const skillId = select.dataset.specialistSkillId;
+      const speciality = normaliseSpeciality(select.dataset.specialistSkillName);
+      const rank = Number(select.value);
+      delete character.advances.skills[skillId];
+      if (rank > 0) character.advances.specialistSkills[key] = { skillId, speciality, rank };
+      else delete character.advances.specialistSkills[key];
+      save();
+      rerenderAdvancesPreservingScroll(`[data-specialist-skill-advance="${key}"]`, `#specialist-${skillId}`);
+    });
+  });
+  document.querySelectorAll("[data-add-specialist-skill]").forEach((button) => {
+    button.addEventListener("click", () => {
+      character.advances.specialistSkills ||= {};
+      const skillId = button.dataset.addSpecialistSkill;
+      const selected = document.querySelector(`[data-specialist-skill-choice="${skillId}"]`)?.value || "";
+      const custom = document.querySelector(`[data-specialist-skill-custom="${skillId}"]`)?.value || "";
+      const speciality = normaliseSpeciality(selected || custom);
+      if (!speciality) return;
+      const key = specialistSkillKey(skillId, speciality);
+      character.advances.specialistSkills[key] = { skillId, speciality, rank: Math.max(1, Number(character.advances.specialistSkills[key]?.rank || 0)) };
+      delete character.advances.skills[skillId];
+      playMechanicalLock();
+      save();
+      rerenderAdvancesPreservingScroll(`[data-specialist-skill-advance="${key}"]`, `#specialist-${skillId}`);
     });
   });
   const filterTalents = () => {
@@ -4605,11 +4777,13 @@ function wireEvents() {
         divinationModifiers: divinationCharacteristicModifiers(),
         fateThreshold: finalFateThreshold(),
         aptitudes: resolvedAptitudes().aptitudes,
-        skills: Object.fromEntries(skills.filter((skill) => skillRank(skill.id) > 0).map((skill) => [skill.id, {
-          rank: skillRank(skill.id),
-          initial: Boolean(resolvedGrantedSkills()[skill.id]),
-          source: resolvedGrantedSkills()[skill.id]?.source || "XP",
-          speciality: resolvedGrantedSkills()[skill.id]?.speciality || "",
+        skills: Object.fromEntries(ownedSkillRecords().map((record) => [record.key, {
+          id: record.skill.id,
+          name: record.skill.name,
+          rank: record.rank,
+          initial: Boolean(record.grant),
+          source: record.grant?.source || "XP",
+          speciality: record.speciality,
         }])),
         talents: [
           ...Object.values(resolvedGrantedTalents()).map((talent) => ({ id: talent.id, name: talent.displayName, initial: true, cost: 0, source: talent.source })),
