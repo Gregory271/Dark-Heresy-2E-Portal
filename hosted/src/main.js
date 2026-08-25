@@ -4876,7 +4876,6 @@ function renderReview() {
             <h3>Aptitudes</h3>
             <div class="tag-list final">${resolvedAptitudes().aptitudes.map((aptitude) => `<span>${aptitude}</span>`).join("")}</div>
           </section>
-          ${renderActionIndex(currentActions)}
           <section class="review-talents-section">
             <h3>Talents</h3>
             <div class="dossier-list">${[
@@ -4951,6 +4950,7 @@ function renderReview() {
               return `<div>${label}<span>${rankNames[rank - 1]} · ${skill.characteristic} target ${skillTestTarget(skill, speciality)}</span><em>${grant ? `Initial · ${grant.source}` : `${skillXpCost(skill.id, speciality)} XP`}</em></div>`;
             }).join("") || "<p>None recorded.</p>"}</div>
           </section>
+          ${renderActionIndex(currentActions)}
           <section class="review-inventory-section">
             <div class="review-section-heading">
               <div><h3>Inventory</h3><p>All owned weapons, armour, modifications, and carried gear. Change an item's current state here at any time.</p></div>

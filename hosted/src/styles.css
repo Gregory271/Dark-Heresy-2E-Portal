@@ -2658,11 +2658,31 @@ dialog h2,
   .review-skills-section,.review-inventory-section,.review-actions-index { grid-column: 1; }
   .review-talents-section .dossier-list,
   .review-abilities-section .dossier-list { grid-template-columns: 1fr; }
+  .review-sections .dossier-list.review-skills-list > div {
+    grid-template-columns: minmax(0,1fr);
+    gap: 4px;
+  }
+  .review-skills-list > div > * {
+    grid-column: 1;
+    max-width: 100%;
+    text-align: left;
+  }
   .action-index-heading { align-items: flex-start; }
   .action-index-counts { border-left: 0; border-top: 1px solid rgba(222,182,112,.35); padding: 7px 0 0; }
   .action-filter-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
   .action-filter-list button { min-height: 42px; }
-  .action-card header { align-items: flex-start; }
+  .action-card header { align-items: flex-start; gap: 8px; }
+  .action-card .action-type-badge {
+    flex-basis: 48px;
+    min-width: 48px;
+    padding-left: 6px;
+  }
+  .action-card .action-type-caption {
+    max-width: 48px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
   .action-card footer { align-items: stretch; flex-direction: column; }
   .action-card footer button { width: 100%; min-height: 42px; }
   .action-roll-equation { grid-template-columns: 1fr 1fr; }
