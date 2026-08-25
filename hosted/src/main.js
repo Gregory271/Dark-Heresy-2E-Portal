@@ -1,7 +1,16 @@
 import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.3";
 import { armoury } from "./armoury-data.js?v=0.8.1";
 import { actionGroups, actionSource, combatActionCatalogue } from "./action-data.js?v=0.1.0";
-import { talentCatalogue } from "./talent-data.js?v=0.9.1";
+import { talentCatalogue as baseTalentCatalogue } from "./talent-data.js?v=0.9.1";
+import {
+  disciplineId,
+  eliteAdvanceById,
+  eliteAdvanceCatalogue,
+  eliteTalentCatalogue,
+  psychicDisciplines,
+  psychicPowerById,
+  psychicPowerCatalogue,
+} from "./advancement-data.js?v=0.1.0";
 import { characteristicRuleTerms, contextualRuleTerms, coreRuleTerms, creatorRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.4.2";
 import {
   buildSourcebookLibrary,
@@ -34,6 +43,8 @@ import {
   parseFate,
   parseWounds,
 } from "./creation-data.js?v=0.8.0";
+
+const talentCatalogue = [...baseTalentCatalogue, ...eliteTalentCatalogue];
 
 const root = document.querySelector("#app");
 const portalEmblem = `<img class="sigil" src="./public/assets/brand/pax-historia-emblem.png?v=0.1.0" alt="" aria-hidden="true" />`;
@@ -124,6 +135,15 @@ function prepareCharacter(input = {}) {
   prepared.advances.talents ||= [];
   prepared.advances.psychicPowers ||= [];
   prepared.advances.eliteAdvances ||= [];
+  prepared.advances.psyRating = Math.max(0, Number(prepared.advances.psyRating || 0));
+  prepared.conditions ||= { insanity: 0, corruption: 0 };
+  prepared.conditions.insanity = Math.max(0, Number(prepared.conditions.insanity || 0));
+  prepared.conditions.corruption = Math.max(0, Number(prepared.conditions.corruption || 0));
+  prepared.psychicFilters ||= { query: "", discipline: "All Powers", showUnavailable: true };
+  prepared.psychicShopSelected ||= null;
+  prepared.eliteShopSelected ||= null;
+  prepared.eliteSetup ||= { gmApproved: {}, inquisitorLore: "", sisterWeapon: "", psykerCorruption: null, maleficApproved: false };
+  prepared.eliteSetup.gmApproved ||= {};
   prepared.talentShopSelected ||= null;
   prepared.talentFilters ||= { query: "", tier: "All" };
   prepared.xp ||= { starting: 1000 };
@@ -557,6 +577,22 @@ function resolvedGrantedEquipment() {
       });
     });
   });
+  if (hasEliteAdvance("sister-of-battle")) {
+    ["Adepta Sororitas Power Armour", character.eliteSetup.sisterWeapon].filter(Boolean).forEach((label, index) => {
+      const item = armouryItemWithExactName(label);
+      entries.push({
+        key: `elite-sister-of-battle-${index}`,
+        label,
+        listedAs: label,
+        item,
+        itemId: item?.id || "",
+        sourceType: "elite-grant",
+        sourceName: "Sister of Battle Elite Advance",
+        choiceId: index === 1 ? "elite-sister-weapon" : "",
+        unresolvedChoice: false,
+      });
+    });
+  }
   return { sourceName, entries };
 }
 
@@ -1055,7 +1091,12 @@ function rawAptitudes() {
   const backgroundAptitude = backgroundRaw.includes(" or ")
     ? character.aptitudeSelections.background || backgroundRaw.split(" or ")[0].trim()
     : backgroundRaw.trim();
-  return ["General", homeWorldRules().aptitude, backgroundAptitude, ...roleAptitudes].filter(Boolean);
+  const eliteAptitudes = [
+    hasEliteAdvance("psyker") ? "Psyker" : "",
+    hasEliteAdvance("inquisitor") ? "Leadership" : "",
+    hasEliteAdvance("sister-of-battle") ? "Willpower" : "",
+  ].filter(Boolean);
+  return ["General", homeWorldRules().aptitude, backgroundAptitude, ...roleAptitudes, ...eliteAptitudes].filter(Boolean);
 }
 
 function resolvedAptitudes() {
@@ -1134,6 +1175,15 @@ function resolvedGrantedSkills() {
     const skill = skills.find((entry) => entry.id === divinationGrant.id);
     if (skill) grants[skill.id] = { key: skill.id, id: skill.id, name: skill.name, displayName: skill.name, speciality: "", rank: 1, source: "Divination" };
   }
+  const addEliteSpeciality = (skillId, speciality, source) => {
+    if (!speciality) return;
+    const skill = skills.find((entry) => entry.id === skillId);
+    if (!skill) return;
+    const key = specialistSkillKey(skillId, speciality);
+    grants[key] = { key, id: skillId, name: skill.name, speciality, displayName: `${skill.name} (${speciality})`, rank: 1, source };
+  };
+  if (hasEliteAdvance("sister-of-battle")) addEliteSpeciality("scholastic-lore", "Tactica Imperialis", "Sister of Battle Elite Advance");
+  if (hasEliteAdvance("inquisitor")) addEliteSpeciality("forbidden-lore", character.eliteSetup.inquisitorLore, "Inquisitor Elite Advance");
   return grants;
 }
 
@@ -1148,6 +1198,13 @@ function resolvedGrantedTalents() {
   splitGrant(ruleValue(character.background, "Talents / Traits")).forEach((label) => addGrant(label, "Background"));
   addGrant(character.grantChoices["role-talent-0"], "Role");
   addGrant(character.grantChoices["homeworld-bonus-0"], "Home World");
+  if (character.homeWorld === "voidborn") addGrant("Strong Minded", "Voidborn — Child of the Dark");
+  if (hasEliteAdvance("untouchable")) addGrant("Resistance (Psychic Powers)", "Untouchable Elite Advance");
+  if (hasEliteAdvance("inquisitor")) addGrant("Peer (Inquisition)", "Inquisitor Elite Advance");
+  if (hasEliteAdvance("sister-of-battle")) {
+    addGrant("Peer (Adepta Sororitas)", "Sister of Battle Elite Advance");
+    addGrant("Weapon Training (Bolt)", "Sister of Battle Elite Advance");
+  }
   return grants;
 }
 
@@ -1156,6 +1213,10 @@ function talentPrerequisiteStatus(talent) {
   if (!text) return { missing: [], parsed: true };
   const missing = [];
   let parsed = false;
+  if (talent.requiresEliteAdvance) {
+    parsed = true;
+    if (!hasEliteAdvance(talent.requiresEliteAdvance)) missing.push(`${eliteAdvanceById(talent.requiresEliteAdvance)?.name || talent.requiresEliteAdvance} Elite Advance`);
+  }
   for (const characteristic of characteristics) {
     const match = text.match(new RegExp(`${characteristic.name}\\s+(\\d+)`, "i"));
     if (!match) continue;
@@ -1167,6 +1228,11 @@ function talentPrerequisiteStatus(talent) {
     if (prerequisite.id === talent.id || !new RegExp(`\\b${prerequisite.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text)) continue;
     parsed = true;
     if (!ownedIds.has(prerequisite.id)) missing.push(prerequisite.name);
+  }
+  const insanityMatch = text.match(/Insanity\s+(\d+)/i);
+  if (insanityMatch) {
+    parsed = true;
+    if (Number(character.conditions.insanity || 0) < Number(insanityMatch[1])) missing.push(`Insanity ${insanityMatch[1]}`);
   }
   return { missing: [...new Set(missing)], parsed };
 }
@@ -1244,13 +1310,20 @@ function ownedSkillRecords() {
 }
 
 function automaticEliteAdvances() {
-  return character.role === "mystic"
-    ? [{ id: "psyker", name: "Psyker", source: "Mystic Role — Stare into the Warp", cost: 0, automatic: true }]
-    : [];
+  if (character.role !== "mystic") return [];
+  const psyker = eliteAdvanceById("psyker");
+  return [{ ...psyker, source: "Mystic Role — Stare into the Warp", ruleSource: `${psyker.source}, p. ${psyker.page}`, cost: 0, automatic: true }];
 }
 
-function selectedEliteAdvance() {
-  return character.advances.eliteAdvances.find((entry) => entry?.id || entry?.name) || null;
+function activeEliteAdvances() {
+  const combined = [...automaticEliteAdvances(), ...character.advances.eliteAdvances]
+    .map((entry) => ({ ...(eliteAdvanceById(entry?.id) || {}), ...entry }))
+    .filter((entry) => entry.id);
+  return [...new Map(combined.map((entry) => [entry.id, entry])).values()];
+}
+
+function hasEliteAdvance(id) {
+  return activeEliteAdvances().some((entry) => entry.id === id);
 }
 
 function automaticTraits() {
@@ -1260,7 +1333,7 @@ function automaticTraits() {
     summary: "The character possesses the foundational cranial circuitry, cyber-mantle, electro-graft, electoo inductors, and Potentia Coil of a servant of the Machine-God.",
     source: character.background === "mechanicus" ? "Adeptus Mechanicus Background" : "Heretek Background",
   });
-  if (automaticEliteAdvances().some((entry) => entry.id === "psyker")) traits.push({
+  if (hasEliteAdvance("psyker")) traits.push({
     name: "Psyker",
     summary: "The character has a Psy Rating and can manifest psychic powers, with the attendant risk of Psychic Phenomena.",
     source: "Psyker Elite Advance",
@@ -1270,6 +1343,10 @@ function automaticTraits() {
     summary: "The character is an Imperial-sanctioned psyker and begins the Psyker elite advance at Psy Rating 2 rather than 1.",
     source: "Adeptus Astra Telepathica — Tested on Terra",
   });
+  if (hasEliteAdvance("astropath")) traits.push(
+    { name: "Soul Bound", summary: "The Astropath is soul-bound to the Emperor and permanently loses normal sight.", source: "Astropath Elite Advance" },
+    { name: `Unnatural Senses (${characteristicValue("willpower") || "WP"})`, summary: "The Astropath perceives surroundings psychically to a range equal to Willpower in metres.", source: "Astropath Elite Advance" },
+  );
   return traits;
 }
 
@@ -1331,6 +1408,7 @@ function xpSpent() {
   for (const collection of [character.advances.psychicPowers, character.advances.eliteAdvances]) {
     for (const entry of collection) spent += Number(entry?.cost || 0);
   }
+  spent += psyRatingXpCost();
   return spent;
 }
 
@@ -1465,7 +1543,13 @@ function resetCreationDataFrom(sceneId) {
     talents: [],
     psychicPowers: [],
     eliteAdvances: [],
+    psyRating: 0,
   };
+  character.conditions = { insanity: 0, corruption: 0 };
+  character.psychicFilters = { query: "", discipline: "All Powers", showUnavailable: true };
+  character.psychicShopSelected = null;
+  character.eliteShopSelected = null;
+  character.eliteSetup = { gmApproved: {}, inquisitorLore: "", sisterWeapon: "", psykerCorruption: null, maleficApproved: false };
   character.talentShopSelected = null;
   character.talentFilters = { query: "", tier: "All" };
   character.xp = { starting: 1000 };
@@ -2058,7 +2142,20 @@ function foundrySkillData() {
 
 function foundryPsyRating() {
   if (!hasPsykerAccess()) return 0;
+  return basePsyRating() + Math.max(0, Number(character.advances.psyRating || 0));
+}
+
+function basePsyRating() {
+  if (!hasPsykerAccess()) return 0;
   return character.background === "astra-telepathica" ? 2 : 1;
+}
+
+function psyRatingXpCost() {
+  const base = basePsyRating();
+  const advances = Math.max(0, Number(character.advances.psyRating || 0));
+  let cost = 0;
+  for (let rating = base + 1; rating <= base + advances; rating += 1) cost += rating * 200;
+  return cost;
 }
 
 function parseSpecialAbility([source, value]) {
@@ -2145,8 +2242,70 @@ function foundryUnlinkedGrantedEquipment() {
 }
 
 function hasPsykerAccess() {
-  return automaticEliteAdvances().some((entry) => entry.id === "psyker")
-    || character.advances.eliteAdvances.some((entry) => /psyker|astropath/i.test(entry?.name || ""));
+  return hasEliteAdvance("psyker");
+}
+
+function eliteAdvanceStatus(advance) {
+  const missing = [];
+  const activeIds = new Set(activeEliteAdvances().map((entry) => entry.id));
+  for (const [id, minimum] of Object.entries(advance.prerequisites?.characteristics || {})) {
+    if (characteristicValue(id) < minimum) missing.push(`${characteristics.find((entry) => entry.id === id)?.name || id} ${minimum}`);
+  }
+  if (advance.prerequisites?.background && character.background !== advance.prerequisites.background) {
+    missing.push(`${catalogs.backgrounds.find((entry) => entry.id === advance.prerequisites.background)?.name || advance.prerequisites.background} background`);
+  }
+  for (const id of advance.prerequisites?.elite || []) {
+    if (!activeIds.has(id)) missing.push(`${eliteAdvanceById(id)?.name || id} Elite Advance`);
+  }
+  for (const id of advance.prerequisites?.excludes || []) {
+    if (activeIds.has(id)) missing.push(`Incompatible with ${eliteAdvanceById(id)?.name || id}`);
+  }
+  if (!character.eliteSetup.gmApproved?.[advance.id] && !advance.automatic) missing.push("GM approval");
+  return { missing: [...new Set(missing)], owned: activeIds.has(advance.id) };
+}
+
+function purchasedPsychicPowerIds() {
+  return new Set(character.advances.psychicPowers.map((entry) => entry?.id).filter(Boolean));
+}
+
+function psychicPowerStatus(power) {
+  const missing = [];
+  const prerequisites = power.prerequisite || {};
+  if (!hasPsykerAccess()) missing.push("Psyker Elite Advance");
+  if (power.discipline === "Astropath" && !hasEliteAdvance("astropath")) missing.push("Astropath Elite Advance");
+  if (power.discipline === "Malefic Daemonology" && !character.eliteSetup.maleficApproved) missing.push("GM approval for Malefic Daemonology");
+  if (prerequisites.psyRating && foundryPsyRating() < prerequisites.psyRating) missing.push(`Psy Rating ${prerequisites.psyRating}`);
+  for (const [id, minimum] of Object.entries(prerequisites.characteristics || {})) {
+    if (characteristicValue(id) < minimum) missing.push(`${characteristics.find((entry) => entry.id === id)?.name || id} ${minimum}`);
+  }
+  for (const [id, rank] of Object.entries(prerequisites.skills || {})) {
+    if (skillRank(id) < rank) missing.push(`${skills.find((entry) => entry.id === id)?.name || id} ${rankNames[rank - 1] || `rank ${rank}`}`);
+  }
+  for (const name of prerequisites.talents || []) if (!hasTalentNamed(name)) missing.push(name);
+  for (const id of prerequisites.elite || []) if (!hasEliteAdvance(id)) missing.push(`${eliteAdvanceById(id)?.name || id} Elite Advance`);
+  if (prerequisites.corruption && Number(character.conditions.corruption || 0) < prerequisites.corruption) missing.push(`${prerequisites.corruption} Corruption points`);
+  if (prerequisites.insanity && Number(character.conditions.insanity || 0) < prerequisites.insanity) missing.push(`${prerequisites.insanity} Insanity points`);
+  const ownedIds = purchasedPsychicPowerIds();
+  for (const id of prerequisites.powers || []) if (!ownedIds.has(id)) missing.push(psychicPowerById(id)?.name || id);
+  if (power.path?.length && !power.path.some((id) => ownedIds.has(id))) {
+    const names = power.path.map((id) => psychicPowerById(id)?.name || id);
+    missing.push(`Power path: ${names.join(" or ")}`);
+  }
+  return { missing: [...new Set(missing)], owned: ownedIds.has(power.id) };
+}
+
+function focusPowerTest(power) {
+  const focus = String(power.focus || "");
+  const modifierText = focus.match(/\(([+–-]?\d+)\)/)?.[1]?.replace("–", "-") || "0";
+  const modifier = Number(modifierText || 0);
+  const skill = skills.find((entry) => new RegExp(`\\b${entry.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(focus));
+  if (skill) {
+    const test = skillActionTest(skill, "");
+    return { ...test, actionModifier: test.actionModifier + modifier, characteristicName: `Focus Power · ${skill.name}`, psychicPowerId: power.id };
+  }
+  const characteristic = characteristics.find((entry) => new RegExp(`\\b${entry.name}\\b`, "i").test(focus))
+    || characteristics.find((entry) => entry.id === "willpower");
+  return actionTestRecord(characteristic.id, modifier, { characteristicName: `Focus Power · ${skill?.name || characteristic.name}`, psychicPowerId: power.id });
 }
 
 function currentTalentRecords() {
@@ -2489,18 +2648,18 @@ function capabilityActionRecords(inventoryItems) {
 }
 
 function psychicActionRecords() {
-  return character.advances.psychicPowers.filter((entry) => entry?.name).map((power, index) => ({
+  return character.advances.psychicPowers.map((entry, index) => psychicPowerById(entry.id) || entry).filter((power) => power?.name).map((power, index) => ({
     id: `psychic-${power.id || index}-${String(power.name).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
     name: `Manifest ${power.name}`,
     group: "Psychic",
     type: power.action || "Use power profile",
-    subtypes: ["Concentration", "Psychic"],
-    summary: power.description || "Manifest this known psychic power using its Focus Power profile.",
-    source: power.source || "Psychic power advancement",
-    context: `Psy Rating ${foundryPsyRating()} · Consult this power's Focus Power characteristic and modifier`,
+    subtypes: [...new Set([...(String(power.subtype || "Concentration").split(/\s*,\s*/)), "Psychic"])],
+    summary: power.summary || power.description || "Manifest this known psychic power using its Focus Power profile.",
+    source: power.page ? `${power.source}, p. ${power.page}` : power.source || "Psychic power advancement",
+    context: `Psy Rating ${foundryPsyRating()} · ${power.focus || "Use the recorded Focus Power profile"} · Range ${power.range || "varies"}${power.sustained ? ` · Sustained ${power.sustained}` : ""}`,
     available: hasPsykerAccess(),
     unavailableReason: hasPsykerAccess() ? "" : "Requires the Psyker elite advance.",
-    test: null,
+    test: power.focus ? focusPowerTest(power) : null,
   }));
 }
 
@@ -2889,6 +3048,133 @@ function renderSpecialistSkillShop(ownedAptitudes) {
     </section>`;
 }
 
+function psychicPrerequisiteText(power) {
+  const prerequisite = power.prerequisite || {};
+  const parts = [];
+  for (const [id, minimum] of Object.entries(prerequisite.characteristics || {})) parts.push(`${characteristics.find((entry) => entry.id === id)?.name || id} ${minimum}`);
+  for (const [id, rank] of Object.entries(prerequisite.skills || {})) parts.push(`${skills.find((entry) => entry.id === id)?.name || id} ${rankNames[rank - 1] || rank}`);
+  if (prerequisite.psyRating) parts.push(`Psy Rating ${prerequisite.psyRating}`);
+  if (prerequisite.corruption) parts.push(`${prerequisite.corruption} Corruption points`);
+  if (prerequisite.insanity) parts.push(`${prerequisite.insanity} Insanity points`);
+  parts.push(...(prerequisite.talents || []));
+  parts.push(...(prerequisite.elite || []).map((id) => `${eliteAdvanceById(id)?.name || id} Elite Advance`));
+  parts.push(...(prerequisite.powers || []).map((id) => psychicPowerById(id)?.name || id));
+  if (power.path?.length) parts.push(`Power path: ${power.path.map((id) => psychicPowerById(id)?.name || id).join(" or ")}`);
+  return parts.join(" · ") || "Psyker Elite Advance";
+}
+
+function renderPsychicShop() {
+  const selected = psychicPowerById(character.psychicShopSelected)
+    || psychicPowerCatalogue.find((power) => power.name === "Telekinetic Control")
+    || psychicPowerCatalogue[0];
+  const selectedStatus = psychicPowerStatus(selected);
+  const purchasedIds = purchasedPsychicPowerIds();
+  const query = String(character.psychicFilters.query || "").trim().toLowerCase();
+  const discipline = character.psychicFilters.discipline || "All Powers";
+  const showUnavailable = character.psychicFilters.showUnavailable !== false;
+  const baseRating = basePsyRating();
+  const currentRating = foundryPsyRating();
+  const remaining = character.xp.starting - xpSpent();
+  return `<section id="advance-psychic" class="psychic-shop">
+    <div class="advance-section-heading psychic-heading">
+      <div><p class="choice-source">Psyker access detected</p><h2>Psychic Powers and Psy Rating</h2><p>Choose powers from complete sourcebook catalogues. Power-tree paths, prerequisites, and XP are checked automatically.</p></div>
+      <div class="psy-rating-control">
+        <span>Psy Rating</span><strong>${currentRating}</strong><small>Base ${baseRating} · ${psyRatingXpCost()} XP spent</small>
+        <label><span>Purchased increases</span><select data-psy-rating-advance>
+          ${Array.from({ length: Math.max(1, 10 - baseRating + 1) }, (_, count) => {
+            const finalRating = baseRating + count;
+            let addedCost = 0;
+            for (let rating = baseRating + 1; rating <= finalRating; rating += 1) addedCost += rating * 200;
+            return `<option value="${count}" ${Number(character.advances.psyRating || 0) === count ? "selected" : ""}>PR ${finalRating}${count ? ` · ${addedCost} XP` : " · starting"}</option>`;
+          }).join("")}
+        </select></label>
+      </div>
+    </div>
+    <div class="warp-exposure-controls">
+      <label><span>Current Insanity</span><input type="number" min="0" max="100" value="${Number(character.conditions.insanity || 0)}" data-condition-value="insanity" /></label>
+      <label><span>Current Corruption</span><input type="number" min="0" max="100" value="${Number(character.conditions.corruption || 0)}" data-condition-value="corruption" /></label>
+      <label class="malefic-approval"><input type="checkbox" data-malefic-approval ${character.eliteSetup.maleficApproved ? "checked" : ""} /><span>GM approves access to Malefic Daemonology</span></label>
+    </div>
+    <div class="purchased-psychic-powers">${character.advances.psychicPowers.map((entry) => {
+      const record = psychicPowerById(entry.id);
+      return record ? `<button type="button" data-remove-psychic-power="${record.id}">${record.name} · ${record.cost} XP <b>×</b></button>` : "";
+    }).join("") || "<span>No psychic powers purchased.</span>"}</div>
+    <div class="psychic-terminal">
+      <div class="psychic-catalogue">
+        <div class="psychic-filters">
+          <input id="psychic-search" type="search" aria-label="Search psychic powers" placeholder="Search powers, effects, prerequisites..." autocomplete="off" value="${escapeHtmlAttribute(character.psychicFilters.query || "")}" />
+          <label><span>Discipline</span><select data-psychic-discipline>${psychicDisciplines.map((entry) => `<option value="${entry.name}" ${entry.name === discipline ? "selected" : ""}>${entry.name}</option>`).join("")}</select></label>
+          <label class="show-unavailable"><input type="checkbox" data-psychic-show-unavailable ${showUnavailable ? "checked" : ""} /><span>Show locked powers</span></label>
+        </div>
+        <div class="psychic-list">${psychicPowerCatalogue.map((power) => {
+          const status = psychicPowerStatus(power);
+          const search = `${power.name} ${power.discipline} ${power.summary} ${psychicPrerequisiteText(power)} ${power.source}`.toLowerCase();
+          const visible = search.includes(query) && (discipline === "All Powers" || power.discipline === discipline) && (showUnavailable || !status.missing.length || status.owned);
+          return `<button type="button" class="psychic-row ${power.id === selected.id ? "selected" : ""} ${status.missing.length ? "locked" : ""} ${status.owned ? "owned" : ""}" data-psychic-power-id="${power.id}" data-psychic-search="${escapeHtmlAttribute(search)}" data-psychic-discipline-value="${escapeHtmlAttribute(power.discipline)}" data-psychic-available="${status.missing.length ? "false" : "true"}" ${visible ? "" : "hidden"}>
+            <strong>${power.name}</strong><span>${power.discipline}</span><em>${status.owned ? "Known" : `${power.cost} XP`}</em>
+          </button>`;
+        }).join("")}</div>
+      </div>
+      <article class="psychic-inspector">
+        <p class="choice-source">${selected.source}, p. ${selected.page}</p>
+        <h3>${selected.name}</h3>
+        <div class="psychic-cost"><strong>${selected.cost} XP</strong><span>${selected.discipline}</span></div>
+        <p>${selected.summary}</p>
+        <dl>
+          <div><dt>Prerequisites</dt><dd>${psychicPrerequisiteText(selected)}</dd></div>
+          ${selectedStatus.missing.length ? `<div><dt>Missing</dt><dd class="missing-prerequisite">${selectedStatus.missing.join(" · ")}</dd></div>` : ""}
+          <div><dt>Action</dt><dd>${selected.action}</dd></div>
+          <div><dt>Focus Power</dt><dd>${selected.focus}</dd></div>
+          <div><dt>Range</dt><dd>${selected.range}</dd></div>
+          <div><dt>Sustained</dt><dd>${selected.sustained}</dd></div>
+          <div><dt>Subtype</dt><dd>${selected.subtype}</dd></div>
+        </dl>
+        <button class="primary-button purchase-psychic-power" type="button" data-purchase-psychic-power="${selected.id}" ${selectedStatus.owned || selectedStatus.missing.length || selected.cost > remaining ? "disabled" : ""}>${selectedStatus.owned ? "Power Already Known" : selectedStatus.missing.length ? "Prerequisites Missing" : selected.cost > remaining ? "Insufficient XP" : "Purchase Psychic Power"}<span>›</span></button>
+      </article>
+    </div>
+  </section>`;
+}
+
+function eliteSetupControls(advance) {
+  if (advance.id === "psyker" && character.background !== "astra-telepathica") {
+    const value = character.eliteSetup.psykerCorruption;
+    return `<div class="elite-setup-control"><strong>Rogue psyker Corruption</strong><p>Record the required 1d10+3 Corruption immediately.</p><label><span>Result</span><input type="number" min="4" max="13" data-psyker-corruption value="${value ?? ""}" placeholder="4–13" /></label><button class="compact-button" type="button" data-roll-psyker-corruption>Roll 1d10+3</button></div>`;
+  }
+  if (advance.setup === "inquisitor-lore") {
+    return `<label class="elite-setup-control"><strong>Forbidden Lore speciality</strong><select data-inquisitor-lore><option value="">Choose one...</option>${(skillSpecialities["forbidden-lore"] || []).map((entry) => `<option value="${escapeHtmlAttribute(entry)}" ${character.eliteSetup.inquisitorLore === entry ? "selected" : ""}>${entry}</option>`).join("")}</select></label>`;
+  }
+  if (advance.setup === "sister-weapon") {
+    return `<label class="elite-setup-control"><strong>Granted weapon</strong><select data-sister-weapon><option value="">Choose one...</option>${["Godwyn-Deaz Bolt Pistol", "Flamer"].map((entry) => `<option value="${entry}" ${character.eliteSetup.sisterWeapon === entry ? "selected" : ""}>${entry}</option>`).join("")}</select></label>`;
+  }
+  return "";
+}
+
+function renderEliteAdvanceShop() {
+  const selected = eliteAdvanceById(character.eliteShopSelected) || eliteAdvanceCatalogue.find((entry) => !entry.automatic) || eliteAdvanceCatalogue[0];
+  const status = eliteAdvanceStatus(selected);
+  const active = activeEliteAdvances();
+  return `<section class="elite-advance-shop" id="advance-elite">
+    <div class="elite-compact-heading"><div><p class="choice-source">Optional, campaign-changing advances</p><h2>Elite Advances</h2></div><p>Choose an advance to inspect it. The builder checks mechanical prerequisites; the GM must still approve how it enters the story.</p></div>
+    <div class="active-elite-advances">${active.map((advance) => `<div class="active-elite-chip"><span>${advance.automatic ? "Granted" : "Purchased"}</span><strong>${advance.name}</strong><small>${advance.automatic ? advance.source : `${advance.cost} XP`}</small>${advance.automatic ? "" : `<button type="button" data-remove-elite-advance="${advance.id}" aria-label="Remove ${advance.name}">×</button>`}</div>`).join("") || "<span>No Elite Advance selected.</span>"}</div>
+    <div class="elite-selector-grid">
+      <label class="elite-select-control"><span>Inspect an Elite Advance</span><select data-elite-advance-inspect aria-label="Inspect an Elite Advance"><option value="">Choose an advance...</option>${eliteAdvanceCatalogue.map((entry) => `<option value="${entry.id}" ${entry.id === selected.id ? "selected" : ""}>${entry.name}</option>`).join("")}</select></label>
+      <article class="elite-inspector">
+        <div><p class="choice-source">${selected.source}, p. ${selected.page}</p><h3>${selected.name}</h3><p>${selected.summary}</p></div>
+        <dl>
+          <div><dt>Cost</dt><dd>${selected.cost} XP</dd></div>
+          <div><dt>Instant changes</dt><dd>${selected.instantChanges.join(" · ")}</dd></div>
+          <div><dt>Guidance</dt><dd>${selected.notes}</dd></div>
+          ${selected.prerequisites?.narrative ? `<div><dt>Narrative prerequisite</dt><dd>${selected.prerequisites.narrative}</dd></div>` : ""}
+          ${status.missing.filter((entry) => entry !== "GM approval").length ? `<div><dt>Missing</dt><dd class="missing-prerequisite">${status.missing.filter((entry) => entry !== "GM approval").join(" · ")}</dd></div>` : ""}
+        </dl>
+        <label class="elite-gm-approval"><input type="checkbox" data-elite-gm-approval="${selected.id}" ${character.eliteSetup.gmApproved?.[selected.id] ? "checked" : ""} ${status.owned ? "disabled" : ""} /><span>GM approval confirmed for this character</span></label>
+        <button class="primary-button" type="button" data-purchase-elite-advance="${selected.id}" ${status.owned || status.missing.length || xpSpent() + selected.cost > character.xp.starting ? "disabled" : ""}>${status.owned ? "Advance Already Active" : status.missing.length ? "Prerequisites Missing" : xpSpent() + selected.cost > character.xp.starting ? "Insufficient XP" : "Purchase Elite Advance"}<span>›</span></button>
+      </article>
+    </div>
+    ${active.map(eliteSetupControls).filter(Boolean).join("")}
+  </section>`;
+}
+
 function renderAdvances() {
   const owned = resolvedAptitudes().aptitudes;
   const spent = xpSpent();
@@ -2902,7 +3188,7 @@ function renderAdvances() {
       </aside>
       <section class="advance-shop">
         ${unresolved.length ? `<div class="advance-warning"><strong>Starting choices incomplete</strong><span>Return to Starting Abilities and resolve ${unresolved.length} granted alternative${unresolved.length === 1 ? "" : "s"} before purchasing advances.</span></div>` : ""}
-        <nav class="advance-nav"><button type="button" data-advance-jump="advance-characteristics">Characteristics</button><button type="button" data-advance-jump="advance-skills">Skills</button><button type="button" data-advance-jump="advance-talents">Talents</button>${hasPsykerAccess() ? `<button type="button" data-advance-jump="advance-psychic">Psychic</button>` : ""}</nav>
+        <nav class="advance-nav"><button type="button" data-advance-jump="advance-characteristics">Characteristics</button><button type="button" data-advance-jump="advance-skills">Skills</button><button type="button" data-advance-jump="advance-talents">Talents</button><button type="button" data-advance-jump="advance-elite">Elite Advances</button>${hasPsykerAccess() ? `<button type="button" data-advance-jump="advance-psychic">Psychic</button>` : ""}</nav>
         <h2 id="advance-characteristics">Characteristic Advances</h2>
         <div class="advance-rows">
           ${characteristics.filter((entry) => entry.id !== "influence").map((entry) => {
@@ -2936,29 +3222,8 @@ function renderAdvances() {
         </div>
         ${renderSpecialistSkillShop(owned)}
         ${renderTalentShop()}
-        ${hasPsykerAccess() ? `
-          <section id="advance-psychic" class="conditional-advances">
-            <p class="choice-source">Psyker access detected</p>
-            <h2>Psychic Powers and Psy Rating</h2>
-            <div class="other-advances">
-              ${[["psychicPowers", "Psychic Power"]].map(([type, label]) => {
-                const entry = character.advances[type][0] || {};
-                return `<label><span>${label}</span><input data-other-name="${type}" aria-label="${label} name" value="${entry.name || ""}" placeholder="Enter selected ${label.toLowerCase()}" /><input data-other-cost="${type}" aria-label="${label} XP cost" type="number" min="0" step="50" value="${entry.cost || ""}" placeholder="XP" /></label>`;
-              }).join("")}
-            </div>
-          </section>` : ""}
-        <section class="elite-select-row" id="advance-elite">
-          <div class="elite-select-copy">
-            <span>Optional</span>
-            <strong>Elite Advance</strong>
-            <p>Only select one with GM approval. Its complete cost, prerequisites, and instant changes will be configured in a later expansion.</p>
-          </div>
-          ${automaticEliteAdvances().length ? `<div class="automatic-elite-compact"><span>Granted automatically</span>${automaticEliteAdvances().map((entry) => `<strong>${entry.name}</strong><small>${entry.source}</small>`).join("")}</div>` : ""}
-          <label class="elite-select-control"><span>Add an optional Elite Advance?</span><select data-elite-advance-select aria-label="Optional Elite Advance">
-            <option value="">No optional Elite Advance</option>
-            ${catalogs.eliteAdvances.filter((entry) => !automaticEliteAdvances().some((automatic) => automatic.id === entry.id)).map((entry) => `<option value="${entry.id}" ${selectedEliteAdvance()?.id === entry.id || selectedEliteAdvance()?.name === entry.name ? "selected" : ""}>${entry.name}</option>`).join("")}
-          </select></label>
-        </section>
+        ${renderEliteAdvanceShop()}
+        ${hasPsykerAccess() ? renderPsychicShop() : ""}
       </section>
     </div>`;
 }
@@ -4463,8 +4728,8 @@ function renderReview() {
   const purchasedTalents = character.advances.talents.map((entry) => talentCatalogue.find((talent) => talent.id === entry.id)).filter(Boolean);
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
   const ownedWeapons = inventoryItems.filter((item) => item.category === "Weapons");
-  const psychicPowers = character.advances.psychicPowers.filter((entry) => entry?.name);
-  const eliteAdvances = [...automaticEliteAdvances(), ...character.advances.eliteAdvances.filter((entry) => entry?.name)];
+  const psychicPowers = character.advances.psychicPowers.map((entry) => psychicPowerById(entry.id) || entry).filter((entry) => entry?.name);
+  const eliteAdvances = activeEliteAdvances();
   const equipmentState = equipmentRulesState(inventoryItems);
   const currentActions = derivedCharacterActions(inventoryItems);
   const grantedEquipment = resolvedGrantedEquipment();
@@ -4474,7 +4739,8 @@ function renderReview() {
     ...ownedSkills.filter((record) => skillXpCost(record.skill.id, record.speciality) > 0).map((record) => [`${record.displayName} · ${rankNames[record.rank - 1]}`, skillXpCost(record.skill.id, record.speciality)]),
     ...purchasedTalents.map((talent) => [talent.name, talentCost(talent)]),
     ...character.advances.psychicPowers.filter((entry) => entry?.name).map((entry) => [entry.name, Number(entry.cost || 0)]),
-    ...character.advances.eliteAdvances.filter((entry) => entry?.name && !entry.pendingSetup).map((entry) => [entry.name, Number(entry.cost || 0)]),
+    ...(psyRatingXpCost() ? [[`Psy Rating ${foundryPsyRating()}`, psyRatingXpCost()]] : []),
+    ...character.advances.eliteAdvances.filter((entry) => entry?.name).map((entry) => [entry.name, Number(entry.cost || 0)]),
   ];
   const abilityEntries = [
     ["Home World", ruleValue(character.homeWorld, "Home World Bonus")],
@@ -4491,6 +4757,10 @@ function renderReview() {
     unresolvedGrantChoices.length ? `${unresolvedGrantChoices.length} granted alternative${unresolvedGrantChoices.length === 1 ? "" : "s"} remain.` : "",
     unresolvedAptitudes > 0 ? `${unresolvedAptitudes} duplicate aptitude replacements remain.` : "",
     spent > character.xp.starting ? `XP is overspent by ${spent - character.xp.starting}.` : "",
+    hasEliteAdvance("psyker") && character.background !== "astra-telepathica" && character.eliteSetup.psykerCorruption === null ? "The rogue psyker's 1d10+3 starting Corruption has not been recorded." : "",
+    hasEliteAdvance("inquisitor") && !character.eliteSetup.inquisitorLore ? "The Inquisitor's granted Forbidden Lore speciality has not been chosen." : "",
+    hasEliteAdvance("sister-of-battle") && !character.eliteSetup.sisterWeapon ? "The Sister of Battle's granted weapon has not been chosen." : "",
+    ...psychicPowers.filter((power) => psychicPowerStatus(power).missing.length).map((power) => `${power.name} no longer meets: ${psychicPowerStatus(power).missing.join(", ")}.`),
     ...equipmentState.warnings.filter((entry) => entry.level === "warning").map((entry) => entry.message),
   ].filter(Boolean);
   return `
@@ -4523,6 +4793,9 @@ function renderReview() {
           <span>Fatigue Threshold <strong>${characteristicBonus("toughness") + characteristicBonus("willpower")}</strong></span>
           <span>Move <strong>${characteristicBonus("agility")} / ${characteristicBonus("agility") * 2} / ${characteristicBonus("agility") * 3} / ${characteristicBonus("agility") * 6}</strong></span>
           <span>XP <strong>${spent} / ${character.xp.starting}</strong></span>
+          ${hasPsykerAccess() ? `<span>Psy Rating <strong>${foundryPsyRating()}</strong></span>` : ""}
+          ${Number(character.conditions.insanity || 0) ? `<span>Insanity <strong>${Number(character.conditions.insanity)}</strong></span>` : ""}
+          ${Number(character.conditions.corruption || 0) ? `<span>Corruption <strong>${Number(character.conditions.corruption)}</strong></span>` : ""}
         </div>
         <div class="review-sections">
           <section>
@@ -4586,15 +4859,22 @@ function renderReview() {
             <div class="dossier-list">${psychicPowers.map((power) => renderSheetEntry({
               kind: "Psychic Power",
               name: power.name,
-              summary: power.description || "Psychic power selected during advancement.",
+              summary: power.summary || power.description || "Psychic power selected during advancement.",
               meta: `${Number(power.cost || 0)} XP`,
-              source: power.source || "Character advancement",
-              rows: [["Psy Rating", foundryPsyRating()], ["XP Cost", Number(power.cost || 0)]],
+              source: power.page ? `${power.source}, p. ${power.page}` : power.source || "Character advancement",
+              rows: [["Discipline", power.discipline], ["Psy Rating", foundryPsyRating()], ["Action", power.action], ["Focus Power", power.focus], ["Range", power.range], ["Sustained", power.sustained], ["Subtype", power.subtype], ["XP Cost", Number(power.cost || 0)]],
             })).join("")}</div>
           </section>` : ""}
           ${eliteAdvances.length ? `<section>
             <h3>Elite Advances</h3>
-            <div class="dossier-list">${eliteAdvances.map((entry) => `<div><strong>${entry.name}</strong><span>${entry.automatic ? entry.source : "Optional Elite Advance · detailed setup pending"}</span><em>${entry.automatic ? "Automatic · 0 XP" : "GM approval required"}</em></div>`).join("")}</div>
+            <div class="dossier-list">${eliteAdvances.map((entry) => renderSheetEntry({
+              kind: "Elite Advance",
+              name: entry.name,
+              summary: entry.summary,
+              meta: entry.automatic ? "Automatic · 0 XP" : `${entry.cost} XP`,
+              source: entry.ruleSource || `${entry.source}, p. ${entry.page}`,
+              rows: [["Instant changes", entry.instantChanges?.join(" · ")], ["Guidance", entry.notes]],
+            })).join("")}</div>
           </section>` : ""}
           <section class="review-skills-section">
             <h3>Skills</h3>
@@ -5324,14 +5604,70 @@ function wireEvents() {
       rerenderAdvancesPreservingScroll(`[data-characteristic-advance="${characteristicId}"]`, "#advance-characteristics");
     });
   });
-  document.querySelector("[data-elite-advance-select]")?.addEventListener("change", (event) => {
-    const selected = catalogs.eliteAdvances.find((entry) => entry.id === event.target.value);
-    character.advances.eliteAdvances = selected
-      ? [{ id: selected.id, name: selected.name, source: selected.source, cost: 0, pendingSetup: true }]
-      : [];
+  document.querySelector("[data-elite-advance-inspect]")?.addEventListener("change", (event) => {
+    character.eliteShopSelected = event.target.value || null;
     playMechanicalLock();
     save();
-    rerenderAdvancesPreservingScroll("[data-elite-advance-select]", "#advance-elite");
+    rerenderAdvancesPreservingScroll("[data-elite-advance-inspect]", "#advance-elite");
+  });
+  document.querySelectorAll("[data-elite-gm-approval]").forEach((input) => {
+    input.addEventListener("change", () => {
+      character.eliteSetup.gmApproved[input.dataset.eliteGmApproval] = input.checked;
+      save();
+      rerenderAdvancesPreservingScroll(`[data-elite-gm-approval="${input.dataset.eliteGmApproval}"]`, "#advance-elite");
+    });
+  });
+  document.querySelector("[data-purchase-elite-advance]")?.addEventListener("click", (event) => {
+    const advance = eliteAdvanceById(event.currentTarget.dataset.purchaseEliteAdvance);
+    if (!advance || eliteAdvanceStatus(advance).missing.length || hasEliteAdvance(advance.id)) return;
+    character.advances.eliteAdvances.push({ id: advance.id, name: advance.name, source: `${advance.source}, p. ${advance.page}`, cost: advance.cost });
+    if (advance.id === "psyker" && character.background === "astra-telepathica") character.eliteSetup.psykerCorruption = 0;
+    playMechanicalLock();
+    syncGrantedEquipment();
+    save();
+    rerenderAdvancesPreservingScroll("#advance-elite", "#advance-elite");
+  });
+  document.querySelectorAll("[data-remove-elite-advance]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.removeEliteAdvance;
+      const removedIds = new Set([id]);
+      if (id === "psyker") removedIds.add("astropath");
+      character.advances.eliteAdvances = character.advances.eliteAdvances.filter((entry) => !removedIds.has(entry.id));
+      if (removedIds.has("astropath")) character.advances.psychicPowers = character.advances.psychicPowers.filter((entry) => psychicPowerById(entry.id)?.discipline !== "Astropath");
+      if (!hasPsykerAccess()) {
+        character.advances.psychicPowers = [];
+        character.advances.psyRating = 0;
+      }
+      playMechanicalLock();
+      syncGrantedEquipment();
+      save();
+      rerenderAdvancesPreservingScroll("#advance-elite", "#advance-elite");
+    });
+  });
+  document.querySelector("[data-inquisitor-lore]")?.addEventListener("change", (event) => {
+    character.eliteSetup.inquisitorLore = event.target.value;
+    save();
+    rerenderAdvancesPreservingScroll("[data-inquisitor-lore]", "#advance-elite");
+  });
+  document.querySelector("[data-sister-weapon]")?.addEventListener("change", (event) => {
+    character.eliteSetup.sisterWeapon = event.target.value;
+    syncGrantedEquipment();
+    save();
+    rerenderAdvancesPreservingScroll("[data-sister-weapon]", "#advance-elite");
+  });
+  document.querySelector("[data-psyker-corruption]")?.addEventListener("input", (event) => {
+    const value = event.target.value === "" ? null : Math.max(4, Math.min(13, Number(event.target.value)));
+    character.eliteSetup.psykerCorruption = value;
+    if (value !== null) character.conditions.corruption = value;
+    save();
+    refreshXpMeter();
+  });
+  document.querySelector("[data-roll-psyker-corruption]")?.addEventListener("click", async () => {
+    const [die] = await rollVisualDice(1, 10);
+    character.eliteSetup.psykerCorruption = die + 3;
+    character.conditions.corruption = die + 3;
+    save();
+    rerenderAdvancesPreservingScroll("[data-psyker-corruption]", "#advance-elite");
   });
   document.querySelectorAll("[data-skill-advance]").forEach((select) => {
     select.addEventListener("change", () => {
@@ -5427,15 +5763,70 @@ function wireEvents() {
       if (shop && target) shop.scrollTo({ top: Math.max(0, target.offsetTop - 46), behavior: "smooth" });
     });
   });
-  document.querySelectorAll("[data-other-name],[data-other-cost]").forEach((input) => {
+  document.querySelector("[data-psy-rating-advance]")?.addEventListener("change", (event) => {
+    character.advances.psyRating = Math.max(0, Number(event.target.value || 0));
+    playMechanicalLock();
+    save();
+    rerenderAdvancesPreservingScroll("[data-psy-rating-advance]", "#advance-psychic");
+  });
+  document.querySelectorAll("[data-condition-value]").forEach((input) => {
     input.addEventListener("input", () => {
-      const type = input.dataset.otherName || input.dataset.otherCost;
-      const entry = character.advances[type][0] || { name: "", cost: 0 };
-      if (input.dataset.otherName) entry.name = input.value;
-      else entry.cost = Number(input.value || 0);
-      character.advances[type][0] = entry;
+      character.conditions[input.dataset.conditionValue] = Math.max(0, Math.min(100, Number(input.value || 0)));
       save();
-      if (input.dataset.otherCost) refreshXpMeter();
+    });
+  });
+  document.querySelector("[data-malefic-approval]")?.addEventListener("change", (event) => {
+    character.eliteSetup.maleficApproved = event.target.checked;
+    save();
+    rerenderAdvancesPreservingScroll("[data-malefic-approval]", "#advance-psychic");
+  });
+  const filterPsychicPowers = () => {
+    const query = String(document.querySelector("#psychic-search")?.value || "").trim().toLowerCase();
+    const discipline = document.querySelector("[data-psychic-discipline]")?.value || "All Powers";
+    const showUnavailable = document.querySelector("[data-psychic-show-unavailable]")?.checked !== false;
+    document.querySelectorAll(".psychic-row").forEach((row) => {
+      row.hidden = !(row.dataset.psychicSearch.includes(query)
+        && (discipline === "All Powers" || row.dataset.psychicDisciplineValue === discipline)
+        && (showUnavailable || row.dataset.psychicAvailable === "true" || row.classList.contains("owned")));
+    });
+  };
+  document.querySelector("#psychic-search")?.addEventListener("input", (event) => {
+    character.psychicFilters.query = event.target.value;
+    save();
+    filterPsychicPowers();
+  });
+  document.querySelector("[data-psychic-discipline]")?.addEventListener("change", (event) => {
+    character.psychicFilters.discipline = event.target.value;
+    save();
+    filterPsychicPowers();
+  });
+  document.querySelector("[data-psychic-show-unavailable]")?.addEventListener("change", (event) => {
+    character.psychicFilters.showUnavailable = event.target.checked;
+    save();
+    filterPsychicPowers();
+  });
+  document.querySelectorAll("[data-psychic-power-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      character.psychicShopSelected = button.dataset.psychicPowerId;
+      playMechanicalLock();
+      save();
+      rerenderAdvancesPreservingScroll(`[data-psychic-power-id="${button.dataset.psychicPowerId}"]`, "#advance-psychic");
+    });
+  });
+  document.querySelector("[data-purchase-psychic-power]")?.addEventListener("click", (event) => {
+    const power = psychicPowerById(event.currentTarget.dataset.purchasePsychicPower);
+    if (!power || psychicPowerStatus(power).missing.length || purchasedPsychicPowerIds().has(power.id) || xpSpent() + power.cost > character.xp.starting) return;
+    character.advances.psychicPowers.push({ id: power.id, name: power.name, source: `${power.source}, p. ${power.page}`, cost: power.cost });
+    playMechanicalLock();
+    save();
+    rerenderAdvancesPreservingScroll(`[data-psychic-power-id="${power.id}"]`, "#advance-psychic");
+  });
+  document.querySelectorAll("[data-remove-psychic-power]").forEach((button) => {
+    button.addEventListener("click", () => {
+      character.advances.psychicPowers = character.advances.psychicPowers.filter((entry) => entry.id !== button.dataset.removePsychicPower);
+      playMechanicalLock();
+      save();
+      rerenderAdvancesPreservingScroll("#advance-psychic", "#advance-psychic");
     });
   });
   document.querySelector(".export-builder")?.addEventListener("click", () => {
@@ -5466,7 +5857,11 @@ function wireEvents() {
             return talent ? { id: talent.id, name: talent.name, initial: false, cost: talentCost(talent), source: "XP" } : entry;
           }),
         ],
-        eliteAdvances: [...automaticEliteAdvances(), ...character.advances.eliteAdvances],
+        eliteAdvances: activeEliteAdvances(),
+        psyRating: foundryPsyRating(),
+        psyRatingXp: psyRatingXpCost(),
+        psychicPowers: character.advances.psychicPowers.map((entry) => psychicPowerById(entry.id) || entry),
+        conditions: { ...character.conditions },
         actions: serialisableCharacterActions(),
         xpSpent: xpSpent(),
       },
@@ -5481,7 +5876,7 @@ function wireEvents() {
     render();
   });
   document.querySelector(".export-foundry")?.addEventListener("click", () => {
-    const eliteAdvances = [...automaticEliteAdvances(), ...character.advances.eliteAdvances];
+    const eliteAdvances = activeEliteAdvances();
     const foundryAbilities = [
       ["Home World", ruleValue(character.homeWorld, "Home World Bonus")],
       ["Background", ruleValue(character.background, "Background Bonus")],
@@ -5496,7 +5891,7 @@ function wireEvents() {
           homeWorld: foundryBioValue(catalogs.homeWorlds, character.homeWorld),
           background: foundryBackgroundName(),
           role: foundryBioValue(catalogs.roles, character.role),
-          elite: eliteAdvances[0]?.name || "",
+          elite: eliteAdvances.map((entry) => entry.name).join(", "),
           divination: foundryDivinationName(),
           gender: character.presentation || "",
           notes: character.appearance || "",
@@ -5519,13 +5914,13 @@ function wireEvents() {
           sustained: 0,
           defaultPR: foundryPsyRating(),
           class: character.background === "astra-telepathica" ? "bound" : "unbound",
-          cost: 0,
+          cost: psyRatingXpCost(),
           hasFocus: character.equipment.inventory.some((id) => /psy-focus/i.test(armoury.find((item) => item.id === id)?.name || "")),
         },
         skills: foundrySkillData(),
         experience: { total: character.xp.starting, used: xpSpent() },
-        insanity: 0,
-        corruption: 0,
+        insanity: Number(character.conditions.insanity || 0),
+        corruption: Number(character.conditions.corruption || 0),
       },
       items: [
         ...resolvedAptitudes().aptitudes.map((aptitude) => ({
@@ -5559,15 +5954,28 @@ function wireEvents() {
           flags: { dh2CharacterBuilder: { initial: true, conditional: Boolean(entry.conditional) } },
         })),
         ...foundryAbilities.map(foundrySpecialAbility),
-        ...character.advances.psychicPowers.filter((entry) => entry?.name).map((entry) => ({
+        ...eliteAdvances.map((entry) => ({
+          name: entry.name,
+          type: "specialAbility",
+          system: { description: entry.summary || entry.notes, benefit: entry.instantChanges?.join("; ") || entry.summary },
+          flags: { dh2CharacterBuilder: { initial: Boolean(entry.automatic), eliteAdvance: true, source: entry.ruleSource || `${entry.source}, p. ${entry.page}` } },
+        })),
+        ...character.advances.psychicPowers.map((entry) => psychicPowerById(entry.id) || entry).filter((entry) => entry?.name).map((entry) => ({
           name: entry.name,
           type: "psychicPower",
           system: {
-            description: entry.description || "Selected during character advancement.",
-            benefit: entry.description || "",
+            description: entry.summary || entry.description || "Selected during character advancement.",
+            benefit: entry.summary || entry.description || "",
             cost: Number(entry.cost || 0),
+            discipline: entry.discipline || "",
+            action: entry.action || "",
+            focusPower: entry.focus || "",
+            range: entry.range || "",
+            sustained: entry.sustained || "",
+            subtype: entry.subtype || "",
+            prerequisites: psychicPrerequisiteText(entry),
           },
-          flags: { dh2CharacterBuilder: { initial: false, source: "XP" } },
+          flags: { dh2CharacterBuilder: { initial: false, source: entry.page ? `${entry.source}, p. ${entry.page}` : "XP" } },
         })),
       ],
       flags: {
@@ -5576,6 +5984,8 @@ function wireEvents() {
           schemaVersion: 2,
           source: character,
           derivedActions: serialisableCharacterActions(),
+          eliteAdvances,
+          psyRatingXp: psyRatingXpCost(),
         },
       },
     });

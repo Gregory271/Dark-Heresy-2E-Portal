@@ -706,6 +706,21 @@ html[data-text-size="extra-large"] .topbar .nav-wide { display: none; }
 html[data-text-size="extra-large"] .topbar .nav-narrow { display: inline; }
 html[data-text-size="extra-large"] .armoury-item { grid-template-columns: minmax(0,1fr); }
 html[data-text-size="extra-large"] .armoury-item .item-category { display: none; }
+html[data-text-size="extra-large"] .advance-nav { flex-wrap: wrap; }
+html[data-text-size="extra-large"] .elite-compact-heading,
+html[data-text-size="extra-large"] .psychic-heading,
+html[data-text-size="extra-large"] .elite-selector-grid,
+html[data-text-size="extra-large"] .elite-inspector,
+html[data-text-size="extra-large"] .psychic-terminal { grid-template-columns: minmax(0,1fr); }
+html[data-text-size="extra-large"] .elite-selector-grid > .elite-select-control,
+html[data-text-size="extra-large"] .psychic-catalogue { border-right: 0; border-bottom: 1px solid var(--line); }
+html[data-text-size="extra-large"] .elite-gm-approval,
+html[data-text-size="extra-large"] .elite-inspector > .primary-button { grid-column: 1; }
+html[data-text-size="extra-large"] .psychic-terminal { height: auto; }
+html[data-text-size="extra-large"] .psychic-list { max-height: 430px; }
+html[data-text-size="extra-large"] .psychic-inspector { overflow: visible; }
+html[data-text-size="extra-large"] .warp-exposure-controls { grid-template-columns: repeat(2,minmax(0,1fr)); }
+html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { grid-column: 1 / -1; }
 .advance-layout { display: grid; grid-template-columns: 180px 1fr; height: min(72vh,620px); overflow: hidden; }
 .xp-meter { display: grid; align-content: start; gap: 5px; padding: 20px; border-right: 1px solid var(--line); }
 .xp-meter span { margin-top: 10px; color: #aaa69d; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
@@ -758,6 +773,83 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
 .talent-inspector dd { margin: 2px 0 0; color: #d3cec4; font-size: 10px; line-height: 1.4; }
 .talent-inspector dd.missing-prerequisite { color: #ffad98; }
 .talent-inspector .primary-button { width: 100%; min-width: 0; padding: 10px 12px; font-size: 10px; }
+.elite-advance-shop,
+.psychic-shop { margin-top: 20px; scroll-margin-top: 48px; }
+.elite-compact-heading,
+.psychic-heading { display: grid; grid-template-columns: minmax(0,1fr) minmax(240px,.72fr); align-items: end; gap: 16px; margin-bottom: 10px; }
+.elite-compact-heading h2,
+.psychic-heading h2 { margin: 2px 0 0; }
+.elite-compact-heading > p,
+.psychic-heading > div:first-child > p:last-child { margin: 0; color: #aaa49a; font-size: 9px; line-height: 1.5; }
+.active-elite-advances,
+.purchased-psychic-powers { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
+.active-elite-advances > span,
+.purchased-psychic-powers > span { color: #979189; font-size: 9px; }
+.active-elite-chip { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; min-width: 210px; border: 1px solid rgba(145,174,104,.38); padding: 6px 9px; background: rgba(101,126,70,.13); }
+.active-elite-chip span,
+.active-elite-chip small { color: #aeb99f; font-size: 7px; text-transform: uppercase; }
+.active-elite-chip strong { color: #e3ecd6; font: 600 11px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.active-elite-chip button { border: 0; padding: 2px 5px; background: transparent; color: #ffae9a; cursor: pointer; }
+.elite-selector-grid { display: grid; grid-template-columns: minmax(220px,.52fr) minmax(0,1.48fr); border: 1px solid rgba(255,255,255,.12); background: rgba(3,6,6,.5); }
+.elite-selector-grid > .elite-select-control { align-content: start; border-right: 1px solid var(--line); padding: 14px; }
+.elite-inspector { display: grid; grid-template-columns: minmax(220px,.8fr) minmax(260px,1.2fr); gap: 12px 18px; min-width: 0; padding: 14px 16px; }
+.elite-inspector h3,
+.psychic-inspector h3 { margin: 3px 0 7px; color: #fff0cf; font: 600 25px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.elite-inspector p,
+.psychic-inspector > p:not(.choice-source) { color: #cbc4b8; font-size: 9px; line-height: 1.5; }
+.elite-inspector dl,
+.psychic-inspector dl { margin: 0; }
+.elite-inspector dl div,
+.psychic-inspector dl div { padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.09); }
+.elite-inspector dt,
+.psychic-inspector dt { color: #c39c61; font: 600 8px "Barlow Condensed",sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.elite-inspector dd,
+.psychic-inspector dd { margin: 2px 0 0; color: #d3cec4; font-size: 9px; line-height: 1.42; overflow-wrap: anywhere; }
+.missing-prerequisite { color: #ffad98 !important; }
+.elite-gm-approval { grid-column: 1; display: flex; align-items: center; gap: 7px; color: #d9d1c4; font-size: 9px; }
+.elite-inspector > .primary-button { grid-column: 2; align-self: end; width: 100%; min-width: 0; }
+.elite-setup-control { display: grid; grid-template-columns: minmax(180px,.7fr) minmax(210px,1fr) auto; align-items: center; gap: 9px; margin-top: 7px; border-left: 2px solid #d1a15c; padding: 8px 11px; background: rgba(151,100,37,.1); }
+.elite-setup-control strong { color: #eadabd; font: 600 11px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.elite-setup-control p { margin: 0; color: #aaa49a; font-size: 8px; }
+.elite-setup-control label { display: flex; align-items: center; gap: 6px; color: #aaa49a; font-size: 8px; }
+.elite-setup-control input,
+.elite-setup-control select { width: 100%; min-width: 0; }
+.psy-rating-control { display: grid; grid-template-columns: auto 52px minmax(150px,1fr); align-items: center; gap: 3px 10px; border-left: 2px solid #8c6cbb; padding: 8px 10px; background: rgba(83,58,119,.14); }
+.psy-rating-control > span,
+.psy-rating-control label span { color: #bcadd2; font-size: 8px; letter-spacing: .07em; text-transform: uppercase; }
+.psy-rating-control > strong { grid-row: 1 / 3; grid-column: 2; color: #efe4ff; font: 600 32px "Barlow Condensed",sans-serif; text-align: center; }
+.psy-rating-control > small { color: #a99cb8; font-size: 8px; }
+.psy-rating-control label { grid-column: 3; display: grid; gap: 3px; }
+.psy-rating-control select { width: 100%; min-width: 0; }
+.warp-exposure-controls { display: grid; grid-template-columns: 150px 150px minmax(250px,1fr); gap: 7px; margin-bottom: 9px; }
+.warp-exposure-controls > label { display: grid; gap: 4px; border: 1px solid rgba(255,255,255,.11); padding: 7px 9px; color: #aaa49a; font-size: 8px; }
+.warp-exposure-controls input[type="number"] { width: 100%; min-width: 0; }
+.warp-exposure-controls .malefic-approval { display: flex; align-items: center; color: #d0b6ae; }
+.purchased-psychic-powers button { border: 1px solid rgba(140,108,187,.42); padding: 5px 7px; background: rgba(83,58,119,.14); color: #ded2ed; font-size: 8px; cursor: pointer; }
+.purchased-psychic-powers button b { margin-left: 5px; color: #ffb09d; }
+.psychic-terminal { display: grid; grid-template-columns: minmax(360px,1fr) minmax(310px,.9fr); height: 410px; border: 1px solid rgba(255,255,255,.12); background: rgba(3,6,6,.5); }
+.psychic-catalogue { display: grid; grid-template-rows: auto minmax(0,1fr); min-height: 0; border-right: 1px solid var(--line); }
+.psychic-filters { display: grid; grid-template-columns: minmax(180px,1fr) minmax(170px,.72fr) auto; align-items: end; gap: 6px; padding: 8px; border-bottom: 1px solid var(--line); }
+.psychic-filters > input { min-width: 0; }
+.psychic-filters label { display: grid; gap: 3px; color: #aaa49a; font-size: 7px; text-transform: uppercase; }
+.psychic-filters .show-unavailable { display: flex; align-items: center; align-self: center; }
+.psychic-list { min-height: 0; overflow-y: auto; scrollbar-color: #8c6cbb #090d0c; scrollbar-width: thin; }
+.psychic-row { display: grid; width: 100%; grid-template-columns: minmax(0,1fr) minmax(120px,.52fr) 62px; gap: 8px; border: 0; border-bottom: 1px solid rgba(255,255,255,.08); padding: 8px 9px; background: transparent; color: #aaa69d; text-align: left; cursor: pointer; }
+.psychic-row[hidden] { display: none; }
+.psychic-row:hover,
+.psychic-row.selected { background: linear-gradient(90deg,rgba(83,58,119,.34),transparent); }
+.psychic-row.selected { box-shadow: inset 2px 0 #b896e2; }
+.psychic-row.locked:not(.owned) { opacity: .58; }
+.psychic-row.owned { background: linear-gradient(90deg,rgba(101,126,70,.18),transparent); }
+.psychic-row strong { color: #e8dfef; font: 600 11px "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.psychic-row span,
+.psychic-row em { font-size: 8px; font-style: normal; }
+.psychic-row em { color: #d7baf8; text-align: right; }
+.psychic-inspector { min-height: 0; overflow-y: auto; padding: 14px 15px; }
+.psychic-cost { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.psychic-cost strong { color: #d7baf8; font: 600 20px "Barlow Condensed",sans-serif; }
+.psychic-cost span { color: #aaa1b5; font-size: 8px; text-transform: uppercase; }
+.psychic-inspector .primary-button { width: 100%; min-width: 0; margin-top: 12px; padding: 10px 12px; font-size: 10px; }
 .skill-shop { max-height: none; overflow: visible; }
 .specialist-skill-shop { margin-top: 14px; scroll-margin-top: 44px; }
 .specialist-skill-intro { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 8px; }
@@ -2072,6 +2164,20 @@ dialog h2,
   .action-index-controls { grid-template-columns: 1fr; align-items: stretch; }
   .show-unavailable { white-space: normal; }
   .action-roll-equation { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .elite-compact-heading,
+  .psychic-heading,
+  .elite-selector-grid,
+  .elite-inspector,
+  .psychic-terminal { grid-template-columns: 1fr; }
+  .elite-selector-grid > .elite-select-control,
+  .psychic-catalogue { border-right: 0; border-bottom: 1px solid var(--line); }
+  .elite-gm-approval,
+  .elite-inspector > .primary-button { grid-column: 1; }
+  .psychic-terminal { height: auto; }
+  .psychic-list { max-height: 330px; }
+  .psychic-inspector { max-height: none; overflow: visible; }
+  .warp-exposure-controls { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .warp-exposure-controls .malefic-approval { grid-column: 1 / -1; }
 }
 
 /* Phone mode intentionally becomes a straightforward, native-control workflow.
@@ -2085,6 +2191,58 @@ dialog h2,
     overflow-y: auto;
   }
   body { font-size: 16px; }
+  .psychic-filters,
+  .warp-exposure-controls,
+  .elite-setup-control { grid-template-columns: 1fr; }
+  .psychic-filters .show-unavailable,
+  .warp-exposure-controls .malefic-approval { grid-column: 1; }
+  .psy-rating-control { grid-template-columns: auto 48px minmax(0,1fr); }
+  .psychic-row { grid-template-columns: minmax(0,1fr) 70px; }
+  .psychic-row span { display: none; }
+  .active-elite-chip { width: 100%; min-width: 0; }
+  .advance-shop,
+  .talent-shop,
+  .talent-terminal,
+  .talent-catalogue,
+  .talent-filters,
+  .talent-list,
+  .talent-inspector,
+  .elite-advance-shop,
+  .psychic-shop,
+  .elite-compact-heading,
+  .psychic-heading,
+  .elite-selector-grid,
+  .elite-inspector,
+  .psy-rating-control,
+  .warp-exposure-controls,
+  .psychic-terminal,
+  .psychic-catalogue,
+  .psychic-filters,
+  .psychic-list,
+  .psychic-inspector {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .psychic-filters input,
+  .psychic-filters select,
+  .psy-rating-control select { width: 100%; min-width: 0; max-width: 100%; }
+  .talent-filters { flex-wrap: wrap; }
+  .talent-filters input { width: 100%; min-width: 0; flex-basis: 100%; }
+  .talent-filters button { min-width: 0; flex: 1; }
+  .talent-row { grid-template-columns: minmax(0,1fr) auto; }
+  .talent-row span { display: none; }
+  html[data-text-size="extra-large"] .advance-shop input,
+  html[data-text-size="extra-large"] .advance-shop select,
+  html[data-text-size="extra-large"] .advance-shop button { font-size: 20px !important; }
+  html[data-text-size="extra-large"] .advance-shop h2,
+  html[data-text-size="extra-large"] .elite-inspector h3,
+  html[data-text-size="extra-large"] .psychic-inspector h3 { overflow-wrap: anywhere; }
+  html[data-text-size="extra-large"] .psy-rating-control { grid-template-columns: 1fr; }
+  html[data-text-size="extra-large"] .psy-rating-control > strong,
+  html[data-text-size="extra-large"] .psy-rating-control label { grid-row: auto; grid-column: 1; text-align: left; }
+  .xp-meter { width: 100%; min-width: 0; grid-template-columns: repeat(3,minmax(0,1fr)); }
+  html[data-text-size="extra-large"] .xp-meter span { overflow-wrap: anywhere; }
   .scene {
     width: 100%;
     height: auto;
