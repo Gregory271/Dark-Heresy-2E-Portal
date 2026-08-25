@@ -1,5 +1,6 @@
 import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.3";
 import { armoury } from "./armoury-data.js?v=0.8.1";
+import { actionGroups, actionSource, combatActionCatalogue } from "./action-data.js?v=0.1.0";
 import { talentCatalogue } from "./talent-data.js?v=0.9.1";
 import { characteristicRuleTerms, contextualRuleTerms, coreRuleTerms, creatorRuleTerms, ruleTermsById } from "./compendium-terms.js?v=0.4.2";
 import {
@@ -48,6 +49,12 @@ let cloudStatus = cloudIsConfigured() ? "disconnected" : "unconfigured";
 let cloudRefreshTimer = null;
 const sheetDetailRecords = new Map();
 let sheetDetailCounter = 0;
+const currentActionRecords = new Map();
+let actionIndexState = {
+  query: localStorage.getItem("dh2-action-query") || "",
+  group: localStorage.getItem("dh2-action-group") || "Attacks",
+  showUnavailable: localStorage.getItem("dh2-action-show-unavailable") === "true",
+};
 
 function characterId() {
   return globalThis.crypto?.randomUUID?.() || `acolyte-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -2142,6 +2149,459 @@ function hasPsykerAccess() {
     || character.advances.eliteAdvances.some((entry) => /psyker|astropath/i.test(entry?.name || ""));
 }
 
+function currentTalentRecords() {
+  return [
+    ...Object.values(resolvedGrantedTalents()).map((talent) => ({
+      id: talent.id,
+      name: talent.displayName || talent.name,
+      benefit: talent.benefit,
+      source: talent.ruleSource || talent.source,
+      initial: true,
+    })),
+    ...character.advances.talents.map((entry) => {
+      const talent = talentCatalogue.find((candidate) => candidate.id === entry?.id);
+      return talent ? { ...talent, initial: false } : null;
+    }).filter(Boolean),
+  ];
+}
+
+function hasTalentNamed(name) {
+  const sought = String(name || "").toLowerCase();
+  return currentTalentRecords().some((talent) => String(talent.name || "").toLowerCase().includes(sought));
+}
+
+function weaponIsMelee(weapon) {
+  return String(weapon?.profile?.class || "").toLowerCase() === "melee";
+}
+
+function weaponIsRanged(weapon) {
+  return Boolean(weapon) && !weaponIsMelee(weapon) && weapon.category === "Weapons";
+}
+
+function weaponTrainingModifier(weapon) {
+  if (!weapon) return 0;
+  const type = String(weapon.profile?.type || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const training = currentTalentRecords()
+    .map((talent) => String(talent.name || ""))
+    .filter((name) => /weapon training/i.test(name));
+  if (training.some((name) => {
+    const normalised = name.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+    return type && normalised.includes(type);
+  })) return 0;
+  return -20;
+}
+
+function actionTestRecord(characteristicId, modifier = 0, extra = {}) {
+  const characteristic = characteristics.find((entry) => entry.id === characteristicId);
+  return {
+    characteristicId,
+    characteristicName: characteristic?.name || characteristicId,
+    baseTarget: characteristicValue(characteristicId),
+    actionModifier: Number(modifier || 0),
+    ...extra,
+  };
+}
+
+function skillActionTest(skill, speciality = "") {
+  const rank = skillRank(skill.id, speciality);
+  const characteristic = characteristics.find((entry) => entry.name === skill.characteristic);
+  const trainedBonus = rank > 0 ? (rank - 1) * 10 : -20;
+  return actionTestRecord(characteristic?.id, trainedBonus, {
+    characteristicName: speciality ? `${skill.name} (${speciality})` : skill.name,
+    skillId: skill.id,
+    speciality,
+    rank,
+    untrained: rank === 0,
+  });
+}
+
+function actionAvailability(record, context) {
+  let available = true;
+  let reason = "";
+  if (record.requirement === "heavyWeapon" && !context.heavyWeapons.length) {
+    available = false;
+    reason = "No readied Heavy weapon.";
+  } else if (record.requirement === "meleeWeapon" && !context.meleeWeapons.length) {
+    available = false;
+    reason = "No melee weapon is currently readied.";
+  } else if (record.requirement === "rangedWeapon" && !context.rangedWeapons.length) {
+    available = false;
+    reason = "No ranged weapon is currently readied.";
+  } else if (record.requirement === "psyker" && !hasPsykerAccess()) {
+    available = false;
+    reason = "Requires the Psyker elite advance.";
+  } else if (record.requirement === "lightningAttack" && !hasTalentNamed("Lightning Attack")) {
+    available = false;
+    reason = "Requires the Lightning Attack talent.";
+  } else if (record.requirement === "swiftAttack" && !hasTalentNamed("Swift Attack")) {
+    available = false;
+    reason = "Requires the Swift Attack talent.";
+  }
+  if (record.test?.baseTarget === 0) {
+    available = false;
+    reason = `${record.test.characteristicName || "Required characteristic"} has not been determined.`;
+  }
+  return { available, unavailableReason: reason };
+}
+
+function staticCombatActionRecords(context) {
+  return combatActionCatalogue.map((definition) => {
+    const record = {
+      ...definition,
+      source: actionSource,
+      context: "Standard combat option",
+      test: definition.test ? actionTestRecord(definition.test.characteristicId, definition.test.modifier, definition.test) : null,
+    };
+    if (definition.skillId) {
+      const skill = skills.find((entry) => entry.id === definition.skillId);
+      if (skill) {
+        record.test = skillActionTest(skill);
+        record.context = record.test.untrained ? `${skill.name} is untrained (-20)` : `${skill.name}: ${rankNames[record.test.rank - 1]}`;
+      }
+    }
+    if (definition.dynamicType === "ready" && hasTalentNamed("Quick Draw")) {
+      record.type = "Half Action / Free to draw weapon";
+      record.context = "Quick Draw changes drawing a weapon to a Free Action; other Ready uses remain Half Actions.";
+    }
+    if (definition.dynamicType === "stand" && hasTalentNamed("Leap Up")) {
+      record.type = "Half Action / Free to stand";
+      record.context = "Leap Up changes standing from Prone to a Free Action; mounting and dismounting remain Half Actions.";
+    }
+    if (definition.dynamicType === "reload" && context.rangedWeapons.length) {
+      record.context = context.rangedWeapons.map((weapon) => `${weapon.name}: ${weapon.profile?.reload || "reload time not recorded"}`).join(" · ");
+      if (hasTalentNamed("Rapid Reload")) record.context += " · Rapid Reload halves these times.";
+    }
+    const state = actionAvailability(record, context);
+    return { ...record, ...state };
+  });
+}
+
+function weaponAttackRecord(weapon, mode, options = {}) {
+  const readied = character.equipment.readiedWeapons.includes(weapon.id);
+  const melee = weaponIsMelee(weapon);
+  const characteristicId = melee ? "weaponSkill" : "ballisticSkill";
+  const trainingModifier = weaponTrainingModifier(weapon);
+  const actionModifier = Number(options.modifier || 0) + trainingModifier;
+  const baseTarget = characteristicValue(characteristicId);
+  const installedMods = Object.entries(character.equipment.weaponModAssignments)
+    .filter(([, weaponId]) => weaponId === weapon.id)
+    .map(([modId]) => equipmentItem(modId)?.name)
+    .filter(Boolean);
+  let reason = "";
+  if (!readied) reason = `${weapon.name} is carried but not readied.`;
+  else if (!baseTarget) reason = `${melee ? "Weapon Skill" : "Ballistic Skill"} has not been determined.`;
+  const profile = weapon.profile || {};
+  return {
+    id: `weapon-${weapon.id}-${mode.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    name: `${mode} - ${weapon.name}`,
+    group: "Attacks",
+    type: options.type || "Half Action",
+    subtypes: ["Attack", melee ? "Melee" : "Ranged"],
+    summary: options.summary || `Attack with ${weapon.name}.`,
+    source: `${actionSource}; ${weapon.source || "Armoury"}`,
+    context: [
+      `${melee ? "WS" : "BS"} ${baseTarget || "not set"}`,
+      trainingModifier ? "Untrained weapon -20" : "Weapon training matched",
+      installedMods.length ? `Installed: ${installedMods.join(", ")}` : "",
+    ].filter(Boolean).join(" · "),
+    available: readied && Boolean(baseTarget),
+    unavailableReason: reason,
+    test: actionTestRecord(characteristicId, actionModifier, {
+      weaponId: weapon.id,
+      weaponName: weapon.name,
+      mode,
+      hitMode: options.hitMode || "single",
+      calledShot: Boolean(options.calledShot),
+      trainingModifier,
+      inherentModifier: Number(options.modifier || 0),
+      rateOfFire: profile.rateOfFire || {},
+    }),
+  };
+}
+
+function weaponActionRecords(inventoryItems) {
+  const records = [];
+  inventoryItems.filter((item) => item.category === "Weapons").forEach((weapon) => {
+    const profile = weapon.profile || {};
+    const melee = weaponIsMelee(weapon);
+    const canSingle = melee || Number(profile.rateOfFire?.single || 0) > 0;
+    if (canSingle) {
+      records.push(weaponAttackRecord(weapon, "Standard Attack", {
+        modifier: 10,
+        summary: `Make one ${melee ? "melee" : "ranged"} attack with ${weapon.name} at +10.`,
+      }));
+      records.push(weaponAttackRecord(weapon, "Called Shot", {
+        type: "Full Action",
+        modifier: -20,
+        calledShot: true,
+        summary: `Attack a declared hit location with ${weapon.name} at -20.`,
+      }));
+    }
+    if (!melee && Number(profile.rateOfFire?.burst || 0) > 0) {
+      records.push(weaponAttackRecord(weapon, "Semi-Auto Burst", {
+        modifier: 0,
+        hitMode: "semi",
+        summary: `Fire up to ${profile.rateOfFire.burst} rounds; additional Degrees of Success can score additional hits.`,
+      }));
+      records.push(weaponAttackRecord(weapon, "Suppressing Fire", {
+        type: "Full Action",
+        modifier: -20,
+        hitMode: "suppressing",
+        summary: `Fill a firing arc with ${weapon.name}; targets test against Pinning and successful fire can strike random targets.`,
+      }));
+    }
+    if (!melee && Number(profile.rateOfFire?.full || 0) > 0) {
+      records.push(weaponAttackRecord(weapon, "Full Auto Burst", {
+        modifier: -10,
+        hitMode: "full",
+        summary: `Fire up to ${profile.rateOfFire.full} rounds; each Degree of Success can score a hit.`,
+      }));
+    }
+  });
+  const weaponSkill = characteristicValue("weaponSkill");
+  records.push({
+    id: "weapon-unarmed-standard",
+    name: "Standard Attack - Unarmed",
+    group: "Attacks",
+    type: "Half Action",
+    subtypes: ["Attack", "Melee"],
+    summary: "Make one unarmed melee attack at +10 Weapon Skill.",
+    source: actionSource,
+    context: `WS ${weaponSkill || "not set"} · No Weapon Training required`,
+    available: Boolean(weaponSkill),
+    unavailableReason: weaponSkill ? "" : "Weapon Skill has not been determined.",
+    test: actionTestRecord("weaponSkill", 10, { mode: "Standard Attack", hitMode: "single", unarmed: true }),
+  });
+  return records;
+}
+
+function skillActionRecords() {
+  return ownedSkillRecords()
+    .filter((record) => !["dodge", "parry"].includes(record.skill.id))
+    .map((record) => {
+      const test = skillActionTest(record.skill, record.speciality);
+      return {
+        id: `skill-${record.key}`,
+        name: record.displayName,
+        group: "Skills",
+        type: "Varies by task",
+        subtypes: ["Concentration", "Miscellaneous"],
+        summary: ruleTermsById[`skill-${record.skill.id}`]?.summary || `Use ${record.displayName} to attempt an appropriate task.`,
+        source: ruleTermsById[`skill-${record.skill.id}`] ? `${ruleTermsById[`skill-${record.skill.id}`].book}, skill description` : "Character skill",
+        context: `${rankNames[record.rank - 1]} · target ${test.baseTarget + test.actionModifier}`,
+        available: Boolean(test.baseTarget),
+        unavailableReason: test.baseTarget ? "" : `${record.skill.characteristic} has not been determined.`,
+        test,
+      };
+    });
+}
+
+function characteristicActionRecords() {
+  return characteristics.map((entry) => {
+    const value = characteristicValue(entry.id);
+    return {
+      id: `characteristic-test-${entry.id}`,
+      name: `${entry.name} Test`,
+      group: "Skills",
+      type: "Varies by task",
+      subtypes: ["Test"],
+      summary: ruleTermsById[`characteristic-${entry.id.replace(/([A-Z])/g, "-$1").toLowerCase()}`]?.summary || `Make a test using ${entry.name}.`,
+      source: "Core Rulebook, pp. 21-24",
+      context: `${entry.abbreviation} ${value || "not set"}`,
+      available: Boolean(value),
+      unavailableReason: value ? "" : `${entry.name} has not been determined.`,
+      test: actionTestRecord(entry.id, 0),
+    };
+  });
+}
+
+function capabilityActionRecords(inventoryItems) {
+  const fateThreshold = finalFateThreshold();
+  const fateOptions = [
+    ["fate-reroll", "Spend Fate - Re-roll", "Re-roll one test; the second result must be used."],
+    ["fate-plus-ten", "Spend Fate - Gain +10", "Gain +10 on a test when declared before the dice are rolled."],
+    ["fate-add-dos", "Spend Fate - Add 1 Degree of Success", "Add one Degree of Success to a successful test after the dice are rolled."],
+    ["fate-initiative", "Spend Fate - Initiative 10", "Count as having rolled 10 for Initiative."],
+    ["fate-heal", "Spend Fate - Recover Damage", "Immediately remove 1d5 Damage; this cannot remove Critical Damage."],
+    ["fate-stunned", "Spend Fate - Recover from Stunned", "Immediately recover from being Stunned."],
+    ["fate-fatigue", "Spend Fate - Remove Fatigue", "Remove all levels of Fatigue."],
+    ["fate-burn", "Burn Fate - Survive", "Permanently reduce Fate Threshold by 1 to survive an otherwise certain death, subject to the GM's narration and consequences."],
+  ].map(([id, name, summary]) => ({
+    id,
+    name,
+    group: "Abilities",
+    type: name.startsWith("Spend") ? "Free Action" : "Special",
+    subtypes: [],
+    summary,
+    source: "Core Rulebook, p. 293",
+    context: fateThreshold ? `Fate Threshold ${fateThreshold}; current session Fate is tracked during play` : "Fate Threshold has not been determined",
+    available: Boolean(fateThreshold),
+    unavailableReason: fateThreshold ? "" : "Determine Fate Threshold first.",
+    test: null,
+  }));
+  const abilities = [
+    ...currentTalentRecords().map((talent) => ({
+      id: `talent-${talent.id || talent.name}`,
+      name: talent.name,
+      type: "Talent",
+      summary: talent.benefit || "Character talent.",
+      source: talent.source || "Character talent",
+      context: talent.initial ? "Granted during character creation" : "Purchased with XP",
+    })),
+    ...[...automaticTraits(), ...equipmentGrantedTraits()].map((trait) => ({
+      id: `trait-${trait.name}`,
+      name: trait.name,
+      type: trait.conditional ? "Equipment Trait" : "Trait",
+      summary: trait.summary,
+      source: trait.source,
+      context: trait.conditional ? "Active only while its equipment is in use" : "Always active",
+    })),
+    ...[
+      ["Home World", ruleValue(character.homeWorld, "Home World Bonus")],
+      ["Background", ruleValue(character.background, "Background Bonus")],
+      ["Role", ruleValue(character.role, "Role Bonus")],
+    ].filter(([, value]) => value).map((entry) => {
+      const ability = parseSpecialAbility(entry);
+      return { id: `ability-${entry[0].toLowerCase().replace(/\s+/g, "-")}`, name: ability.name, type: "Special Ability", summary: ability.benefit, source: ability.source, context: `${entry[0]} choice` };
+    }),
+  ].map((entry) => ({ ...entry, group: "Abilities", subtypes: [], available: true, unavailableReason: "", test: null }));
+
+  const usableGear = inventoryItems
+    .filter((item) => !["Weapons", "Armour", "Weapon Mods"].includes(item.category))
+    .map((item) => {
+      const summary = itemRulesSummary(item);
+      const type = /full action/i.test(summary) ? "Full Action" : /half action/i.test(summary) ? "Half Action" : /free action/i.test(summary) ? "Free Action" : "Varies by use";
+      return {
+        id: `gear-${item.id}`,
+        name: `Use ${item.name}`,
+        group: "Utility",
+        type,
+        subtypes: ["Miscellaneous"],
+        summary,
+        source: item.source || "Owned equipment",
+        context: character.equipment.activeGear.includes(item.id) ? "Currently worn or in use" : "Carried in inventory",
+        available: true,
+        unavailableReason: "",
+        test: null,
+      };
+    });
+  return [...fateOptions, ...abilities, ...usableGear];
+}
+
+function psychicActionRecords() {
+  return character.advances.psychicPowers.filter((entry) => entry?.name).map((power, index) => ({
+    id: `psychic-${power.id || index}-${String(power.name).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    name: `Manifest ${power.name}`,
+    group: "Psychic",
+    type: power.action || "Use power profile",
+    subtypes: ["Concentration", "Psychic"],
+    summary: power.description || "Manifest this known psychic power using its Focus Power profile.",
+    source: power.source || "Psychic power advancement",
+    context: `Psy Rating ${foundryPsyRating()} · Consult this power's Focus Power characteristic and modifier`,
+    available: hasPsykerAccess(),
+    unavailableReason: hasPsykerAccess() ? "" : "Requires the Psyker elite advance.",
+    test: null,
+  }));
+}
+
+function derivedCharacterActions(inventoryItems = character.equipment.inventory.map((id) => equipmentItem(id)).filter(Boolean)) {
+  const readied = inventoryItems.filter((item) => character.equipment.readiedWeapons.includes(item.id));
+  const context = {
+    readied,
+    meleeWeapons: readied.filter(weaponIsMelee),
+    rangedWeapons: readied.filter(weaponIsRanged),
+    heavyWeapons: readied.filter((weapon) => String(weapon.profile?.class || "").toLowerCase() === "heavy"),
+  };
+  const records = [
+    ...weaponActionRecords(inventoryItems),
+    ...staticCombatActionRecords(context),
+    ...characteristicActionRecords(),
+    ...skillActionRecords(),
+    ...psychicActionRecords(),
+    ...capabilityActionRecords(inventoryItems),
+  ];
+  if (hasTalentNamed("Technical Knock") && context.rangedWeapons.length) {
+    records.push({
+      id: "talent-clear-jam",
+      name: "Clear Weapon Jam",
+      group: "Utility",
+      type: "Half Action",
+      subtypes: ["Miscellaneous"],
+      summary: "Use Technical Knock to clear a jam as a Half Action instead of a Full Action.",
+      source: "Technical Knock talent; Core Rulebook combat rules",
+      context: context.rangedWeapons.map((weapon) => weapon.name).join(", "),
+      available: true,
+      unavailableReason: "",
+      test: actionTestRecord("ballisticSkill", 0),
+    });
+  }
+  const groupOrder = new Map(actionGroups.map((group, index) => [group, index]));
+  return records.sort((a, b) => (groupOrder.get(a.group) ?? 99) - (groupOrder.get(b.group) ?? 99) || a.name.localeCompare(b.name));
+}
+
+function serialisableCharacterActions(actions = derivedCharacterActions()) {
+  return actions.map((record) => ({
+    id: record.id,
+    name: record.name,
+    group: record.group,
+    actionType: record.type,
+    subtypes: record.subtypes || [],
+    summary: record.summary,
+    source: record.source,
+    context: record.context,
+    available: Boolean(record.available),
+    unavailableReason: record.unavailableReason || record.reason || "",
+    test: record.test ? { ...record.test } : null,
+  }));
+}
+
+function resolvedActionTest(test, situationalModifier = 0) {
+  const actionModifier = Number(test?.actionModifier || 0);
+  const situational = Number(situationalModifier || 0);
+  const combinedModifier = Math.max(-60, Math.min(60, actionModifier + situational));
+  return {
+    baseTarget: Number(test?.baseTarget || 0),
+    actionModifier,
+    situationalModifier: situational,
+    combinedModifier,
+    target: Number(test?.baseTarget || 0) + combinedModifier,
+  };
+}
+
+function testOutcome(roll, target) {
+  const success = roll === 1 || (roll !== 100 && roll <= target);
+  const targetTens = Math.floor(target / 10);
+  const rollTens = Math.floor(roll / 10);
+  const degrees = success
+    ? Math.max(1, 1 + targetTens - rollTens)
+    : Math.max(1, 1 + rollTens - targetTens);
+  return { success, degrees, label: `${degrees} Degree${degrees === 1 ? "" : "s"} of ${success ? "Success" : "Failure"}` };
+}
+
+function attackHitCount(test, degrees) {
+  const cap = test?.hitMode === "semi" || test?.hitMode === "suppressing"
+    ? Number(test.rateOfFire?.burst || 1)
+    : test?.hitMode === "full"
+      ? Number(test.rateOfFire?.full || 1)
+      : ["swift", "lightning"].includes(test?.hitMode)
+        ? Math.max(1, characteristicBonus("weaponSkill"))
+        : 1;
+  if (test?.hitMode === "semi" || test?.hitMode === "suppressing" || test?.hitMode === "swift") return Math.min(cap, 1 + Math.floor((degrees - 1) / 2));
+  if (test?.hitMode === "full" || test?.hitMode === "lightning") return Math.min(cap, degrees);
+  return 1;
+}
+
+function attackHitLocation(roll) {
+  if (roll === 100) return "Left Leg";
+  const reversed = Number(String(roll).padStart(2, "0").split("").reverse().join(""));
+  if (reversed <= 10) return "Head";
+  if (reversed <= 20) return "Right Arm";
+  if (reversed <= 30) return "Left Arm";
+  if (reversed <= 70) return "Body";
+  if (reversed <= 85) return "Right Leg";
+  return "Left Leg";
+}
+
 function expandSpecialistGrantOption(option) {
   const cleaned = option.replace(/^.*?·\s*Gain\s+/i, "").replace(/\.$/, "").trim();
   if (/^one\s+alien\s+language$/i.test(cleaned)) {
@@ -3503,7 +3963,7 @@ function applyRuleHighlights() {
   while (walker.nextNode()) nodes.push(walker.currentNode);
   for (const node of nodes) {
     if (!node.nodeValue?.trim()) continue;
-    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term,.review-characteristics,.review-meta,.xp-ledger,.loadout-panel,.validation-panel,.review-section-heading,.inventory-item-identity,.review-sections strong,.review-sections h1,.review-sections h2,.review-sections h3")) continue;
+    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term,.review-characteristics,.review-meta,.xp-ledger,.loadout-panel,.validation-panel,.review-section-heading,.inventory-item-identity,.action-card,.review-sections strong,.review-sections h1,.review-sections h2,.review-sections h3")) continue;
     const matches = [...node.nodeValue.matchAll(pattern)];
     if (!matches.length) continue;
     const fragment = document.createDocumentFragment();
@@ -3944,6 +4404,50 @@ function wireRosterEvents() {
   });
 }
 
+function renderActionIndex(actions) {
+  if (!actionGroups.includes(actionIndexState.group)) actionIndexState.group = "All";
+  const query = actionIndexState.query.trim().toLowerCase();
+  const initiallyVisible = (action) => (
+    (actionIndexState.group === "All" || action.group === actionIndexState.group)
+    && (action.available || actionIndexState.showUnavailable)
+    && (!query || [action.name, action.group, action.type, action.summary, action.context, ...(action.subtypes || [])].join(" ").toLowerCase().includes(query))
+  );
+  const initialVisibleCount = actions.filter(initiallyVisible).length;
+  const availableCount = actions.filter((action) => action.available).length;
+  const unavailableCount = actions.length - availableCount;
+  const carriedWeaponActions = actions.filter((action) => /carried but not readied/i.test(action.unavailableReason || "")).length;
+  currentActionRecords.clear();
+  actions.forEach((action) => currentActionRecords.set(action.id, action));
+  return `<section class="review-actions-index" aria-labelledby="current-actions-title">
+    <div class="review-section-heading action-index-heading">
+      <div>
+        <h3 id="current-actions-title">Current Actions and Abilities</h3>
+        <p>Derived from this Acolyte's characteristics, training, readied weapons, inventory, psychic powers, and special rules.</p>
+      </div>
+      <div class="action-index-counts" aria-label="Action availability"><strong>${availableCount}</strong><span>available</span>${unavailableCount ? `<em>${unavailableCount} conditional</em>` : ""}</div>
+    </div>
+    <div class="action-index-controls">
+      <label class="action-search"><span>Search actions</span><input id="action-search" type="search" value="${escapeHtmlAttribute(actionIndexState.query)}" placeholder="Attack, Dodge, Tech-Use…" autocomplete="off" /></label>
+      <div class="action-filter-list" role="group" aria-label="Filter actions">${actionGroups.map((group) => `<button class="compact-button ${actionIndexState.group === group ? "active" : ""}" type="button" data-action-group="${group}" aria-pressed="${actionIndexState.group === group}">${group}</button>`).join("")}</div>
+      <label class="show-unavailable"><input id="show-unavailable-actions" type="checkbox" ${actionIndexState.showUnavailable ? "checked" : ""} /><span>Show unavailable options</span></label>
+    </div>
+    ${carriedWeaponActions ? `<p class="action-index-notice">Owned weapons do not add attack buttons until they are marked <strong>Readied</strong> in Inventory. Conditional attack modes remain available through “Show unavailable options.”</p>` : ""}
+    <div class="action-card-grid" id="action-card-grid">${actions.map((action) => {
+      const search = [action.name, action.group, action.type, action.summary, action.context, ...(action.subtypes || [])].join(" ").toLowerCase();
+      const initiallyHidden = !initiallyVisible(action);
+      const preview = action.test ? resolvedActionTest(action.test) : null;
+      return `<article class="action-card ${action.available ? "available" : "unavailable"}" data-action-card data-action-id="${escapeHtmlAttribute(action.id)}" data-action-group-value="${escapeHtmlAttribute(action.group)}" data-action-search="${escapeHtmlAttribute(search)}" data-action-available="${action.available}" ${initiallyHidden ? "hidden" : ""}>
+        <header><div><span>${escapeHtmlAttribute(action.group)}</span><h4>${escapeHtmlAttribute(action.name)}</h4></div><em>${escapeHtmlAttribute(action.type)}</em></header>
+        <p>${escapeHtmlAttribute(action.summary)}</p>
+        <div class="action-context">${escapeHtmlAttribute(action.available ? action.context || "Available now" : action.unavailableReason || "Requirements are not met.")}</div>
+        ${preview ? `<div class="action-test-preview"><span>${escapeHtmlAttribute(action.test.characteristicName)}</span><strong>Target ${preview.target}</strong>${preview.actionModifier ? `<em>${preview.actionModifier > 0 ? "+" : ""}${preview.actionModifier} action modifier</em>` : ""}</div>` : ""}
+        <footer><small>${escapeHtmlAttribute(action.source || actionSource)}</small><button class="compact-button" type="button" data-open-action="${escapeHtmlAttribute(action.id)}" ${action.available ? "" : "disabled"}>${action.test ? "Roll Test" : "Details"}</button></footer>
+      </article>`;
+    }).join("")}</div>
+    <p class="action-empty" id="action-empty" ${initialVisibleCount ? "hidden" : ""}>No available actions match these filters. Change the filter or show unavailable options to inspect unmet requirements.</p>
+  </section>`;
+}
+
 function renderReview() {
   sheetDetailRecords.clear();
   sheetDetailCounter = 0;
@@ -3962,6 +4466,7 @@ function renderReview() {
   const psychicPowers = character.advances.psychicPowers.filter((entry) => entry?.name);
   const eliteAdvances = [...automaticEliteAdvances(), ...character.advances.eliteAdvances.filter((entry) => entry?.name)];
   const equipmentState = equipmentRulesState(inventoryItems);
+  const currentActions = derivedCharacterActions(inventoryItems);
   const grantedEquipment = resolvedGrantedEquipment();
   const unlinkedGrantedEquipment = character.equipment.unlinkedCharacterCreationGrants || [];
   const xpLedger = [
@@ -4035,6 +4540,7 @@ function renderReview() {
             <h3>Aptitudes</h3>
             <div class="tag-list final">${resolvedAptitudes().aptitudes.map((aptitude) => `<span>${aptitude}</span>`).join("")}</div>
           </section>
+          ${renderActionIndex(currentActions)}
           <section class="review-talents-section">
             <h3>Talents</h3>
             <div class="dossier-list">${[
@@ -4279,6 +4785,27 @@ function render() {
       <p id="sheet-detail-summary"></p>
       <dl class="sheet-detail-profile" id="sheet-detail-profile"></dl>
       <p class="source-note" id="sheet-detail-source"></p>
+    </dialog>
+
+    <dialog id="action-dialog" class="action-dialog" aria-labelledby="action-dialog-title">
+      <button class="dialog-close" aria-label="Close action">×</button>
+      <p class="eyebrow" id="action-dialog-kind">Current Action</p>
+      <h2 id="action-dialog-title">Action details</h2>
+      <div class="action-dialog-tags" id="action-dialog-tags"></div>
+      <p id="action-dialog-summary"></p>
+      <p class="action-dialog-context" id="action-dialog-context"></p>
+      <div class="action-roll-panel" id="action-roll-panel" hidden>
+        <div class="action-roll-equation">
+          <span><small>Base</small><strong id="action-roll-base">0</strong></span>
+          <span><small>Action</small><strong id="action-roll-action-mod">+0</strong></span>
+          <label><small>Situation</small><select id="action-roll-situation" aria-label="Situational test modifier">${[60,50,40,30,20,10,0,-10,-20,-30,-40,-50,-60].map((modifier) => `<option value="${modifier}" ${modifier === 0 ? "selected" : ""}>${modifier > 0 ? "+" : ""}${modifier}</option>`).join("")}</select></label>
+          <span class="action-roll-target"><small>Target</small><strong id="action-roll-target">0</strong></span>
+        </div>
+        <p class="action-roll-note">Set only the situational modifier supplied by the GM. The action and training modifiers are already included.</p>
+        <button class="primary-button" id="execute-action-roll" type="button">Roll d100 <span>›</span></button>
+        <div class="action-roll-result" id="action-roll-result" role="status" aria-live="polite"></div>
+      </div>
+      <p class="source-note" id="action-dialog-source"></p>
     </dialog>`;
 
   wireEvents();
@@ -4292,6 +4819,105 @@ function render() {
       focusTarget?.focus({ preventScroll: true });
     }
   });
+}
+
+function filterReviewActionCards() {
+  const query = actionIndexState.query.trim().toLowerCase();
+  let visible = 0;
+  document.querySelectorAll("[data-action-card]").forEach((card) => {
+    const groupMatches = actionIndexState.group === "All" || card.dataset.actionGroupValue === actionIndexState.group;
+    const availabilityMatches = actionIndexState.showUnavailable || card.dataset.actionAvailable === "true";
+    const searchMatches = !query || card.dataset.actionSearch.includes(query);
+    card.hidden = !(groupMatches && availabilityMatches && searchMatches);
+    if (!card.hidden) visible += 1;
+  });
+  const empty = document.querySelector("#action-empty");
+  if (empty) empty.hidden = visible > 0;
+}
+
+function signedNumber(value) {
+  const number = Number(value || 0);
+  return `${number > 0 ? "+" : ""}${number}`;
+}
+
+function refreshActionRollTarget() {
+  const dialog = document.querySelector("#action-dialog");
+  const action = currentActionRecords.get(dialog?.dataset.actionId || "");
+  if (!action?.test) return;
+  const situation = Number(document.querySelector("#action-roll-situation")?.value || 0);
+  const resolved = resolvedActionTest(action.test, situation);
+  document.querySelector("#action-roll-base").textContent = resolved.baseTarget;
+  document.querySelector("#action-roll-action-mod").textContent = signedNumber(resolved.actionModifier);
+  document.querySelector("#action-roll-target").textContent = resolved.target;
+}
+
+function openActionDialog(actionId) {
+  const action = currentActionRecords.get(actionId);
+  const dialog = document.querySelector("#action-dialog");
+  if (!action || !dialog) return;
+  dialog.dataset.actionId = action.id;
+  dialog.querySelector("#action-dialog-kind").textContent = action.group;
+  dialog.querySelector("#action-dialog-title").textContent = action.name;
+  dialog.querySelector("#action-dialog-summary").textContent = action.summary;
+  dialog.querySelector("#action-dialog-context").textContent = action.context || "Available now.";
+  dialog.querySelector("#action-dialog-source").textContent = `Source: ${action.source || actionSource}`;
+  dialog.querySelector("#action-dialog-tags").innerHTML = [action.type, ...(action.subtypes || [])].map((tag) => `<span>${escapeHtmlAttribute(tag)}</span>`).join("");
+  const rollPanel = dialog.querySelector("#action-roll-panel");
+  rollPanel.hidden = !action.test;
+  dialog.querySelector("#action-roll-situation").value = "0";
+  dialog.querySelector("#action-roll-result").replaceChildren();
+  if (action.test) refreshActionRollTarget();
+  dialog.showModal();
+}
+
+async function rollWeaponDamage(action, targetElement) {
+  const weapon = equipmentItem(action.test?.weaponId);
+  if (!weapon || !targetElement) return;
+  const formula = String(weapon.profile?.damage || "");
+  const match = formula.match(/(\d+)d(10|5)\s*([+-]\s*\d+)?/i);
+  if (!match) {
+    targetElement.insertAdjacentHTML("beforeend", `<p class="action-roll-caveat">Damage formula could not be resolved automatically: ${escapeHtmlAttribute(formula || "not recorded")}.</p>`);
+    return;
+  }
+  const baseDice = Number(match[1]);
+  const sides = Number(match[2]);
+  const fixed = Number(String(match[3] || "0").replace(/\s/g, ""));
+  const tearing = Boolean(weapon.profile?.special?.tearing);
+  const rolled = await rollVisualDice(baseDice + (tearing ? 1 : 0), sides);
+  const kept = tearing ? [...rolled].sort((a, b) => b - a).slice(0, baseDice) : rolled;
+  const primitive = Number(weapon.profile?.special?.primitive || 0);
+  const adjusted = primitive ? kept.map((die) => Math.min(die, primitive)) : kept;
+  const strength = weaponIsMelee(weapon) ? characteristicBonus("strength") : 0;
+  const total = Math.max(0, adjusted.reduce((sum, die) => sum + die, 0) + fixed + strength);
+  const qualities = specialSummary(weapon.profile?.special || {});
+  targetElement.insertAdjacentHTML("beforeend", `<div class="action-damage-result"><strong>${total} ${escapeHtmlAttribute(weapon.profile?.damageType || "Damage")}</strong><span>${escapeHtmlAttribute(`${formula}${strength ? ` + SB ${strength}` : ""}`)} · Pen ${escapeHtmlAttribute(String(weapon.profile?.penetration ?? 0))}</span>${qualities ? `<small>${escapeHtmlAttribute(qualities)}</small>` : ""}<em>Raw damage before the target applies Armour, Toughness, and other defences.</em></div>`);
+}
+
+async function executeCurrentActionRoll() {
+  const dialog = document.querySelector("#action-dialog");
+  const action = currentActionRecords.get(dialog?.dataset.actionId || "");
+  if (!action?.test) return;
+  const button = document.querySelector("#execute-action-roll");
+  button.disabled = true;
+  try {
+    const situation = Number(document.querySelector("#action-roll-situation")?.value || 0);
+    const resolved = resolvedActionTest(action.test, situation);
+    const [roll] = await rollVisualDice(1, 100);
+    const outcome = testOutcome(roll, resolved.target);
+    const result = document.querySelector("#action-roll-result");
+    const attack = action.test.weaponId || action.test.unarmed || action.test.hitMode;
+    const hitCount = attack && outcome.success ? attackHitCount(action.test, outcome.degrees) : 0;
+    const location = attack && outcome.success ? (action.test.calledShot ? "Declared location" : attackHitLocation(roll)) : "";
+    const jamThreshold = ["semi", "full", "suppressing"].includes(action.test.hitMode) ? 94 : 96;
+    const possibleJam = Boolean(action.test.weaponId && weaponIsRanged(equipmentItem(action.test.weaponId)) && roll >= jamThreshold);
+    result.innerHTML = `<div class="action-outcome ${outcome.success && !possibleJam ? "success" : "failure"}"><strong>${roll} - ${outcome.success && !possibleJam ? "Success" : possibleJam ? "Possible weapon jam" : "Failure"}</strong><span>Target ${resolved.target} · ${outcome.label}</span>${hitCount ? `<span>${hitCount} hit${hitCount === 1 ? "" : "s"}${location ? ` · ${location}` : ""}</span>` : ""}${possibleJam ? `<em>The roll reached this fire mode's jam threshold. Apply the weapon's Reliable, Unreliable, or other relevant qualities.</em>` : ""}</div>${action.test.weaponId && outcome.success && !possibleJam ? `<button class="compact-button roll-action-damage" type="button">Roll first hit damage</button>` : ""}`;
+    result.querySelector(".roll-action-damage")?.addEventListener("click", async (event) => {
+      event.currentTarget.disabled = true;
+      await rollWeaponDamage(action, result);
+    });
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function wireEvents() {
@@ -4315,6 +4941,39 @@ function wireEvents() {
     document.querySelector("#text-size-value").textContent = `${Math.round(textScale * 100)}%`;
     applyTextScale();
   });
+
+  document.querySelector("#action-search")?.addEventListener("input", (event) => {
+    actionIndexState.query = event.target.value;
+    localStorage.setItem("dh2-action-query", actionIndexState.query);
+    filterReviewActionCards();
+  });
+  document.querySelectorAll("[data-action-group]").forEach((button) => {
+    button.addEventListener("click", () => {
+      actionIndexState.group = button.dataset.actionGroup;
+      localStorage.setItem("dh2-action-group", actionIndexState.group);
+      document.querySelectorAll("[data-action-group]").forEach((entry) => {
+        const active = entry === button;
+        entry.classList.toggle("active", active);
+        entry.setAttribute("aria-pressed", String(active));
+      });
+      filterReviewActionCards();
+    });
+  });
+  document.querySelector("#show-unavailable-actions")?.addEventListener("change", (event) => {
+    actionIndexState.showUnavailable = event.target.checked;
+    localStorage.setItem("dh2-action-show-unavailable", String(actionIndexState.showUnavailable));
+    filterReviewActionCards();
+  });
+  document.querySelectorAll("[data-open-action]").forEach((button) => {
+    button.addEventListener("click", () => openActionDialog(button.dataset.openAction));
+  });
+  const actionDialog = document.querySelector("#action-dialog");
+  actionDialog?.querySelector(".dialog-close")?.addEventListener("click", () => actionDialog.close());
+  actionDialog?.addEventListener("click", (event) => {
+    if (event.target === actionDialog) actionDialog.close();
+  });
+  document.querySelector("#action-roll-situation")?.addEventListener("change", refreshActionRollTarget);
+  document.querySelector("#execute-action-roll")?.addEventListener("click", executeCurrentActionRoll);
 
   document.querySelector("#sound-toggle").addEventListener("click", async () => {
     try {
@@ -4808,6 +5467,7 @@ function wireEvents() {
           }),
         ],
         eliteAdvances: [...automaticEliteAdvances(), ...character.advances.eliteAdvances],
+        actions: serialisableCharacterActions(),
         xpSpent: xpSpent(),
       },
     });
@@ -4915,6 +5575,7 @@ function wireEvents() {
           format: "mrkeathley-dark-heresy-2nd",
           schemaVersion: 2,
           source: character,
+          derivedActions: serialisableCharacterActions(),
         },
       },
     });
