@@ -776,6 +776,20 @@ function applyTextScale(scope = root) {
     ".calculation-note",
     ".review-meta",
     ".review-skill-label",
+    ".action-index-counts",
+    ".action-index-counts span",
+    ".action-index-counts em",
+    ".action-search span",
+    ".action-filter-list button",
+    ".action-filter-list button > span",
+    ".show-unavailable",
+    ".action-index-notice",
+    ".action-group-tag",
+    ".action-group-tag > span",
+    ".action-type-caption",
+    ".action-context",
+    ".action-test-preview",
+    ".action-card footer small",
     ".dossier-list strong",
     ".dossier-list span",
     ".dossier-list em",
@@ -4669,6 +4683,47 @@ function wireRosterEvents() {
   });
 }
 
+function actionGroupKey(group = "") {
+  return String(group).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "other";
+}
+
+function actionTypePresentation(type = "") {
+  const value = String(type).toLowerCase();
+  if (value.includes("reaction")) return { key: "reaction", short: "React" };
+  if (value.includes("extended")) return { key: "extended", short: "Extended" };
+  if (value.includes("half") && value.includes("full")) return { key: "variable", short: "Half / Full" };
+  if (value.includes("full")) return { key: "full", short: "Full" };
+  if (value.includes("half")) return { key: "half", short: "Half" };
+  if (value.includes("free")) return { key: "free", short: "Free" };
+  if (value.includes("talent") || value.includes("trait") || value.includes("ability")) return { key: "passive", short: "Ability" };
+  return { key: "variable", short: "Varies" };
+}
+
+function actionTypeGlyph(kind) {
+  const common = 'viewBox="0 0 24 24" aria-hidden="true" focusable="false"';
+  if (kind === "reaction") return `<svg ${common}><path class="glyph-ring" d="M19.7 8.7A8.5 8.5 0 1 0 20 14"/><path class="glyph-strong" d="m16.2 4.8 3.9 3.9-5.3 1.1"/><path class="glyph-fine" d="M7.3 12h9.4M12 7.3v9.4"/><circle class="glyph-core" cx="12" cy="12" r="2.1"/></svg>`;
+  if (kind === "extended") return `<svg ${common}><path class="glyph-ring" d="M5 3h14M5 21h14"/><path class="glyph-strong" d="M7 4.5c0 4 5 4.2 5 7.5s-5 3.5-5 7.5M17 4.5c0 4-5 4.2-5 7.5s5 3.5 5 7.5"/><path class="glyph-fine" d="M9.2 8.2h5.6M9 17h6"/></svg>`;
+  if (kind === "full") return `<svg ${common}><circle class="glyph-ring" cx="12" cy="12" r="8.5"/><path class="glyph-strong" d="m12 5 5 7-5 7-5-7z"/><path class="glyph-fine" d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`;
+  if (kind === "half") return `<svg ${common}><circle class="glyph-ring" cx="12" cy="12" r="8.5"/><path class="glyph-fill" d="M12 3.5a8.5 8.5 0 0 0 0 17z"/><path class="glyph-strong" d="M12 6v12"/><path class="glyph-fine" d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`;
+  if (kind === "free") return `<svg ${common}><path class="glyph-ring" d="M18.5 7.2A8.5 8.5 0 1 0 19.7 15"/><path class="glyph-strong" d="m13 3-5 9h4l-1 9 6-11h-4z"/></svg>`;
+  if (kind === "passive") return `<svg ${common}><path class="glyph-ring" d="m12 2.8 7.5 4.4v9.6L12 21.2l-7.5-4.4V7.2z"/><path class="glyph-strong" d="m12 6 3.8 6-3.8 6-3.8-6z"/><circle class="glyph-core" cx="12" cy="12" r="1.7"/></svg>`;
+  return `<svg ${common}><circle class="glyph-ring" cx="12" cy="12" r="8.5"/><path class="glyph-strong" d="M7 8.2 12 12l-5 3.8M17 8.2 12 12l5 3.8"/><circle class="glyph-core" cx="12" cy="12" r="1.8"/></svg>`;
+}
+
+function actionGroupGlyph(group) {
+  const key = actionGroupKey(group);
+  const common = 'viewBox="0 0 16 16" aria-hidden="true" focusable="false"';
+  if (key === "attacks") return `<svg ${common}><circle cx="8" cy="8" r="5"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/><circle class="group-core" cx="8" cy="8" r="1.3"/></svg>`;
+  if (key === "movement") return `<svg ${common}><path d="M2 11.5h7.5M7.5 8l3.5 3.5L7.5 15M5 5h7M9.5 1.5 13 5 9.5 8.5"/></svg>`;
+  if (key === "reactions") return `<svg ${common}><path d="M12.7 6.2A5.4 5.4 0 1 0 13 10"/><path d="m10.3 3.5 3 2.7-3.8.8"/></svg>`;
+  if (key === "psychic") return `<svg ${common}><path d="M8 1.2 9.7 6 14.8 8l-5.1 2L8 14.8 6.3 10 1.2 8l5.1-2z"/><circle class="group-core" cx="8" cy="8" r="1.4"/></svg>`;
+  if (key === "skills") return `<svg ${common}><path d="M3 8.3 6.4 12 13 4"/><path d="M2 2h12v12H2z"/></svg>`;
+  if (key === "utility") return `<svg ${common}><path d="M10.5 2.2a3.5 3.5 0 0 0-3.9 4.9L2 11.7 4.3 14l4.6-4.6a3.5 3.5 0 0 0 4.9-3.9l-2.2 2.2-2.3-.9-.9-2.3z"/></svg>`;
+  if (key === "tactical") return `<svg ${common}><path d="m2 11 6-8 6 8-6 3z"/><path d="M8 3v11M4.8 7.3h6.4"/></svg>`;
+  if (key === "abilities") return `<svg ${common}><path d="m8 1.5 5.5 3.2v6.6L8 14.5l-5.5-3.2V4.7z"/><path d="M5.5 8h5M8 5.5v5"/></svg>`;
+  return `<svg ${common}><circle cx="8" cy="8" r="5.5"/><circle class="group-core" cx="8" cy="8" r="1.3"/></svg>`;
+}
+
 function renderActionIndex(actions) {
   if (!actionGroups.includes(actionIndexState.group)) actionIndexState.group = "All";
   const query = actionIndexState.query.trim().toLowerCase();
@@ -4693,7 +4748,7 @@ function renderActionIndex(actions) {
     </div>
     <div class="action-index-controls">
       <label class="action-search"><span>Search actions</span><input id="action-search" type="search" value="${escapeHtmlAttribute(actionIndexState.query)}" placeholder="Attack, Dodge, Tech-Use…" autocomplete="off" /></label>
-      <div class="action-filter-list" role="group" aria-label="Filter actions">${actionGroups.map((group) => `<button class="compact-button ${actionIndexState.group === group ? "active" : ""}" type="button" data-action-group="${group}" aria-pressed="${actionIndexState.group === group}">${group}</button>`).join("")}</div>
+      <div class="action-filter-list" role="group" aria-label="Filter actions">${actionGroups.map((group) => `<button class="compact-button ${actionIndexState.group === group ? "active" : ""}" type="button" data-action-group="${group}" aria-pressed="${actionIndexState.group === group}">${actionGroupGlyph(group)}<span>${group}</span></button>`).join("")}</div>
       <label class="show-unavailable"><input id="show-unavailable-actions" type="checkbox" ${actionIndexState.showUnavailable ? "checked" : ""} /><span>Show unavailable options</span></label>
     </div>
     ${carriedWeaponActions ? `<p class="action-index-notice">Owned weapons do not add attack buttons until they are marked <strong>Readied</strong> in Inventory. Conditional attack modes remain available through “Show unavailable options.”</p>` : ""}
@@ -4701,8 +4756,16 @@ function renderActionIndex(actions) {
       const search = [action.name, action.group, action.type, action.summary, action.context, ...(action.subtypes || [])].join(" ").toLowerCase();
       const initiallyHidden = !initiallyVisible(action);
       const preview = action.test ? resolvedActionTest(action.test) : null;
-      return `<article class="action-card ${action.available ? "available" : "unavailable"}" data-action-card data-action-id="${escapeHtmlAttribute(action.id)}" data-action-group-value="${escapeHtmlAttribute(action.group)}" data-action-search="${escapeHtmlAttribute(search)}" data-action-available="${action.available}" ${initiallyHidden ? "hidden" : ""}>
-        <header><div><span>${escapeHtmlAttribute(action.group)}</span><h4>${escapeHtmlAttribute(action.name)}</h4></div><em>${escapeHtmlAttribute(action.type)}</em></header>
+      const typePresentation = actionTypePresentation(action.type);
+      const groupKey = actionGroupKey(action.group);
+      return `<article class="action-card action-group-${groupKey} action-type-${typePresentation.key} ${action.available ? "available" : "unavailable"}" data-action-card data-action-id="${escapeHtmlAttribute(action.id)}" data-action-group-value="${escapeHtmlAttribute(action.group)}" data-action-search="${escapeHtmlAttribute(search)}" data-action-available="${action.available}" ${initiallyHidden ? "hidden" : ""}>
+        <header>
+          <div class="action-identity">
+            <span class="action-group-tag">${actionGroupGlyph(action.group)}<span>${escapeHtmlAttribute(action.group)}</span></span>
+            <h4>${escapeHtmlAttribute(action.name)}</h4>
+          </div>
+          <span class="action-type-badge" role="img" aria-label="Action type: ${escapeHtmlAttribute(action.type)}" title="${escapeHtmlAttribute(action.type)}">${actionTypeGlyph(typePresentation.key)}<span class="action-type-caption">${escapeHtmlAttribute(typePresentation.short)}</span></span>
+        </header>
         <p>${escapeHtmlAttribute(action.summary)}</p>
         <div class="action-context">${escapeHtmlAttribute(action.available ? action.context || "Available now" : action.unavailableReason || "Requirements are not met.")}</div>
         ${preview ? `<div class="action-test-preview"><span>${escapeHtmlAttribute(action.test.characteristicName)}</span><strong>Target ${preview.target}</strong>${preview.actionModifier ? `<em>${preview.actionModifier > 0 ? "+" : ""}${preview.actionModifier} action modifier</em>` : ""}</div>` : ""}
@@ -5070,7 +5133,10 @@ function render() {
     <dialog id="action-dialog" class="action-dialog" aria-labelledby="action-dialog-title">
       <button class="dialog-close" aria-label="Close action">×</button>
       <p class="eyebrow" id="action-dialog-kind">Current Action</p>
-      <h2 id="action-dialog-title">Action details</h2>
+      <div class="action-dialog-title-row" id="action-dialog-title-row">
+        <h2 id="action-dialog-title">Action details</h2>
+        <span class="action-type-badge" id="action-dialog-type" role="img" aria-label="Action type"></span>
+      </div>
       <div class="action-dialog-tags" id="action-dialog-tags"></div>
       <p id="action-dialog-summary"></p>
       <p class="action-dialog-context" id="action-dialog-context"></p>
@@ -5141,7 +5207,15 @@ function openActionDialog(actionId) {
   dialog.querySelector("#action-dialog-summary").textContent = action.summary;
   dialog.querySelector("#action-dialog-context").textContent = action.context || "Available now.";
   dialog.querySelector("#action-dialog-source").textContent = `Source: ${action.source || actionSource}`;
-  dialog.querySelector("#action-dialog-tags").innerHTML = [action.type, ...(action.subtypes || [])].map((tag) => `<span>${escapeHtmlAttribute(tag)}</span>`).join("");
+  const typePresentation = actionTypePresentation(action.type);
+  dialog.querySelector("#action-dialog-title-row").className = `action-dialog-title-row action-type-${typePresentation.key}`;
+  const typeBadge = dialog.querySelector("#action-dialog-type");
+  typeBadge.setAttribute("aria-label", `Action type: ${action.type}`);
+  typeBadge.setAttribute("title", action.type);
+  typeBadge.innerHTML = `${actionTypeGlyph(typePresentation.key)}<span class="action-type-caption">${escapeHtmlAttribute(typePresentation.short)}</span>`;
+  const tags = dialog.querySelector("#action-dialog-tags");
+  tags.innerHTML = (action.subtypes || []).map((tag) => `<span>${escapeHtmlAttribute(tag)}</span>`).join("");
+  tags.hidden = !(action.subtypes || []).length;
   const rollPanel = dialog.querySelector("#action-roll-panel");
   rollPanel.hidden = !action.test;
   dialog.querySelector("#action-roll-situation").value = "0";
