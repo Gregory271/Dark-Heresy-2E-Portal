@@ -3075,3 +3075,299 @@ dialog h2,
   }
   .review-skills-list { grid-template-columns: 1fr; }
 }
+
+/* Character-sheet workspace: a persistent DH2 summary wrapped around one
+   task-focused tab, following the clean information rhythm of modern digital
+   character sheets without importing another product's visual assets. */
+.scene-review .management-content { max-width: 1760px; }
+.scene-review .review-layout {
+  grid-template-columns: minmax(0,1fr) 220px;
+  min-height: 0;
+  overflow: hidden;
+}
+.review-dossier {
+  display: grid;
+  grid-template-rows: auto auto auto auto minmax(0,1fr);
+  min-width: 0;
+  overflow: hidden;
+  padding: 15px 16px 16px;
+}
+.review-profile-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+}
+.review-profile-heading > div { min-width: 0; }
+.review-profile-heading .choice-source { margin: 0; color: #f1c779; }
+.review-profile-heading h2 { margin: 2px 0 8px; overflow-wrap: anywhere; }
+.review-record-state {
+  flex: 0 0 auto;
+  margin-bottom: 9px;
+  border: 1px solid rgba(224,184,112,.38);
+  padding: 5px 8px;
+  color: #d8c49e;
+  font: 700 8px "Barlow Condensed",sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.review-sheet-body {
+  display: grid;
+  grid-template-columns: minmax(215px,245px) minmax(0,1fr);
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+.review-summary-rail {
+  display: grid;
+  grid-template-rows: auto minmax(0,1fr);
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+}
+.review-summary-card {
+  display: grid;
+  grid-template-rows: minmax(0,1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid rgba(225,187,118,.25);
+  background: rgba(3,7,7,.72);
+}
+.review-summary-card-body {
+  min-width: 0;
+  min-height: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #a77a3e #090d0c;
+}
+.review-summary-card > h3 {
+  margin: 0;
+  border-top: 1px solid rgba(225,187,118,.25);
+  padding: 6px 9px;
+  color: #f0c878;
+  background: linear-gradient(90deg,rgba(123,78,28,.22),transparent);
+  font: 700 10px "Barlow Condensed",sans-serif;
+  letter-spacing: .11em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.review-summary-card .dossier-list > div {
+  grid-template-columns: minmax(82px,.72fr) minmax(0,1.28fr);
+  gap: 5px;
+  padding: 3px 0;
+}
+.review-summary-card .dossier-list em { grid-column: 1 / -1; text-align: left; }
+.review-summary-card .tag-list { gap: 4px; margin: 0; }
+.review-summary-card .tag-list span { padding: 4px 6px; }
+.review-summary-skills .review-skills-list { grid-template-columns: 1fr; }
+.review-summary-skills .review-skills-list > div {
+  grid-template-columns: minmax(0,1fr);
+  gap: 3px 7px;
+  padding: 5px 0;
+}
+.review-summary-skills .review-skills-list > div > * { grid-column: 1; }
+.review-summary-skills .review-skill-label {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.review-workspace {
+  display: grid;
+  grid-template-rows: auto minmax(0,1fr);
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid rgba(225,187,118,.28);
+  background: rgba(2,5,5,.63);
+}
+.review-workspace-tabs {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  border-bottom: 1px solid rgba(225,187,118,.27);
+  padding: 0 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.review-workspace-tabs button {
+  flex: 0 0 auto;
+  min-height: 41px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 8px 10px 5px;
+  background: transparent;
+  color: #aaa69d;
+  font: 700 9px "Barlow Condensed",sans-serif;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.review-workspace-tabs button:hover,
+.review-workspace-tabs button:focus-visible { color: #f1dfbd; background: rgba(144,91,33,.13); }
+.review-workspace-tabs button.active { border-bottom-color: #d79a4d; color: #fff0d1; background: linear-gradient(180deg,rgba(171,105,36,.12),transparent); }
+.review-tab-select { display: none; }
+.review-tab-panels {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+}
+.review-tab-panel {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 9px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #a77a3e #090d0c;
+}
+.review-tab-panel[hidden] { display: none; }
+.review-tab-panels > .review-tab-panel > section,
+.review-feature-grid > section,
+.review-background-grid > section {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid rgba(255,255,255,.11);
+  padding: 11px;
+  background: rgba(3,6,6,.38);
+}
+.review-tab-panels h3,
+.review-feature-grid h3,
+.review-background-grid h3 {
+  margin: 0 0 8px;
+  color: #edc77f;
+  font: 600 17px "CaslonAntique","Barlow Condensed",sans-serif;
+  letter-spacing: .035em;
+}
+.review-tab-panel .review-actions-index { grid-column: auto; }
+.review-feature-grid,
+.review-background-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 9px;
+  align-items: start;
+}
+.review-feature-grid .review-elites-section { grid-column: 1 / -1; }
+.review-feature-grid .review-aptitudes-section { grid-column: 1 / -1; }
+.review-tab-panel .review-talents-section .dossier-list,
+.review-tab-panel .review-abilities-section .dossier-list { grid-template-columns: 1fr; }
+.review-tab-panel .review-skills-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.review-tab-panel .review-skills-list > div {
+  grid-template-columns: minmax(120px,.8fr) minmax(120px,1.2fr) minmax(90px,auto);
+}
+.review-tab-panel .inventory-list { max-height: none; overflow: visible; }
+.review-tab-panel .action-card-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.review-tab-panel .action-index-controls { grid-template-columns: minmax(0,1fr); align-items: stretch; }
+.review-tab-panel .action-filter-list { align-items: stretch; }
+.review-tab-panel .show-unavailable { white-space: normal; }
+.validation-panel {
+  padding: 16px;
+  background: rgba(4,7,7,.78);
+}
+.validation-panel h2 { margin: 0 0 8px; color: #f0c878; font-size: 24px; }
+
+html[data-text-size="extra-large"] .review-sheet-body { grid-template-columns: 1fr; }
+html[data-text-size="extra-large"] .review-summary-rail { display: none; }
+html[data-text-size="extra-large"] .scene-review .management-content {
+  display: block;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+html[data-text-size="extra-large"] .scene-review .review-layout {
+  grid-template-columns: minmax(0,1fr);
+  height: auto;
+  overflow: visible;
+}
+html[data-text-size="extra-large"] .review-dossier { display: block; overflow: visible; }
+html[data-text-size="extra-large"] .review-workspace { display: block; }
+html[data-text-size="extra-large"] .review-tab-panels { overflow: visible; }
+html[data-text-size="extra-large"] .review-tab-panel { height: auto; min-height: 520px; overflow: visible; }
+html[data-text-size="extra-large"] .scene-review .validation-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  border-left: 0;
+  overflow: visible;
+}
+html[data-text-size="extra-large"] .scene-review .validation-panel .export-status { grid-column: 1; }
+html[data-text-size="extra-large"] .review-tab-panel .action-card-grid,
+html[data-text-size="extra-large"] .review-feature-grid,
+html[data-text-size="extra-large"] .review-background-grid,
+html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-template-columns: 1fr; }
+
+@media (max-width: 1180px) {
+  .scene-review .review-layout { grid-template-columns: 1fr; grid-template-rows: minmax(0,1fr) auto; }
+  .scene-review .validation-panel {
+    display: grid;
+    grid-template-columns: auto minmax(150px,1fr) repeat(3,minmax(150px,220px));
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    padding: 8px 12px;
+    overflow-x: auto;
+  }
+  .scene-review .validation-panel h2 { margin: 0; }
+  .scene-review .validation-panel button { margin: 0; }
+  .scene-review .validation-panel .warning,
+  .scene-review .validation-panel .valid { margin: 0; }
+  .scene-review .validation-panel .export-status { grid-column: 1 / -1; }
+  .review-sheet-body { grid-template-columns: minmax(205px,230px) minmax(0,1fr); }
+  html[data-text-size="extra-large"] .scene-review .validation-panel { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 800px) {
+  .scene-review .review-layout { display: block; overflow: visible; }
+  .review-dossier { display: block; padding: 12px; overflow: visible; }
+  .review-profile-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .review-record-state { margin-bottom: 7px; }
+  .review-sheet-body { display: block; }
+  .review-summary-rail { display: grid; grid-template-columns: 1fr; grid-template-rows: auto; margin-bottom: 10px; }
+  .review-summary-skills { display: none; }
+  .review-summary-card-body { overflow: visible; }
+  .review-workspace { display: block; }
+  .review-workspace-tabs { display: none; }
+  .review-tab-select {
+    display: grid;
+    gap: 5px;
+    border-bottom: 1px solid rgba(225,187,118,.27);
+    padding: 10px;
+    color: #d9bf8b;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .review-tab-select select { width: 100%; min-height: 48px; }
+  .review-tab-panels { overflow: visible; }
+  .review-tab-panel { height: auto; padding: 9px; overflow: visible; }
+  .review-feature-grid,
+  .review-background-grid,
+  .review-tab-panel .review-skills-list,
+  .review-tab-panel .action-card-grid { grid-template-columns: 1fr; }
+  .scene-review .validation-panel {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 10px;
+    overflow: visible;
+  }
+  .scene-review .validation-panel .export-status { grid-column: 1; }
+}
+
+@media (max-width: 520px) {
+  .review-summary-rail { grid-template-columns: 1fr; }
+  .review-profile-heading h2 { font-size: 20px; }
+  .review-meta { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+  .review-tab-panel .dossier-list > div,
+  .review-tab-panel .review-skills-list > div,
+  .review-tab-panel .inventory-list > .sheet-entry { grid-template-columns: 1fr; }
+  .review-tab-panel .dossier-list .sheet-entry-meta { grid-column: 1; }
+}
