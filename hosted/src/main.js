@@ -141,6 +141,8 @@ function prepareCharacter(input = {}) {
   prepared.conditions ||= { insanity: 0, corruption: 0 };
   prepared.conditions.insanity = Math.max(0, Number(prepared.conditions.insanity || 0));
   prepared.conditions.corruption = Math.max(0, Number(prepared.conditions.corruption || 0));
+  prepared.combat ||= {};
+  prepared.combat.damage = Math.max(0, Number(prepared.combat.damage || 0));
   prepared.psychicFilters ||= { query: "", discipline: "All Powers", showUnavailable: true };
   prepared.psychicShopSelected ||= null;
   prepared.eliteShopSelected ||= null;
@@ -148,7 +150,10 @@ function prepareCharacter(input = {}) {
   prepared.eliteSetup.gmApproved ||= {};
   prepared.talentShopSelected ||= null;
   prepared.talentFilters ||= { query: "", tier: "All" };
-  prepared.xp ||= { starting: 1000 };
+  prepared.xp ||= {};
+  prepared.xp.starting = Number.isFinite(Number(prepared.xp.starting))
+    ? Math.max(0, Number(prepared.xp.starting))
+    : 1000;
   return prepared;
 }
 
@@ -777,6 +782,14 @@ function applyTextScale(scope = root) {
     ".review-characteristics span",
     ".calculation-note",
     ".review-meta",
+    ".review-vital-heading span",
+    ".review-vital-heading small",
+    ".wounds-total small",
+    ".wounds-controls label span",
+    ".wounds-critical",
+    ".armour-location span",
+    ".armour-location small",
+    ".review-armour-card > p",
     ".review-record-state",
     ".review-summary-card > h3",
     ".review-workspace-tabs button",
@@ -1228,6 +1241,16 @@ function resolvedGrantedTalents() {
   return grants;
 }
 
+function paidTalentAdvanceEntries() {
+  const grantedIds = new Set(Object.keys(resolvedGrantedTalents()));
+  const seen = new Set();
+  return character.advances.talents.filter((entry) => {
+    if (!entry?.id || grantedIds.has(entry.id) || seen.has(entry.id)) return false;
+    seen.add(entry.id);
+    return true;
+  });
+}
+
 function talentPrerequisiteStatus(talent) {
   const text = talent.prerequisites || "";
   if (!text) return { missing: [], parsed: true };
@@ -1421,7 +1444,7 @@ function xpSpent() {
       spent += skillAdvanceCosts[matches][index];
     }
   }
-  for (const entry of character.advances.talents) {
+  for (const entry of paidTalentAdvanceEntries()) {
     const talent = talentCatalogue.find((candidate) => candidate.id === entry?.id);
     spent += talent ? talentCost(talent) : Number(entry?.cost || 0);
   }
@@ -1566,6 +1589,7 @@ function resetCreationDataFrom(sceneId) {
     psyRating: 0,
   };
   character.conditions = { insanity: 0, corruption: 0 };
+  character.combat = { damage: 0 };
   character.psychicFilters = { query: "", discipline: "All Powers", showUnavailable: true };
   character.psychicShopSelected = null;
   character.eliteShopSelected = null;
@@ -2088,6 +2112,109 @@ function equipmentRulesState(inventoryItems = []) {
   };
 }
 
+const armourHitLocations = [
+  { id: "head", label: "Head", range: "01–10" },
+  { id: "leftArm", label: "Left Arm", range: "21–30" },
+  { id: "body", label: "Body", range: "31–70" },
+  { id: "rightArm", label: "Right Arm", range: "11–20" },
+  { id: "leftLeg", label: "Left Leg", range: "86–00" },
+  { id: "rightLeg", label: "Right Leg", range: "71–85" },
+];
+
+function armourProtectionState(wornArmour = []) {
+  return armourHitLocations.map((location) => {
+    const layers = wornArmour
+      .map((item) => ({
+        item,
+        armourPoints: Math.max(0, Number(item.profile?.armourPoints?.[location.id] || 0)),
+      }))
+      .filter((entry) => entry.armourPoints > 0)
+      .sort((a, b) => b.armourPoints - a.armourPoints || a.item.name.localeCompare(b.item.name));
+    return {
+      ...location,
+      layers,
+      armourPoints: layers[0]?.armourPoints || 0,
+      effectiveItem: layers[0]?.item || null,
+    };
+  });
+}
+
+function renderReviewArmour(wornArmour = []) {
+  const protection = armourProtectionState(wornArmour);
+  const tiles = protection.map((location) => {
+    const layerRows = location.layers.length
+      ? location.layers.map((entry) => [entry.item.name, `AP ${entry.armourPoints} · ${entry.item.profile?.type || "Armour"}`])
+      : [["Protection", "No worn armour covers this location"]];
+    const detailId = registerSheetDetail({
+      kind: "Armour Location",
+      name: location.label,
+      summary: location.armourPoints
+        ? `${location.effectiveItem.name} provides the highest worn Armour value at this location. Armour Points from separate worn pieces do not add together.`
+        : "No currently worn armour provides Armour Points at this location.",
+      source: "Current inventory and worn-armour state",
+      rows: [["Hit roll", location.range], ["Effective AP", location.armourPoints], ...layerRows],
+    });
+    return `<button type="button" class="armour-location armour-location-${location.id}" data-sheet-detail="${detailId}" title="${escapeHtmlAttribute(`${location.label}: AP ${location.armourPoints}${location.effectiveItem ? ` from ${location.effectiveItem.name}` : ""}`)}">
+      <span>${location.label}</span><strong>${location.armourPoints}</strong><small>AP · ${location.range}</small>
+    </button>`;
+  }).join("");
+  const covered = protection.filter((location) => location.armourPoints > 0).length;
+  return `<section class="review-armour-card" aria-labelledby="review-armour-heading">
+    <div class="review-vital-heading"><div><span>Protection</span><h3 id="review-armour-heading">Armour</h3></div><small>${covered}/6 locations covered</small></div>
+    <div class="armour-diagram" aria-label="Armour Points by hit location">
+      <img src="./public/assets/ui/acolyte-silhouette.svg" alt="" aria-hidden="true" />
+      ${tiles}
+    </div>
+    <p>Highest worn AP shown · Toughness Bonus ${characteristicBonus("toughness")}</p>
+  </section>`;
+}
+
+function woundStatus() {
+  const threshold = Math.max(0, Number(character.wounds?.total || 0));
+  const damage = Math.max(0, Number(character.combat?.damage || 0));
+  return {
+    threshold,
+    damage,
+    remaining: Math.max(0, threshold - damage),
+    critical: Math.max(0, damage - threshold),
+    percentRemaining: threshold ? Math.max(0, Math.min(100, ((threshold - damage) / threshold) * 100)) : 0,
+  };
+}
+
+function renderReviewWounds() {
+  const status = woundStatus();
+  return `<section class="review-wounds-card" aria-labelledby="review-wounds-heading">
+    <div class="review-vital-heading"><div><span>Condition</span><h3 id="review-wounds-heading">Wounds</h3></div><small>Damage counts upward</small></div>
+    <div class="wounds-total"><strong data-wounds-remaining>${status.threshold ? status.remaining : "—"}</strong><span>/ <b data-wounds-threshold>${status.threshold || "—"}</b><small>Remaining / Threshold</small></span></div>
+    <div class="wounds-track" role="img" aria-label="${status.threshold ? `${status.remaining} of ${status.threshold} Wounds remaining` : "Wounds not recorded"}"><i data-wounds-track style="--wounds-remaining:${status.percentRemaining}%"></i></div>
+    <div class="wounds-controls">
+      <button class="wound-adjust recover" type="button" data-adjust-damage="-1" ${status.damage <= 0 ? "disabled" : ""}>Recover</button>
+      <label><span>Current Damage</span><input type="number" min="0" step="1" inputmode="numeric" data-current-damage value="${status.damage}" ${status.threshold ? "" : "disabled"} /></label>
+      <button class="wound-adjust damage" type="button" data-adjust-damage="1" ${status.threshold ? "" : "disabled"}>Damage</button>
+    </div>
+    <p class="wounds-critical" data-wounds-critical ${status.critical ? "" : "hidden"}>Critical Damage: <strong>${status.critical}</strong></p>
+  </section>`;
+}
+
+function refreshReviewWounds() {
+  const status = woundStatus();
+  const remaining = document.querySelector("[data-wounds-remaining]");
+  const threshold = document.querySelector("[data-wounds-threshold]");
+  const track = document.querySelector("[data-wounds-track]");
+  const input = document.querySelector("[data-current-damage]");
+  const recover = document.querySelector('[data-adjust-damage="-1"]');
+  const critical = document.querySelector("[data-wounds-critical]");
+  if (remaining) remaining.textContent = status.threshold ? String(status.remaining) : "—";
+  if (threshold) threshold.textContent = status.threshold ? String(status.threshold) : "—";
+  if (track) track.style.setProperty("--wounds-remaining", `${status.percentRemaining}%`);
+  if (input && document.activeElement !== input) input.value = String(status.damage);
+  if (recover) recover.disabled = status.damage <= 0;
+  if (critical) {
+    critical.hidden = status.critical <= 0;
+    critical.querySelector("strong").textContent = String(status.critical);
+  }
+}
+
 function displayWeight(item) {
   return Number.isFinite(item?.weight) ? `${item.weight} kg` : "Weight not listed";
 }
@@ -2337,7 +2464,7 @@ function currentTalentRecords() {
       source: talent.ruleSource || talent.source,
       initial: true,
     })),
-    ...character.advances.talents.map((entry) => {
+    ...paidTalentAdvanceEntries().map((entry) => {
       const talent = talentCatalogue.find((candidate) => candidate.id === entry?.id);
       return talent ? { ...talent, initial: false } : null;
     }).filter(Boolean),
@@ -2976,7 +3103,8 @@ function renderEquipment() {
 
 function renderTalentShop() {
   const granted = resolvedGrantedTalents();
-  const purchasedIds = new Set(character.advances.talents.map((entry) => entry.id).filter(Boolean));
+  const purchasedTalents = paidTalentAdvanceEntries();
+  const purchasedIds = new Set(purchasedTalents.map((entry) => entry.id).filter(Boolean));
   const selected = talentCatalogue.find((talent) => talent.id === character.talentShopSelected)
     || talentCatalogue.find((talent) => talent.name === "Quick Draw")
     || talentCatalogue[0];
@@ -2992,7 +3120,7 @@ function renderTalentShop() {
         <div><p class="choice-source">Tiered Advances</p><h2>Talents</h2></div>
         <div class="purchased-talents">${[
           ...Object.values(granted).map((talent) => `<span class="initial">${talent.displayName} · Initial</span>`),
-          ...character.advances.talents.map((entry) => {
+          ...purchasedTalents.map((entry) => {
             const talent = talentCatalogue.find((candidate) => candidate.id === entry.id);
             return talent ? `<button type="button" data-remove-talent="${talent.id}">${talent.name} · ${talentCost(talent)} XP <b>×</b></button>` : "";
           }),
@@ -4248,7 +4376,7 @@ function applyRuleHighlights() {
   while (walker.nextNode()) nodes.push(walker.currentNode);
   for (const node of nodes) {
     if (!node.nodeValue?.trim()) continue;
-    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term,.review-characteristics,.review-meta,.xp-ledger,.loadout-panel,.validation-panel,.review-section-heading,.inventory-item-identity,.action-card,.review-sections strong,.review-sections h1,.review-sections h2,.review-sections h3")) continue;
+    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term,.review-characteristics,.review-vitals-strip,.review-meta,.xp-ledger,.loadout-panel,.validation-panel,.review-section-heading,.inventory-item-identity,.action-card,.review-sections strong,.review-sections h1,.review-sections h2,.review-sections h3")) continue;
     const matches = [...node.nodeValue.matchAll(pattern)];
     if (!matches.length) continue;
     const fragment = document.createDocumentFragment();
@@ -4794,7 +4922,7 @@ function renderReview() {
   const divinationModifiers = divinationCharacteristicModifiers();
   const ownedSkills = ownedSkillRecords();
   const initialTalents = Object.values(resolvedGrantedTalents());
-  const purchasedTalents = character.advances.talents.map((entry) => talentCatalogue.find((talent) => talent.id === entry.id)).filter(Boolean);
+  const purchasedTalents = paidTalentAdvanceEntries().map((entry) => talentCatalogue.find((talent) => talent.id === entry.id)).filter(Boolean);
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
   const ownedWeapons = inventoryItems.filter((item) => item.category === "Weapons");
   const psychicPowers = character.advances.psychicPowers.map((entry) => psychicPowerById(entry.id) || entry).filter((entry) => entry?.name);
@@ -4955,15 +5083,19 @@ function renderReview() {
           ...Object.entries(divinationModifiers).map(([id, amount]) => `${characteristics.find((entry) => entry.id === id)?.name || id} ${amount > 0 ? "+" : ""}${amount}`),
           currentDivination()?.fateChange ? `Fate Threshold +${currentDivination().fateChange}` : "",
         ].filter(Boolean).join(" · ")}</div>` : ""}
-        <div class="review-meta">
-          <span>Fate <strong>${character.fate.roll ? finalFateThreshold() : "—"}</strong></span>
-          <span>Wounds <strong>${character.wounds.total || "—"}</strong></span>
-          <span>Fatigue Threshold <strong>${characteristicBonus("toughness") + characteristicBonus("willpower")}</strong></span>
-          <span>Move <strong>${characteristicBonus("agility")} / ${characteristicBonus("agility") * 2} / ${characteristicBonus("agility") * 3} / ${characteristicBonus("agility") * 6}</strong></span>
-          <span>XP <strong>${spent} / ${character.xp.starting}</strong></span>
-          ${hasPsykerAccess() ? `<span>Psy Rating <strong>${foundryPsyRating()}</strong></span>` : ""}
-          ${Number(character.conditions.insanity || 0) ? `<span>Insanity <strong>${Number(character.conditions.insanity)}</strong></span>` : ""}
-          ${Number(character.conditions.corruption || 0) ? `<span>Corruption <strong>${Number(character.conditions.corruption)}</strong></span>` : ""}
+        <div class="review-vitals-strip">
+          ${renderReviewWounds()}
+          ${renderReviewArmour(equipmentState.wornArmour)}
+          <section class="review-meta review-quick-stats" aria-label="At a glance">
+            <h3>At a Glance</h3>
+            <span>Fate <strong>${character.fate.roll ? finalFateThreshold() : "—"}</strong></span>
+            <span>Fatigue Threshold <strong>${characteristicBonus("toughness") + characteristicBonus("willpower")}</strong></span>
+            <span>Move <strong>${characteristicBonus("agility")} / ${characteristicBonus("agility") * 2} / ${characteristicBonus("agility") * 3} / ${characteristicBonus("agility") * 6}</strong></span>
+            <span>XP Remaining <strong>${character.xp.starting - spent}</strong></span>
+            ${hasPsykerAccess() ? `<span>Psy Rating <strong>${foundryPsyRating()}</strong></span>` : ""}
+            ${Number(character.conditions.insanity || 0) ? `<span>Insanity <strong>${Number(character.conditions.insanity)}</strong></span>` : ""}
+            ${Number(character.conditions.corruption || 0) ? `<span>Corruption <strong>${Number(character.conditions.corruption)}</strong></span>` : ""}
+          </section>
         </div>
         <div class="review-sheet-body">
           <aside class="review-summary-rail" aria-label="Character summary">
@@ -5342,6 +5474,21 @@ function wireEvents() {
   document.querySelector("#review-tab-select")?.addEventListener("change", (event) => {
     playMechanicalLock();
     activateReviewTab(event.target.value);
+  });
+
+  document.querySelector("[data-current-damage]")?.addEventListener("input", (event) => {
+    character.combat.damage = Math.max(0, Number(event.target.value || 0));
+    save();
+    refreshReviewWounds();
+  });
+  document.querySelector("[data-current-damage]")?.addEventListener("change", refreshReviewWounds);
+  document.querySelectorAll("[data-adjust-damage]").forEach((button) => {
+    button.addEventListener("click", () => {
+      character.combat.damage = Math.max(0, Number(character.combat.damage || 0) + Number(button.dataset.adjustDamage || 0));
+      playMechanicalLock();
+      save();
+      refreshReviewWounds();
+    });
   });
 
   document.querySelector("#action-search")?.addEventListener("input", (event) => {
@@ -5974,7 +6121,7 @@ function wireEvents() {
         }])),
         talents: [
           ...Object.values(resolvedGrantedTalents()).map((talent) => ({ id: talent.id, name: talent.displayName, initial: true, cost: 0, source: talent.source })),
-          ...character.advances.talents.map((entry) => {
+          ...paidTalentAdvanceEntries().map((entry) => {
             const talent = talentCatalogue.find((candidate) => candidate.id === entry.id);
             return talent ? { id: talent.id, name: talent.name, initial: false, cost: talentCost(talent), source: "XP" } : entry;
           }),
@@ -6026,8 +6173,8 @@ function wireEvents() {
         },
         wounds: {
           max: Number(character.wounds?.total || 0),
-          value: Number(character.wounds?.total || 0),
-          critical: 0,
+          value: woundStatus().remaining,
+          critical: woundStatus().critical,
           rolled: Boolean(character.wounds?.total),
         },
         fatigue: { value: 0 },
@@ -6055,7 +6202,7 @@ function wireEvents() {
         ...foundryUnlinkedGrantedEquipment(),
         ...[
           ...Object.values(resolvedGrantedTalents()).map((talent) => ({ talent, initial: true })),
-          ...character.advances.talents.map((entry) => ({ talent: talentCatalogue.find((candidate) => candidate.id === entry.id), initial: false })),
+           ...paidTalentAdvanceEntries().map((entry) => ({ talent: talentCatalogue.find((candidate) => candidate.id === entry.id), initial: false })),
         ].filter((entry) => entry.talent).map(({ talent, initial }) => ({
           name: talent.displayName || talent.name,
           type: "talent",
