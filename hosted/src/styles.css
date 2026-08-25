@@ -837,8 +837,8 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
 .calculation-note strong { color: #ffe1aa; text-transform: uppercase; }
 .review-meta { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 10px 0; color: #aaa69d; font-size: 10px; text-transform: uppercase; }
 .review-meta strong { color: #fff; }
-.review-sections { column-count: 3; column-gap: 9px; margin-top: 10px; }
-.review-sections section { display: inline-block; width: 100%; min-width: 0; margin: 0 0 9px; break-inside: avoid; border: 1px solid rgba(255,255,255,.11); padding: 9px; background: rgba(3,6,6,.38); vertical-align: top; }
+.review-sections { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; align-items: start; margin-top: 10px; }
+.review-sections section { display: block; width: 100%; min-width: 0; margin: 0; border: 1px solid rgba(255,255,255,.11); padding: 9px; background: rgba(3,6,6,.38); }
 .review-sections section h3 { margin: 0 0 8px; color: #e3bd7c; font: 600 14px "Barlow Condensed",sans-serif; letter-spacing: .06em; text-transform: uppercase; }
 .review-sections .tag-list { margin-top: 0; }
 .review-skill-label {
@@ -853,10 +853,14 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
 }
 .review-skill-label:hover,
 .review-skill-label:focus-visible { color: #a5e5bc; }
-.review-skills-section {
-  display: block !important;
-  column-span: all;
-}
+.review-talents-section,.review-abilities-section,
+.review-skills-section { grid-column: 1 / -1; }
+.review-talents-section .dossier-list,
+.review-abilities-section .dossier-list { grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 16px; }
+.review-talents-section .dossier-list > div,
+.review-abilities-section .dossier-list > div { grid-template-columns: minmax(110px,.8fr) minmax(0,1.2fr) minmax(82px,auto); gap: 8px; }
+.review-talents-section .dossier-list strong,
+.review-abilities-section .dossier-list strong { overflow-wrap: anywhere; }
 .review-skills-list {
   grid-template-columns: repeat(2,minmax(0,1fr));
   column-gap: 16px;
@@ -870,7 +874,7 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
 .dossier-list > div { display: grid; grid-template-columns: minmax(78px,.62fr) minmax(100px,1.38fr) auto; gap: 6px; align-items: start; border-bottom: 1px solid rgba(255,255,255,.075); padding: 4px 0; }
 .dossier-list strong { color: #e8e1d5; font-size: 9px; }
 .dossier-list span { color: #aaa69d; font-size: 8px; line-height: 1.35; }
-.dossier-list em { color: #c8a56e; font-size: 7px; font-style: normal; text-align: right; text-transform: uppercase; }
+.dossier-list em { color: #c8a56e; font-size: 7px; font-style: normal; overflow-wrap: anywhere; text-align: right; text-transform: uppercase; }
 .dossier-list p { color: #89857d; font-size: 8px; }
 .dossier-list .sheet-entry-summary { min-width: 0; overflow-wrap: anywhere; }
 .dossier-list .sheet-entry-meta {
@@ -878,7 +882,7 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
-  min-width: 56px;
+  min-width: 0;
 }
 .dossier-list .sheet-entry-meta em { max-width: 110px; line-height: 1.2; }
 .sheet-entry-details {
@@ -894,10 +898,7 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
 }
 .sheet-entry-details:hover,
 .sheet-entry-details:focus-visible { border-color: #e6c17e; background: rgba(175,112,42,.24); color: #fff1d2; }
-.review-inventory-section {
-  display: block !important;
-  column-span: all;
-}
+.review-inventory-section { grid-column: 1 / -1; }
 .review-section-heading {
   display: flex;
   justify-content: space-between;
@@ -964,6 +965,7 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
   line-height: 1.25;
 }
 .inventory-item-identity small {
+  overflow-wrap: anywhere;
   color: #aaa69d;
   font-size: 7px;
   letter-spacing: .06em;
@@ -1023,18 +1025,24 @@ html[data-text-size="extra-large"] .armoury-item .item-category { display: none;
 .validation-panel .export-status:empty { display: none; }
 .validation-panel button { width: 100%; margin-top: 10px; }
 
-html[data-text-size="large"] .review-sections { column-count: 2; }
+html[data-text-size="large"] .review-sections { grid-template-columns: repeat(2,minmax(0,1fr)); }
 html[data-text-size="large"] .review-skills-list,
 html[data-text-size="extra-large"] .review-skills-list { grid-template-columns: 1fr; }
 html[data-text-size="extra-large"] .review-layout { grid-template-columns: minmax(0,1fr) 330px; }
-html[data-text-size="extra-large"] .review-sections { column-count: 1; }
+html[data-text-size="extra-large"] .review-sections { grid-template-columns: 1fr; }
+html[data-text-size="extra-large"] .review-talents-section,
+html[data-text-size="extra-large"] .review-abilities-section,
+html[data-text-size="extra-large"] .review-skills-section,
+html[data-text-size="extra-large"] .review-inventory-section { grid-column: 1; }
+html[data-text-size="extra-large"] .review-talents-section .dossier-list,
+html[data-text-size="extra-large"] .review-abilities-section .dossier-list { grid-template-columns: 1fr; }
 html[data-text-size="extra-large"] .review-sections section { padding: 13px; }
 html[data-text-size="extra-large"] .dossier-list > div {
-  grid-template-columns: minmax(150px,.62fr) minmax(0,1.38fr) minmax(110px,auto);
+  grid-template-columns: minmax(150px,.62fr) minmax(0,1.38fr) minmax(0,140px);
   gap: 10px;
   padding: 8px 0;
 }
-html[data-text-size="extra-large"] .dossier-list .sheet-entry-meta { min-width: 110px; }
+html[data-text-size="extra-large"] .dossier-list .sheet-entry-meta { min-width: 0; }
 
 #dice-layer { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; pointer-events: none; opacity: 0; background: radial-gradient(circle,rgba(42,31,20,.38),rgba(2,3,3,.78)); transition: opacity .18s ease; }
 #dice-layer.visible { opacity: 1; }
@@ -1955,7 +1963,13 @@ dialog h2,
   .xp-meter { grid-template-columns: repeat(3,auto 1fr); border-right: 0; border-bottom: 1px solid var(--line); }
   .divination-card,.validation-panel { border-left: 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .scene-review .review-layout { grid-template-columns: 1fr; }
-  .review-sections { column-count: 1; }
+  .review-sections { grid-template-columns: 1fr; }
+  .review-talents-section,.review-abilities-section,
+  .review-skills-section,.review-inventory-section { grid-column: 1; }
+  .review-talents-section .dossier-list,
+  .review-abilities-section .dossier-list { grid-template-columns: 1fr; }
+  .review-talents-section .dossier-list > div,
+  .review-abilities-section .dossier-list > div { grid-template-columns: minmax(110px,.7fr) minmax(0,1.3fr); }
 }
 
 /* Phone mode intentionally becomes a straightforward, native-control workflow.
@@ -2268,7 +2282,11 @@ dialog h2,
   .scene-review .review-layout { height: auto; }
   .review-characteristics { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .review-characteristics div { min-height: 78px; }
-  .review-sections { column-count: 1; }
+  .review-sections { grid-template-columns: 1fr; }
+  .review-talents-section,.review-abilities-section,
+  .review-skills-section,.review-inventory-section { grid-column: 1; }
+  .review-talents-section .dossier-list,
+  .review-abilities-section .dossier-list { grid-template-columns: 1fr; }
   .controls {
     position: relative;
     z-index: 20;
@@ -2563,7 +2581,9 @@ dialog h2,
   .has-selection .catalog-picker { grid-template-columns: 34px minmax(0,420px) 34px; gap: 8px; }
   .mechanics-panel dl div { grid-template-columns: 88px 1fr; gap: 9px; padding: 9px 11px; }
   .mechanics-panel dd { font-size: 11px; }
-  .review-sections { column-count: 2; }
+  .review-sections { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .review-talents-section .dossier-list,
+  .review-abilities-section .dossier-list { grid-template-columns: 1fr; }
 }
 
 /* Between phone and wide-desktop layouts, retain the catalogue beside the

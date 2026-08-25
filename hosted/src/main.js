@@ -4035,7 +4035,7 @@ function renderReview() {
             <h3>Aptitudes</h3>
             <div class="tag-list final">${resolvedAptitudes().aptitudes.map((aptitude) => `<span>${aptitude}</span>`).join("")}</div>
           </section>
-          <section>
+          <section class="review-talents-section">
             <h3>Talents</h3>
             <div class="dossier-list">${[
               ...initialTalents.map((talent) => renderSheetEntry({
@@ -4056,7 +4056,7 @@ function renderReview() {
               })),
             ].join("") || "<p>None recorded.</p>"}</div>
           </section>
-          <section>
+          <section class="review-abilities-section">
             <h3>Traits and Special Abilities</h3>
             <div class="dossier-list">${[
               ...[...automaticTraits(), ...equipmentGrantedTraits()].map((trait) => renderSheetEntry({
