@@ -2772,11 +2772,15 @@ function characteristicActionRecords() {
 
 function fateUseMetadata(record = {}) {
   const text = [record.name, record.summary, record.context].filter(Boolean).join(" ");
-  const spendsFate = /\b(?:spend|spends|spending|spent)\b.{0,18}\bfate\b/i.test(text);
+  const referencesFateSpend = /\b(?:spend|spends|spending|spent)\b.{0,18}\bfate\b/i.test(text);
+  const spendsFate = Boolean(record.spendsFate)
+    || /^\s*spend\s+fate\b/i.test(record.name || "")
+    || /\b(?:may|can|must)\s+spend\b.{0,18}\bfate\b/i.test(text)
+    || /\bspend\s+(?:a|one|1)\s+fate\s+point\s+to\b/i.test(text);
   const burnsFate = /\b(?:burn|burns|burning|burned|burnt)\b.{0,18}\bfate\b/i.test(text);
   return {
-    usesFate: Boolean(record.usesFate || spendsFate || burnsFate),
-    spendsFate: Boolean(record.spendsFate || spendsFate),
+    usesFate: Boolean(record.usesFate || referencesFateSpend || burnsFate),
+    spendsFate,
     burnsFate: Boolean(record.burnsFate || burnsFate),
   };
 }
@@ -5368,6 +5372,10 @@ function render() {
       <div class="action-dialog-tags" id="action-dialog-tags"></div>
       <p id="action-dialog-summary"></p>
       <p class="action-dialog-context" id="action-dialog-context"></p>
+      <div class="action-fate-control" id="action-fate-control" hidden>
+        <div class="action-fate-control-copy">${actionGroupGlyph("Fate")}<span><small>Fate-linked capability</small><strong id="action-fate-status">Fate — / —</strong></span></div>
+        <button class="compact-button" id="spend-action-fate" type="button">Spend 1 Fate Point</button>
+      </div>
       <div class="action-roll-panel" id="action-roll-panel" hidden>
         <div class="action-roll-equation">
           <span><small>Base</small><strong id="action-roll-base">0</strong></span>
@@ -5447,7 +5455,7 @@ function refreshActionRollTarget() {
 }
 
 function openActionDialog(actionId) {
-  const action = currentActionRecords.get(actionId);
+  const action = currentActionRecords.get(actionId) || derivedCharacterActions().find((entry) => entry.id === actionId);
   const dialog = document.querySelector("#action-dialog");
   if (!action || !dialog) return;
   dialog.dataset.actionId = action.id;
@@ -5465,6 +5473,21 @@ function openActionDialog(actionId) {
   const tags = dialog.querySelector("#action-dialog-tags");
   tags.innerHTML = (action.subtypes || []).map((tag) => `<span>${escapeHtmlAttribute(tag)}</span>`).join("");
   tags.hidden = !(action.subtypes || []).length;
+  const fateControl = dialog.querySelector("#action-fate-control");
+  const fateButton = dialog.querySelector("#spend-action-fate");
+  const fate = fateStatus();
+  fateControl.hidden = !action.usesFate;
+  dialog.dataset.resourceChanged = "false";
+  if (action.usesFate) {
+    dialog.querySelector("#action-fate-status").textContent = `Fate ${fate.current} / ${fate.threshold}`;
+    fateControl.classList.toggle("fate-burn-warning", Boolean(action.burnsFate));
+    fateButton.hidden = !action.spendsFate;
+    fateButton.disabled = !action.spendsFate || fate.current <= 0;
+    fateButton.textContent = action.spendsFate ? fate.current > 0 ? "Spend 1 Fate Point" : "No Fate Points Remain" : "Fate-linked rule";
+    fateControl.querySelector("small").textContent = action.burnsFate
+      ? "Permanent Fate burn — resolve with the GM"
+      : action.spendsFate ? "This capability costs current Fate" : "This rule modifies another Fate use";
+  }
   const rollPanel = dialog.querySelector("#action-roll-panel");
   rollPanel.hidden = !action.test;
   dialog.querySelector("#action-roll-situation").value = "0";
@@ -5648,13 +5671,30 @@ function wireEvents() {
     localStorage.setItem("dh2-action-show-unavailable", String(actionIndexState.showUnavailable));
     filterReviewActionCards();
   });
-  document.querySelectorAll("[data-open-action]").forEach((button) => {
-    button.addEventListener("click", () => openActionDialog(button.dataset.openAction));
+  document.querySelector(".review-actions-index")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-open-action]");
+    if (button) openActionDialog(button.dataset.openAction);
   });
   const actionDialog = document.querySelector("#action-dialog");
   actionDialog?.querySelector(".dialog-close")?.addEventListener("click", () => actionDialog.close());
   actionDialog?.addEventListener("click", (event) => {
     if (event.target === actionDialog) actionDialog.close();
+  });
+  actionDialog?.addEventListener("close", () => {
+    if (actionDialog.dataset.resourceChanged === "true") rerenderEquipmentStatePreservingScroll();
+  });
+  document.querySelector("#spend-action-fate")?.addEventListener("click", (event) => {
+    const action = currentActionRecords.get(actionDialog?.dataset.actionId || "");
+    const fate = fateStatus();
+    if (!action?.spendsFate || fate.current <= 0) return;
+    character.fate.current = fate.current - 1;
+    actionDialog.dataset.resourceChanged = "true";
+    playMechanicalLock();
+    save();
+    event.currentTarget.disabled = true;
+    event.currentTarget.textContent = "Fate Point Spent";
+    actionDialog.querySelector("#action-fate-status").textContent = `Fate ${fate.current - 1} / ${fate.threshold}`;
+    actionDialog.querySelector("#action-fate-control").classList.add("fate-spent");
   });
   document.querySelector("#action-roll-situation")?.addEventListener("change", refreshActionRollTarget);
   document.querySelector("#execute-action-roll")?.addEventListener("click", executeCurrentActionRoll);

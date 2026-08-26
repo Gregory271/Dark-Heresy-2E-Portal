@@ -1199,6 +1199,27 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 .action-dialog-tags[hidden] { display: none; }
 .action-dialog-tags span { border: 1px solid rgba(213,174,103,.38); padding: 4px 7px; color: #d6bc8a; font-size: 9px; text-transform: uppercase; }
 .action-dialog-context { border-left: 2px solid #618f7d; padding: 7px 10px; background: rgba(46,80,67,.14); color: #b8cbc3; }
+.action-fate-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+  border: 1px solid rgba(239,196,92,.55);
+  padding: 9px 10px;
+  background: linear-gradient(110deg,rgba(155,105,27,.25),rgba(9,13,11,.72));
+  color: #f1ca6f;
+}
+.action-fate-control[hidden] { display: none; }
+.action-fate-control-copy { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.action-fate-control-copy > svg { flex: 0 0 22px; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.35; }
+.action-fate-control-copy .group-core { fill: currentColor; stroke: none; }
+.action-fate-control-copy > span { display: grid; gap: 2px; min-width: 0; }
+.action-fate-control-copy small { color: #c3aa72; font-size: 8px; letter-spacing: .07em; text-transform: uppercase; }
+.action-fate-control-copy strong { color: #ffe4a2; font: 700 16px "Barlow Condensed",sans-serif; }
+.action-fate-control > button { flex: 0 0 auto; border-color: rgba(239,196,92,.56); color: #ffe6aa; }
+.action-fate-control.fate-spent { border-color: rgba(122,180,128,.55); background: rgba(45,105,65,.18); color: #a8d5ad; }
+.action-fate-control.fate-burn-warning { border-color: rgba(210,100,78,.58); background: rgba(112,39,28,.2); color: #e7a28e; }
 .action-roll-panel { margin-top: 14px; border: 1px solid rgba(211,171,99,.35); padding: 12px; background: rgba(5,9,9,.72); }
 .action-roll-panel[hidden] { display: none; }
 .action-roll-equation { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; }
@@ -3703,4 +3724,6 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
   .review-tab-panel .review-skills-list > div,
   .review-tab-panel .inventory-list > .sheet-entry { grid-template-columns: 1fr; }
   .review-tab-panel .dossier-list .sheet-entry-meta { grid-column: 1; }
+  .action-fate-control { align-items: stretch; flex-direction: column; }
+  .action-fate-control > button { width: 100%; }
 }
