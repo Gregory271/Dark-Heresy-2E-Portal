@@ -61,6 +61,7 @@ let cloudRefreshTimer = null;
 const sheetDetailRecords = new Map();
 let sheetDetailCounter = 0;
 const currentActionRecords = new Map();
+let actionRollSession = null;
 let actionIndexState = {
   query: localStorage.getItem("dh2-action-query") || "",
   group: localStorage.getItem("dh2-action-group") || "Attacks",
@@ -2341,6 +2342,32 @@ function foundryPsyRating() {
   return basePsyRating() + Math.max(0, Number(character.advances.psyRating || 0));
 }
 
+function psykerClass() {
+  return character.background === "astra-telepathica" ? "Bound" : "Unbound";
+}
+
+function psychicStrengthProfile(effectiveRating = foundryPsyRating()) {
+  const base = Math.max(1, foundryPsyRating());
+  const classification = psykerClass();
+  const pushLimit = classification === "Bound" ? 2 : 4;
+  const effective = Math.max(1, Math.min(base + pushLimit, Number(effectiveRating || base)));
+  const pushed = effective > base;
+  const modifier = (base - effective) * 10;
+  const risk = pushed
+    ? classification === "Bound"
+      ? "Pushed: Psychic Phenomena occurs on any Focus Power result except doubles."
+      : "Pushed: Psychic Phenomena occurs automatically."
+    : "Normal strength: Psychic Phenomena occurs when the Focus Power dice show doubles.";
+  return { base, effective, classification, pushLimit, pushed, modifier, risk };
+}
+
+function psychicPhenomenaTriggered(roll, profile) {
+  if (!profile) return false;
+  const doubles = roll === 100 || (roll > 0 && roll % 11 === 0);
+  if (!profile.pushed) return doubles;
+  return profile.classification === "Bound" ? !doubles : true;
+}
+
 function basePsyRating() {
   if (!hasPsykerAccess()) return 0;
   return character.background === "astra-telepathica" ? 2 : 1;
@@ -2954,14 +2981,16 @@ function serialisableCharacterActions(actions = derivedCharacterActions()) {
   }));
 }
 
-function resolvedActionTest(test, situationalModifier = 0) {
+function resolvedActionTest(test, situationalModifier = 0, fateModifier = 0) {
   const actionModifier = Number(test?.actionModifier || 0);
   const situational = Number(situationalModifier || 0);
-  const combinedModifier = Math.max(-60, Math.min(60, actionModifier + situational));
+  const fate = Number(fateModifier || 0);
+  const combinedModifier = Math.max(-60, Math.min(60, actionModifier + situational + fate));
   return {
     baseTarget: Number(test?.baseTarget || 0),
     actionModifier,
     situationalModifier: situational,
+    fateModifier: fate,
     combinedModifier,
     target: Number(test?.baseTarget || 0) + combinedModifier,
   };
@@ -5377,13 +5406,26 @@ function render() {
         <button class="compact-button" id="spend-action-fate" type="button">Spend 1 Fate Point</button>
       </div>
       <div class="action-roll-panel" id="action-roll-panel" hidden>
+        <div class="action-psychic-control" id="action-psychic-control" hidden>
+          <div><small>Psychic Strength</small><strong id="action-psychic-class">Bound Psyker</strong><span id="action-psychic-base">Base Psy Rating —</span></div>
+          <label><span>Effective Psy Rating</span><select id="action-psychic-rating" aria-label="Effective Psy Rating"></select></label>
+          <p id="action-psychic-risk"></p>
+        </div>
         <div class="action-roll-equation">
           <span><small>Base</small><strong id="action-roll-base">0</strong></span>
           <span><small>Action</small><strong id="action-roll-action-mod">+0</strong></span>
+          <span class="action-roll-psychic-value" id="action-roll-psychic-cell" hidden><small>Psychic</small><strong id="action-roll-psychic-mod">+0</strong></span>
           <label><small>Situation</small><select id="action-roll-situation" aria-label="Situational test modifier">${[60,50,40,30,20,10,0,-10,-20,-30,-40,-50,-60].map((modifier) => `<option value="${modifier}" ${modifier === 0 ? "selected" : ""}>${modifier > 0 ? "+" : ""}${modifier}</option>`).join("")}</select></label>
+          <span class="action-roll-fate-value"><small>Fate</small><strong id="action-roll-fate-mod">+0</strong></span>
           <span class="action-roll-target"><small>Target</small><strong id="action-roll-target">0</strong></span>
         </div>
         <p class="action-roll-note">Set only the situational modifier supplied by the GM. The action and training modifiers are already included.</p>
+        <label class="action-roll-fate-option" id="action-roll-fate-option">
+          <input id="action-roll-fate-plus-ten" type="checkbox" />
+          ${actionGroupGlyph("Fate")}
+          <span><strong>Gain +10 with Fate</strong><small>Declare before rolling. The point is spent when the d100 is rolled.</small></span>
+          <em id="action-roll-fate-available">Fate — / —</em>
+        </label>
         <button class="primary-button" id="execute-action-roll" type="button">Roll d100 <span>›</span></button>
         <div class="action-roll-result" id="action-roll-result" role="status" aria-live="polite"></div>
       </div>
@@ -5448,10 +5490,118 @@ function refreshActionRollTarget() {
   const action = currentActionRecords.get(dialog?.dataset.actionId || "");
   if (!action?.test) return;
   const situation = Number(document.querySelector("#action-roll-situation")?.value || 0);
-  const resolved = resolvedActionTest(action.test, situation);
+  const fateBonus = document.querySelector("#action-roll-fate-plus-ten")?.checked ? 10 : 0;
+  const psychic = action.test.psychicPowerId
+    ? psychicStrengthProfile(document.querySelector("#action-psychic-rating")?.value)
+    : null;
+  const test = psychic ? { ...action.test, actionModifier: Number(action.test.actionModifier || 0) + psychic.modifier } : action.test;
+  const resolved = resolvedActionTest(test, situation, fateBonus);
   document.querySelector("#action-roll-base").textContent = resolved.baseTarget;
-  document.querySelector("#action-roll-action-mod").textContent = signedNumber(resolved.actionModifier);
+  document.querySelector("#action-roll-action-mod").textContent = signedNumber(action.test.actionModifier);
+  document.querySelector("#action-roll-psychic-mod").textContent = signedNumber(psychic?.modifier || 0);
+  document.querySelector("#action-roll-fate-mod").textContent = signedNumber(resolved.fateModifier);
   document.querySelector("#action-roll-target").textContent = resolved.target;
+  if (psychic) {
+    document.querySelector("#action-psychic-risk").textContent = psychic.risk;
+    document.querySelector("#action-psychic-control")?.classList.toggle("pushed", psychic.pushed);
+  }
+}
+
+function configurePsychicActionRoll(action) {
+  const control = document.querySelector("#action-psychic-control");
+  const cell = document.querySelector("#action-roll-psychic-cell");
+  const select = document.querySelector("#action-psychic-rating");
+  const psychic = Boolean(action?.test?.psychicPowerId);
+  control.hidden = !psychic;
+  cell.hidden = !psychic;
+  if (!psychic) {
+    select.replaceChildren();
+    return;
+  }
+  const profile = psychicStrengthProfile();
+  document.querySelector("#action-psychic-class").textContent = `${profile.classification} Psyker`;
+  document.querySelector("#action-psychic-base").textContent = `Base Psy Rating ${profile.base}`;
+  select.innerHTML = Array.from({ length: profile.base + profile.pushLimit }, (_, index) => index + 1)
+    .map((rating) => `<option value="${rating}" ${rating === profile.base ? "selected" : ""}>${rating}${rating < profile.base ? " · controlled" : rating === profile.base ? " · normal" : " · push"}</option>`)
+    .join("");
+  document.querySelector("#action-psychic-risk").textContent = profile.risk;
+  control.classList.remove("pushed");
+}
+
+function refreshActionRollFateControls() {
+  const status = fateStatus();
+  const checkbox = document.querySelector("#action-roll-fate-plus-ten");
+  const label = document.querySelector("#action-roll-fate-option");
+  const available = document.querySelector("#action-roll-fate-available");
+  if (available) available.textContent = `Fate ${status.current} / ${status.threshold}`;
+  if (checkbox) {
+    const rollStarted = Boolean(actionRollSession?.roll);
+    checkbox.disabled = rollStarted || (!checkbox.checked && status.current <= 0);
+  }
+  label?.classList.toggle("selected", Boolean(checkbox?.checked));
+  label?.classList.toggle("unavailable", status.current <= 0 && !checkbox?.checked);
+}
+
+function spendFateForActionRoll() {
+  const status = fateStatus();
+  if (status.current <= 0) return false;
+  character.fate.current = status.current - 1;
+  const dialog = document.querySelector("#action-dialog");
+  if (dialog) dialog.dataset.resourceChanged = "true";
+  playMechanicalLock();
+  save();
+  refreshActionRollFateControls();
+  const generalStatus = dialog?.querySelector("#action-fate-status");
+  if (generalStatus) generalStatus.textContent = `Fate ${status.current - 1} / ${status.threshold}`;
+  return true;
+}
+
+function actionRollResultMarkup(action, session) {
+  const { outcome, resolved, roll, originalRoll, rerolled, addedDegree } = session;
+  const attack = action.test.weaponId || action.test.unarmed || action.test.hitMode;
+  const effectiveDegrees = outcome.success ? outcome.degrees + (addedDegree ? 1 : 0) : outcome.degrees;
+  const outcomeLabel = `${effectiveDegrees} Degree${effectiveDegrees === 1 ? "" : "s"} of ${outcome.success ? "Success" : "Failure"}${addedDegree ? " (includes +1 from Fate)" : ""}`;
+  const hitCount = attack && outcome.success ? attackHitCount(action.test, effectiveDegrees) : 0;
+  const location = attack && outcome.success ? (action.test.calledShot ? "Declared location" : attackHitLocation(roll)) : "";
+  const jamThreshold = ["semi", "full", "suppressing"].includes(action.test.hitMode) ? 94 : 96;
+  const possibleJam = Boolean(action.test.weaponId && weaponIsRanged(equipmentItem(action.test.weaponId)) && roll >= jamThreshold);
+  session.possibleJam = possibleJam;
+  const phenomena = psychicPhenomenaTriggered(roll, session.psychic);
+  session.phenomena = phenomena;
+  const fate = fateStatus();
+  const canReroll = !rerolled && !addedDegree && fate.current > 0;
+  const canAddDegree = outcome.success && !addedDegree && fate.current > 0;
+  return `<div class="action-outcome ${outcome.success && !possibleJam ? "success" : "failure"}"><strong>${roll} - ${outcome.success && !possibleJam ? "Success" : possibleJam ? "Possible weapon jam" : "Failure"}</strong><span>Target ${resolved.target} · ${outcomeLabel}</span>${rerolled ? `<span>Mandatory reroll · original result ${originalRoll}</span>` : ""}${session.psychic ? `<span>Effective Psy Rating ${session.psychic.effective} · ${session.psychic.classification}${session.psychic.pushed ? " Push" : " normal strength"}</span>` : ""}${hitCount ? `<span>${hitCount} hit${hitCount === 1 ? "" : "s"}${location ? ` · ${location}` : ""}</span>` : ""}${possibleJam ? `<em>The roll reached this fire mode's jam threshold. Apply the weapon's Reliable, Unreliable, or other relevant qualities.</em>` : ""}</div>
+    ${phenomena ? `<div class="psychic-phenomena-alert"><strong>Psychic Phenomena triggered</strong><span>Resolve the Warp disturbance before applying the power's effects.</span><button class="compact-button roll-psychic-phenomena" type="button">Roll Psychic Phenomena d100</button></div>` : session.psychic ? `<p class="psychic-risk-clear">No Psychic Phenomena was triggered by this Focus Power result.</p>` : ""}
+    <div class="action-roll-fate-after" ${canReroll || canAddDegree ? "" : "hidden"}>
+      ${canReroll ? `<button class="compact-button reroll-action-with-fate" type="button">Spend Fate to re-roll</button>` : ""}
+      ${canAddDegree ? `<button class="compact-button add-action-degree-with-fate" type="button">Spend Fate for +1 DoS</button>` : ""}
+      <small>Fate ${fate.current} / ${fate.threshold}</small>
+    </div>
+    ${action.test.weaponId && outcome.success && !possibleJam ? `<button class="compact-button roll-action-damage" type="button">Roll first hit damage</button>` : ""}`;
+}
+
+function wireActionRollResultButtons(action, result) {
+  result.querySelector(".reroll-action-with-fate")?.addEventListener("click", rerollCurrentActionWithFate);
+  result.querySelector(".add-action-degree-with-fate")?.addEventListener("click", addDegreeToCurrentActionWithFate);
+  result.querySelector(".roll-action-damage")?.addEventListener("click", async (event) => {
+    event.currentTarget.disabled = true;
+    await rollWeaponDamage(action, result);
+  });
+  result.querySelector(".roll-psychic-phenomena")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    const [roll] = await rollVisualDice(1, 100);
+    button.insertAdjacentHTML("afterend", `<p class="psychic-phenomena-result"><strong>${roll}</strong><span>Apply this result on Table 6–2: Psychic Phenomena (Core Rulebook, p. 196) before resolving the power.</span></p>`);
+  });
+}
+
+function renderCurrentActionRollResult(action) {
+  const result = document.querySelector("#action-roll-result");
+  if (!result || !actionRollSession?.outcome) return;
+  result.innerHTML = actionRollResultMarkup(action, actionRollSession);
+  wireActionRollResultButtons(action, result);
+  refreshActionRollFateControls();
 }
 
 function openActionDialog(actionId) {
@@ -5490,9 +5640,18 @@ function openActionDialog(actionId) {
   }
   const rollPanel = dialog.querySelector("#action-roll-panel");
   rollPanel.hidden = !action.test;
+  configurePsychicActionRoll(action);
   dialog.querySelector("#action-roll-situation").value = "0";
+  dialog.querySelector("#action-roll-fate-plus-ten").checked = false;
   dialog.querySelector("#action-roll-result").replaceChildren();
-  if (action.test) refreshActionRollTarget();
+  const rollButton = dialog.querySelector("#execute-action-roll");
+  rollButton.disabled = false;
+  rollButton.innerHTML = "Roll d100 <span>›</span>";
+  actionRollSession = action.test ? { actionId: action.id, plusTenSpent: false, rerolled: false, addedDegree: false, roll: null, originalRoll: null, outcome: null, resolved: null } : null;
+  if (action.test) {
+    refreshActionRollTarget();
+    refreshActionRollFateControls();
+  }
   dialog.showModal();
 }
 
@@ -5527,23 +5686,48 @@ async function executeCurrentActionRoll() {
   button.disabled = true;
   try {
     const situation = Number(document.querySelector("#action-roll-situation")?.value || 0);
-    const resolved = resolvedActionTest(action.test, situation);
+    const plusTen = Boolean(document.querySelector("#action-roll-fate-plus-ten")?.checked);
+    if (plusTen && !actionRollSession?.plusTenSpent) {
+      if (!spendFateForActionRoll()) return;
+      actionRollSession.plusTenSpent = true;
+    }
+    const psychic = action.test.psychicPowerId
+      ? psychicStrengthProfile(document.querySelector("#action-psychic-rating")?.value)
+      : null;
+    const test = psychic ? { ...action.test, actionModifier: Number(action.test.actionModifier || 0) + psychic.modifier } : action.test;
+    const resolved = resolvedActionTest(test, situation, plusTen ? 10 : 0);
     const [roll] = await rollVisualDice(1, 100);
     const outcome = testOutcome(roll, resolved.target);
-    const result = document.querySelector("#action-roll-result");
-    const attack = action.test.weaponId || action.test.unarmed || action.test.hitMode;
-    const hitCount = attack && outcome.success ? attackHitCount(action.test, outcome.degrees) : 0;
-    const location = attack && outcome.success ? (action.test.calledShot ? "Declared location" : attackHitLocation(roll)) : "";
-    const jamThreshold = ["semi", "full", "suppressing"].includes(action.test.hitMode) ? 94 : 96;
-    const possibleJam = Boolean(action.test.weaponId && weaponIsRanged(equipmentItem(action.test.weaponId)) && roll >= jamThreshold);
-    result.innerHTML = `<div class="action-outcome ${outcome.success && !possibleJam ? "success" : "failure"}"><strong>${roll} - ${outcome.success && !possibleJam ? "Success" : possibleJam ? "Possible weapon jam" : "Failure"}</strong><span>Target ${resolved.target} · ${outcome.label}</span>${hitCount ? `<span>${hitCount} hit${hitCount === 1 ? "" : "s"}${location ? ` · ${location}` : ""}</span>` : ""}${possibleJam ? `<em>The roll reached this fire mode's jam threshold. Apply the weapon's Reliable, Unreliable, or other relevant qualities.</em>` : ""}</div>${action.test.weaponId && outcome.success && !possibleJam ? `<button class="compact-button roll-action-damage" type="button">Roll first hit damage</button>` : ""}`;
-    result.querySelector(".roll-action-damage")?.addEventListener("click", async (event) => {
-      event.currentTarget.disabled = true;
-      await rollWeaponDamage(action, result);
-    });
+    actionRollSession = { ...actionRollSession, actionId: action.id, resolved, psychic, roll, originalRoll: roll, outcome };
+    renderCurrentActionRollResult(action);
   } finally {
-    button.disabled = false;
+    const resolved = Boolean(actionRollSession?.roll);
+    button.disabled = resolved;
+    button.innerHTML = resolved ? "Test resolved" : "Roll d100 <span>›</span>";
   }
+}
+
+async function rerollCurrentActionWithFate() {
+  const dialog = document.querySelector("#action-dialog");
+  const action = currentActionRecords.get(dialog?.dataset.actionId || "");
+  if (!action?.test || !actionRollSession?.roll || actionRollSession.rerolled || actionRollSession.addedDegree) return;
+  if (!spendFateForActionRoll()) return;
+  const button = document.querySelector(".reroll-action-with-fate");
+  if (button) button.disabled = true;
+  const [roll] = await rollVisualDice(1, 100);
+  actionRollSession.roll = roll;
+  actionRollSession.rerolled = true;
+  actionRollSession.outcome = testOutcome(roll, actionRollSession.resolved.target);
+  renderCurrentActionRollResult(action);
+}
+
+function addDegreeToCurrentActionWithFate() {
+  const dialog = document.querySelector("#action-dialog");
+  const action = currentActionRecords.get(dialog?.dataset.actionId || "");
+  if (!action?.test || !actionRollSession?.outcome?.success || actionRollSession.addedDegree) return;
+  if (!spendFateForActionRoll()) return;
+  actionRollSession.addedDegree = true;
+  renderCurrentActionRollResult(action);
 }
 
 function wireEvents() {
@@ -5697,6 +5881,11 @@ function wireEvents() {
     actionDialog.querySelector("#action-fate-control").classList.add("fate-spent");
   });
   document.querySelector("#action-roll-situation")?.addEventListener("change", refreshActionRollTarget);
+  document.querySelector("#action-psychic-rating")?.addEventListener("change", refreshActionRollTarget);
+  document.querySelector("#action-roll-fate-plus-ten")?.addEventListener("change", () => {
+    refreshActionRollTarget();
+    refreshActionRollFateControls();
+  });
   document.querySelector("#execute-action-roll")?.addEventListener("click", executeCurrentActionRoll);
 
   document.querySelector("#sound-toggle").addEventListener("click", async () => {

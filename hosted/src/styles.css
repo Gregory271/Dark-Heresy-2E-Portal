@@ -1191,7 +1191,7 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 }
 .sheet-entry-details:hover,
 .sheet-entry-details:focus-visible { border-color: #e6c17e; background: rgba(175,112,42,.24); color: #fff1d2; }
-.action-dialog { width: min(680px,calc(100vw - 32px)); }
+.action-dialog { width: min(680px,calc(100vw - 32px)); max-height: min(88dvh,800px); overflow-y: auto; }
 .action-dialog-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; min-width: 0; }
 .action-dialog-title-row h2 { min-width: 0; margin-right: 0; color: #fff0d1; }
 .action-dialog-title-row .action-type-badge { margin-right: 42px; border-left-color: rgba(220,182,111,.25); }
@@ -1222,14 +1222,50 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 .action-fate-control.fate-burn-warning { border-color: rgba(210,100,78,.58); background: rgba(112,39,28,.2); color: #e7a28e; }
 .action-roll-panel { margin-top: 14px; border: 1px solid rgba(211,171,99,.35); padding: 12px; background: rgba(5,9,9,.72); }
 .action-roll-panel[hidden] { display: none; }
-.action-roll-equation { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; }
+.action-psychic-control { display: grid; grid-template-columns: minmax(130px,.62fr) minmax(160px,.7fr) minmax(0,1.3fr); align-items: center; gap: 10px; margin-bottom: 10px; border: 1px solid rgba(185,154,220,.42); padding: 9px 10px; background: linear-gradient(110deg,rgba(82,55,116,.26),rgba(5,9,9,.7)); }
+.action-psychic-control[hidden] { display: none; }
+.action-psychic-control > div { display: grid; gap: 2px; }
+.action-psychic-control small,.action-psychic-control label > span { color: #b39bcf; font-size: 8px; letter-spacing: .07em; text-transform: uppercase; }
+.action-psychic-control strong { color: #eadbfa; font: 600 15px "Barlow Condensed",sans-serif; }
+.action-psychic-control > div > span { color: #a9a0b3; font-size: 8px; }
+.action-psychic-control label { display: grid; gap: 4px; }
+.action-psychic-control select { width: 100%; min-height: 34px; }
+.action-psychic-control p { margin: 0; border-left: 2px solid #8e69b7; padding-left: 9px; color: #c7bbd2; font-size: 9px; line-height: 1.4; }
+.action-psychic-control.pushed { border-color: rgba(205,93,83,.58); background: linear-gradient(110deg,rgba(122,37,51,.28),rgba(5,9,9,.7)); }
+.action-psychic-control.pushed p { border-left-color: #ca5f55; color: #e1b3ad; }
+.action-roll-equation { display: grid; grid-template-columns: repeat(auto-fit,minmax(82px,1fr)); gap: 7px; }
 .action-roll-equation > span,.action-roll-equation > label { display: grid; gap: 3px; border: 1px solid rgba(255,255,255,.1); padding: 8px; }
 .action-roll-equation small { color: #9e988e; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
 .action-roll-equation strong { color: #ede4d5; font: 600 19px "Barlow Condensed",sans-serif; }
 .action-roll-equation select { width: 100%; min-height: 31px; padding: 3px 6px; }
 .action-roll-equation .action-roll-target { border-color: rgba(222,177,91,.65); background: rgba(144,91,33,.18); }
 .action-roll-equation .action-roll-target strong { color: #ffdb97; }
+.action-roll-equation .action-roll-fate-value { border-color: rgba(239,196,92,.38); background: rgba(155,105,27,.12); }
+.action-roll-equation .action-roll-fate-value strong { color: #f1ca6f; }
+.action-roll-equation .action-roll-psychic-value { border-color: rgba(185,154,220,.4); background: rgba(82,55,116,.14); }
+.action-roll-equation .action-roll-psychic-value strong { color: #d8bff1; }
 .action-roll-note { color: #99938a; font-size: 9px; }
+.action-roll-fate-option {
+  display: grid;
+  grid-template-columns: auto 24px minmax(0,1fr) auto;
+  align-items: center;
+  gap: 9px;
+  margin-top: 9px;
+  border: 1px solid rgba(239,196,92,.34);
+  padding: 8px 9px;
+  background: rgba(119,75,29,.12);
+  color: #d9c18d;
+  cursor: pointer;
+}
+.action-roll-fate-option input { width: 18px; height: 18px; margin: 0; accent-color: #d4a94d; }
+.action-roll-fate-option > svg { width: 22px; height: 22px; fill: none; stroke: #e5bc61; stroke-width: 1.35; }
+.action-roll-fate-option .group-core { fill: #e5bc61; stroke: none; }
+.action-roll-fate-option > span { display: grid; gap: 2px; min-width: 0; }
+.action-roll-fate-option strong { color: #ffe2a1; font: 600 13px "Barlow Condensed",sans-serif; }
+.action-roll-fate-option small { color: #aaa187; font-size: 8px; line-height: 1.35; }
+.action-roll-fate-option em { color: #d6b867; font-size: 9px; font-style: normal; white-space: nowrap; }
+.action-roll-fate-option.selected { border-color: rgba(239,196,92,.72); background: rgba(155,105,27,.22); box-shadow: inset 3px 0 #d8ad50; }
+.action-roll-fate-option.unavailable { opacity: .56; cursor: not-allowed; }
 .action-roll-panel > .primary-button { width: 100%; margin-top: 8px; }
 .action-roll-result { display: grid; gap: 7px; margin-top: 10px; }
 .action-outcome { display: grid; gap: 3px; border-left: 3px solid #a14b3e; padding: 9px 11px; background: rgba(109,37,29,.18); }
@@ -1237,10 +1273,29 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 .action-outcome strong { color: #f0e4d3; font: 600 18px "Barlow Condensed",sans-serif; }
 .action-outcome span { color: #bbb4aa; font-size: 10px; }
 .action-outcome em { color: #d6a18d; font-size: 9px; font-style: normal; }
+.psychic-phenomena-alert { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 3px 12px; align-items: center; border: 1px solid rgba(205,93,83,.58); border-left: 3px solid #cb584e; padding: 9px 10px; background: rgba(121,34,43,.22); }
+.psychic-phenomena-alert strong { color: #ffc0b4; font: 600 15px "Barlow Condensed",sans-serif; }
+.psychic-phenomena-alert span { color: #d6b2ad; font-size: 9px; }
+.psychic-phenomena-alert button { grid-column: 2; grid-row: 1 / span 2; border-color: rgba(222,111,94,.62); color: #ffd2c8; }
+.psychic-phenomena-result { display: grid; grid-column: 1 / -1; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 8px; margin: 6px 0 0; border-top: 1px solid rgba(255,255,255,.12); padding-top: 7px; }
+.psychic-phenomena-result strong { color: #ffd5a1; font-size: 20px; }
+.psychic-phenomena-result span { font-size: 8px; }
+.psychic-risk-clear { margin: 0; border-left: 2px solid #765b91; padding: 6px 9px; background: rgba(82,55,116,.12); color: #bfb1cb; font-size: 8px; }
+.action-roll-fate-after { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; border: 1px solid rgba(239,196,92,.28); padding: 7px; background: rgba(155,105,27,.1); }
+.action-roll-fate-after[hidden] { display: none; }
+.action-roll-fate-after .compact-button { border-color: rgba(239,196,92,.48); color: #ffe2a1; }
+.action-roll-fate-after small { margin-left: auto; color: #d2b972; font-size: 8px; white-space: nowrap; }
 .action-damage-result { display: grid; gap: 3px; border: 1px solid rgba(220,178,98,.36); padding: 10px; background: rgba(119,75,29,.14); }
 .action-damage-result strong { color: #ffd38a; font: 600 20px "Barlow Condensed",sans-serif; }
 .action-damage-result span,.action-damage-result small { color: #c6b9a6; font-size: 9px; }
 .action-damage-result em,.action-roll-caveat { color: #928c83; font-size: 8px; font-style: normal; }
+@media (max-width: 640px) {
+  .action-psychic-control { grid-template-columns: 1fr; }
+  .action-roll-equation { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .action-roll-equation .action-roll-target { grid-column: 1 / -1; }
+  .action-roll-fate-option { grid-template-columns: auto 22px minmax(0,1fr); }
+  .action-roll-fate-option em { grid-column: 3; }
+}
 .review-inventory-section { grid-column: 1 / -1; }
 .review-section-heading {
   display: flex;
