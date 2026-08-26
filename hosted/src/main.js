@@ -64,6 +64,7 @@ const currentActionRecords = new Map();
 let actionIndexState = {
   query: localStorage.getItem("dh2-action-query") || "",
   group: localStorage.getItem("dh2-action-group") || "Attacks",
+  fateOnly: localStorage.getItem("dh2-action-fate-only") === "true",
   showUnavailable: localStorage.getItem("dh2-action-show-unavailable") === "true",
 };
 const reviewTabStorageKey = "dh2-review-tab";
@@ -1105,6 +1106,19 @@ function characteristicValue(characteristicId) {
 
 function finalFateThreshold() {
   return Number(character.fate?.threshold || 0) + Number(currentDivination()?.fateChange || 0);
+}
+
+function fateStatus() {
+  const threshold = Math.max(0, finalFateThreshold());
+  const recorded = character.fate?.current;
+  const current = recorded === undefined || recorded === null || recorded === ""
+    ? threshold
+    : Math.max(0, Math.min(threshold, Number(recorded) || 0));
+  return { threshold, current };
+}
+
+function currentFatePoints() {
+  return fateStatus().current;
 }
 
 function characteristicBonus(characteristicId) {
@@ -2215,6 +2229,41 @@ function refreshReviewWounds() {
   }
 }
 
+function renderReviewFate() {
+  const status = fateStatus();
+  const pips = Array.from({ length: status.threshold }, (_, index) => `<i class="${index < status.current ? "filled" : ""}"></i>`).join("");
+  return `<section class="review-fate-card" aria-labelledby="review-fate-heading">
+    <div class="review-vital-heading"><div><span>Resource</span><h3 id="review-fate-heading">Fate</h3></div><small>Spend, then restore next session</small></div>
+    <div class="fate-total"><strong data-fate-current-display>${status.threshold ? status.current : "—"}</strong><span>/ <b data-fate-threshold>${status.threshold || "—"}</b><small>Current / Threshold</small></span></div>
+    <div class="fate-pips" data-fate-pips role="img" aria-label="${status.threshold ? `${status.current} of ${status.threshold} Fate points available` : "Fate has not been determined"}">${pips}</div>
+    <div class="fate-controls">
+      <button class="fate-adjust restore" type="button" data-adjust-fate="1" ${!status.threshold || status.current >= status.threshold ? "disabled" : ""}>Restore</button>
+      <label><span>Current Fate</span><input type="number" min="0" max="${status.threshold}" step="1" inputmode="numeric" data-current-fate value="${status.current}" ${status.threshold ? "" : "disabled"} /></label>
+      <button class="fate-adjust spend" type="button" data-adjust-fate="-1" ${status.current <= 0 ? "disabled" : ""}>Spend</button>
+    </div>
+    <button class="compact-button view-fate-actions" type="button" data-open-fate-actions ${status.threshold ? "" : "disabled"}>View Fate Actions</button>
+  </section>`;
+}
+
+function refreshReviewFate() {
+  const status = fateStatus();
+  const display = document.querySelector("[data-fate-current-display]");
+  const threshold = document.querySelector("[data-fate-threshold]");
+  const input = document.querySelector("[data-current-fate]");
+  const restore = document.querySelector('[data-adjust-fate="1"]');
+  const spend = document.querySelector('[data-adjust-fate="-1"]');
+  const pips = document.querySelector("[data-fate-pips]");
+  if (display) display.textContent = status.threshold ? String(status.current) : "—";
+  if (threshold) threshold.textContent = status.threshold ? String(status.threshold) : "—";
+  if (input && document.activeElement !== input) input.value = String(status.current);
+  if (restore) restore.disabled = !status.threshold || status.current >= status.threshold;
+  if (spend) spend.disabled = status.current <= 0;
+  if (pips) {
+    [...pips.children].forEach((pip, index) => pip.classList.toggle("filled", index < status.current));
+    pips.setAttribute("aria-label", status.threshold ? `${status.current} of ${status.threshold} Fate points available` : "Fate has not been determined");
+  }
+}
+
 function displayWeight(item) {
   return Number.isFinite(item?.weight) ? `${item.weight} kg` : "Weight not listed";
 }
@@ -2721,8 +2770,20 @@ function characteristicActionRecords() {
   });
 }
 
+function fateUseMetadata(record = {}) {
+  const text = [record.name, record.summary, record.context].filter(Boolean).join(" ");
+  const spendsFate = /\b(?:spend|spends|spending|spent)\b.{0,18}\bfate\b/i.test(text);
+  const burnsFate = /\b(?:burn|burns|burning|burned|burnt)\b.{0,18}\bfate\b/i.test(text);
+  return {
+    usesFate: Boolean(record.usesFate || spendsFate || burnsFate),
+    spendsFate: Boolean(record.spendsFate || spendsFate),
+    burnsFate: Boolean(record.burnsFate || burnsFate),
+  };
+}
+
 function capabilityActionRecords(inventoryItems) {
   const fateThreshold = finalFateThreshold();
+  const currentFate = currentFatePoints();
   const fateOptions = [
     ["fate-reroll", "Spend Fate - Re-roll", "Re-roll one test; the second result must be used."],
     ["fate-plus-ten", "Spend Fate - Gain +10", "Gain +10 on a test when declared before the dice are rolled."],
@@ -2732,19 +2793,30 @@ function capabilityActionRecords(inventoryItems) {
     ["fate-stunned", "Spend Fate - Recover from Stunned", "Immediately recover from being Stunned."],
     ["fate-fatigue", "Spend Fate - Remove Fatigue", "Remove all levels of Fatigue."],
     ["fate-burn", "Burn Fate - Survive", "Permanently reduce Fate Threshold by 1 to survive an otherwise certain death, subject to the GM's narration and consequences."],
-  ].map(([id, name, summary]) => ({
-    id,
-    name,
-    group: "Abilities",
-    type: name.startsWith("Spend") ? "Free Action" : "Special",
-    subtypes: [],
-    summary,
-    source: "Core Rulebook, p. 293",
-    context: fateThreshold ? `Fate Threshold ${fateThreshold}; current session Fate is tracked during play` : "Fate Threshold has not been determined",
-    available: Boolean(fateThreshold),
-    unavailableReason: fateThreshold ? "" : "Determine Fate Threshold first.",
-    test: null,
-  }));
+  ].map(([id, name, summary]) => {
+    const burnsFate = name.startsWith("Burn");
+    const available = burnsFate ? fateThreshold > 0 : currentFate > 0;
+    return {
+      id,
+      name,
+      group: "Abilities",
+      type: name.startsWith("Spend") ? "Free Action" : "Special",
+      subtypes: [],
+      summary,
+      source: "Core Rulebook, p. 293",
+      context: fateThreshold
+        ? burnsFate
+          ? `Fate ${currentFate}/${fateThreshold} · burning Fate permanently reduces the threshold`
+          : `Fate ${currentFate}/${fateThreshold} · costs 1 current Fate point`
+        : "Fate Threshold has not been determined",
+      available,
+      unavailableReason: fateThreshold ? burnsFate ? "" : "No current Fate points remain." : "Determine Fate Threshold first.",
+      usesFate: true,
+      spendsFate: !burnsFate,
+      burnsFate,
+      test: null,
+    };
+  });
   const abilities = [
     ...currentTalentRecords().map((talent) => ({
       id: `talent-${talent.id || talent.name}`,
@@ -2841,8 +2913,22 @@ function derivedCharacterActions(inventoryItems = character.equipment.inventory.
       test: actionTestRecord("ballisticSkill", 0),
     });
   }
+  const fate = fateStatus();
+  const normalizedRecords = records.map((record) => {
+    const metadata = fateUseMetadata(record);
+    if (!metadata.spendsFate && !metadata.burnsFate) return { ...record, ...metadata };
+    const fateAvailable = metadata.burnsFate ? fate.threshold > 0 : fate.current > 0;
+    return {
+      ...record,
+      ...metadata,
+      available: Boolean(record.available && fateAvailable),
+      unavailableReason: record.available && !fateAvailable
+        ? metadata.burnsFate ? "No Fate Threshold remains to burn." : "No current Fate points remain."
+        : record.unavailableReason,
+    };
+  });
   const groupOrder = new Map(actionGroups.map((group, index) => [group, index]));
-  return records.sort((a, b) => (groupOrder.get(a.group) ?? 99) - (groupOrder.get(b.group) ?? 99) || a.name.localeCompare(b.name));
+  return normalizedRecords.sort((a, b) => (groupOrder.get(a.group) ?? 99) - (groupOrder.get(b.group) ?? 99) || a.name.localeCompare(b.name));
 }
 
 function serialisableCharacterActions(actions = derivedCharacterActions()) {
@@ -2856,6 +2942,9 @@ function serialisableCharacterActions(actions = derivedCharacterActions()) {
     source: record.source,
     context: record.context,
     available: Boolean(record.available),
+    usesFate: Boolean(record.usesFate),
+    spendsFate: Boolean(record.spendsFate),
+    burnsFate: Boolean(record.burnsFate),
     unavailableReason: record.unavailableReason || record.reason || "",
     test: record.test ? { ...record.test } : null,
   }));
@@ -4855,6 +4944,7 @@ function actionGroupGlyph(group) {
   if (key === "utility") return `<svg ${common}><path d="M10.5 2.2a3.5 3.5 0 0 0-3.9 4.9L2 11.7 4.3 14l4.6-4.6a3.5 3.5 0 0 0 4.9-3.9l-2.2 2.2-2.3-.9-.9-2.3z"/></svg>`;
   if (key === "tactical") return `<svg ${common}><path d="m2 11 6-8 6 8-6 3z"/><path d="M8 3v11M4.8 7.3h6.4"/></svg>`;
   if (key === "abilities") return `<svg ${common}><path d="m8 1.5 5.5 3.2v6.6L8 14.5l-5.5-3.2V4.7z"/><path d="M5.5 8h5M8 5.5v5"/></svg>`;
+  if (key === "fate") return `<svg ${common}><path d="M8 1.5 12.8 4v5.3L8 14.5 3.2 9.3V4z"/><path d="M8 4.2v7.6M5.8 6.1h4.4M6.5 9.8h3"/><circle class="group-core" cx="8" cy="8" r="1.1"/></svg>`;
   return `<svg ${common}><circle cx="8" cy="8" r="5.5"/><circle class="group-core" cx="8" cy="8" r="1.3"/></svg>`;
 }
 
@@ -4863,8 +4953,9 @@ function renderActionIndex(actions) {
   const query = actionIndexState.query.trim().toLowerCase();
   const initiallyVisible = (action) => (
     (actionIndexState.group === "All" || action.group === actionIndexState.group)
+    && (!actionIndexState.fateOnly || action.usesFate)
     && (action.available || actionIndexState.showUnavailable)
-    && (!query || [action.name, action.group, action.type, action.summary, action.context, ...(action.subtypes || [])].join(" ").toLowerCase().includes(query))
+    && (!query || [action.name, action.group, action.type, action.summary, action.context, action.usesFate ? "Fate" : "", ...(action.subtypes || [])].join(" ").toLowerCase().includes(query))
   );
   const initialVisibleCount = actions.filter(initiallyVisible).length;
   const availableCount = actions.filter((action) => action.available).length;
@@ -4882,20 +4973,20 @@ function renderActionIndex(actions) {
     </div>
     <div class="action-index-controls">
       <label class="action-search"><span>Search actions</span><input id="action-search" type="search" value="${escapeHtmlAttribute(actionIndexState.query)}" placeholder="Attack, Dodge, Tech-Use…" autocomplete="off" /></label>
-      <div class="action-filter-list" role="group" aria-label="Filter actions">${actionGroups.map((group) => `<button class="compact-button ${actionIndexState.group === group ? "active" : ""}" type="button" data-action-group="${group}" aria-pressed="${actionIndexState.group === group}">${actionGroupGlyph(group)}<span>${group}</span></button>`).join("")}</div>
+      <div class="action-filter-list" role="group" aria-label="Filter actions">${actionGroups.map((group) => `<button class="compact-button ${actionIndexState.group === group ? "active" : ""}" type="button" data-action-group="${group}" aria-pressed="${actionIndexState.group === group}">${actionGroupGlyph(group)}<span>${group}</span></button>`).join("")}<button class="compact-button fate-action-filter ${actionIndexState.fateOnly ? "active" : ""}" type="button" data-action-fate-only aria-pressed="${actionIndexState.fateOnly}">${actionGroupGlyph("Fate")}<span>Fate</span></button></div>
       <label class="show-unavailable"><input id="show-unavailable-actions" type="checkbox" ${actionIndexState.showUnavailable ? "checked" : ""} /><span>Show unavailable options</span></label>
     </div>
     ${carriedWeaponActions ? `<p class="action-index-notice">Owned weapons do not add attack buttons until they are marked <strong>Readied</strong> in Inventory. Conditional attack modes remain available through “Show unavailable options.”</p>` : ""}
     <div class="action-card-grid" id="action-card-grid">${actions.map((action) => {
-      const search = [action.name, action.group, action.type, action.summary, action.context, ...(action.subtypes || [])].join(" ").toLowerCase();
+      const search = [action.name, action.group, action.type, action.summary, action.context, action.usesFate ? "Fate" : "", ...(action.subtypes || [])].join(" ").toLowerCase();
       const initiallyHidden = !initiallyVisible(action);
       const preview = action.test ? resolvedActionTest(action.test) : null;
       const typePresentation = actionTypePresentation(action.type);
       const groupKey = actionGroupKey(action.group);
-      return `<article class="action-card action-group-${groupKey} action-type-${typePresentation.key} ${action.available ? "available" : "unavailable"}" data-action-card data-action-id="${escapeHtmlAttribute(action.id)}" data-action-group-value="${escapeHtmlAttribute(action.group)}" data-action-search="${escapeHtmlAttribute(search)}" data-action-available="${action.available}" ${initiallyHidden ? "hidden" : ""}>
+      return `<article class="action-card action-group-${groupKey} action-type-${typePresentation.key} ${action.usesFate ? "uses-fate" : ""} ${action.available ? "available" : "unavailable"}" data-action-card data-action-id="${escapeHtmlAttribute(action.id)}" data-action-group-value="${escapeHtmlAttribute(action.group)}" data-action-search="${escapeHtmlAttribute(search)}" data-action-available="${action.available}" data-action-uses-fate="${Boolean(action.usesFate)}" ${initiallyHidden ? "hidden" : ""}>
         <header>
           <div class="action-identity">
-            <span class="action-group-tag">${actionGroupGlyph(action.group)}<span>${escapeHtmlAttribute(action.group)}</span></span>
+            <span class="action-group-tag">${actionGroupGlyph(action.group)}<span>${escapeHtmlAttribute(action.group)}</span>${action.usesFate ? `<em class="action-fate-tag">${actionGroupGlyph("Fate")} Fate</em>` : ""}</span>
             <h4>${escapeHtmlAttribute(action.name)}</h4>
           </div>
           <span class="action-type-badge" role="img" aria-label="Action type: ${escapeHtmlAttribute(action.type)}" title="${escapeHtmlAttribute(action.type)}">${actionTypeGlyph(typePresentation.key)}<span class="action-type-caption">${escapeHtmlAttribute(typePresentation.short)}</span></span>
@@ -5086,17 +5177,17 @@ function renderReview() {
         <div class="review-vitals-strip">
           ${renderReviewWounds()}
           ${renderReviewArmour(equipmentState.wornArmour)}
-          <section class="review-meta review-quick-stats" aria-label="At a glance">
-            <h3>At a Glance</h3>
-            <span>Fate <strong>${character.fate.roll ? finalFateThreshold() : "—"}</strong></span>
-            <span>Fatigue Threshold <strong>${characteristicBonus("toughness") + characteristicBonus("willpower")}</strong></span>
-            <span>Move <strong>${characteristicBonus("agility")} / ${characteristicBonus("agility") * 2} / ${characteristicBonus("agility") * 3} / ${characteristicBonus("agility") * 6}</strong></span>
-            <span>XP Remaining <strong>${character.xp.starting - spent}</strong></span>
-            ${hasPsykerAccess() ? `<span>Psy Rating <strong>${foundryPsyRating()}</strong></span>` : ""}
-            ${Number(character.conditions.insanity || 0) ? `<span>Insanity <strong>${Number(character.conditions.insanity)}</strong></span>` : ""}
-            ${Number(character.conditions.corruption || 0) ? `<span>Corruption <strong>${Number(character.conditions.corruption)}</strong></span>` : ""}
-          </section>
+          ${renderReviewFate()}
         </div>
+        <section class="review-meta review-quick-stats review-quick-strip" aria-label="At a glance">
+          <h3>At a Glance</h3>
+          <span>Fatigue Threshold <strong>${characteristicBonus("toughness") + characteristicBonus("willpower")}</strong></span>
+          <span>Move <strong>${characteristicBonus("agility")} / ${characteristicBonus("agility") * 2} / ${characteristicBonus("agility") * 3} / ${characteristicBonus("agility") * 6}</strong></span>
+          <span>XP Remaining <strong>${character.xp.starting - spent}</strong></span>
+          ${hasPsykerAccess() ? `<span>Psy Rating <strong>${foundryPsyRating()}</strong></span>` : ""}
+          ${Number(character.conditions.insanity || 0) ? `<span>Insanity <strong>${Number(character.conditions.insanity)}</strong></span>` : ""}
+          ${Number(character.conditions.corruption || 0) ? `<span>Corruption <strong>${Number(character.conditions.corruption)}</strong></span>` : ""}
+        </section>
         <div class="review-sheet-body">
           <aside class="review-summary-rail" aria-label="Character summary">
             <section class="review-summary-card"><div class="review-summary-card-body">${identitySummaryRows}</div><h3>Identity</h3></section>
@@ -5309,9 +5400,10 @@ function filterReviewActionCards() {
   let visible = 0;
   document.querySelectorAll("[data-action-card]").forEach((card) => {
     const groupMatches = actionIndexState.group === "All" || card.dataset.actionGroupValue === actionIndexState.group;
+    const fateMatches = !actionIndexState.fateOnly || card.dataset.actionUsesFate === "true";
     const availabilityMatches = actionIndexState.showUnavailable || card.dataset.actionAvailable === "true";
     const searchMatches = !query || card.dataset.actionSearch.includes(query);
-    card.hidden = !(groupMatches && availabilityMatches && searchMatches);
+    card.hidden = !(groupMatches && fateMatches && availabilityMatches && searchMatches);
     if (!card.hidden) visible += 1;
   });
   const empty = document.querySelector("#action-empty");
@@ -5491,6 +5583,42 @@ function wireEvents() {
     });
   });
 
+  document.querySelector("[data-current-fate]")?.addEventListener("input", (event) => {
+    const threshold = finalFateThreshold();
+    character.fate.current = Math.max(0, Math.min(threshold, Number(event.target.value || 0)));
+    save();
+    refreshReviewFate();
+  });
+  document.querySelector("[data-current-fate]")?.addEventListener("change", () => {
+    rerenderEquipmentStatePreservingScroll("[data-current-fate]");
+  });
+  document.querySelectorAll("[data-adjust-fate]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const status = fateStatus();
+      character.fate.current = Math.max(0, Math.min(status.threshold, status.current + Number(button.dataset.adjustFate || 0)));
+      playMechanicalLock();
+      save();
+      rerenderEquipmentStatePreservingScroll(`[data-adjust-fate="${button.dataset.adjustFate}"]`);
+    });
+  });
+  document.querySelector("[data-open-fate-actions]")?.addEventListener("click", () => {
+    actionIndexState.group = "All";
+    actionIndexState.fateOnly = true;
+    localStorage.setItem("dh2-action-group", actionIndexState.group);
+    localStorage.setItem("dh2-action-fate-only", "true");
+    activateReviewTab("actions");
+    document.querySelectorAll("[data-action-group]").forEach((entry) => {
+      const active = entry.dataset.actionGroup === "All";
+      entry.classList.toggle("active", active);
+      entry.setAttribute("aria-pressed", String(active));
+    });
+    const fateButton = document.querySelector("[data-action-fate-only]");
+    fateButton?.classList.add("active");
+    fateButton?.setAttribute("aria-pressed", "true");
+    filterReviewActionCards();
+    document.querySelector('[data-review-panel="actions"]')?.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
   document.querySelector("#action-search")?.addEventListener("input", (event) => {
     actionIndexState.query = event.target.value;
     localStorage.setItem("dh2-action-query", actionIndexState.query);
@@ -5507,6 +5635,13 @@ function wireEvents() {
       });
       filterReviewActionCards();
     });
+  });
+  document.querySelector("[data-action-fate-only]")?.addEventListener("click", (event) => {
+    actionIndexState.fateOnly = !actionIndexState.fateOnly;
+    localStorage.setItem("dh2-action-fate-only", String(actionIndexState.fateOnly));
+    event.currentTarget.classList.toggle("active", actionIndexState.fateOnly);
+    event.currentTarget.setAttribute("aria-pressed", String(actionIndexState.fateOnly));
+    filterReviewActionCards();
   });
   document.querySelector("#show-unavailable-actions")?.addEventListener("change", (event) => {
     actionIndexState.showUnavailable = event.target.checked;
@@ -6110,6 +6245,7 @@ function wireEvents() {
         characteristicBreakdowns: Object.fromEntries(characteristics.map((entry) => [entry.id, characteristicBreakdown(entry.id)])),
         divinationModifiers: divinationCharacteristicModifiers(),
         fateThreshold: finalFateThreshold(),
+        currentFate: currentFatePoints(),
         aptitudes: resolvedAptitudes().aptitudes,
         skills: Object.fromEntries(ownedSkillRecords().map((record) => [record.key, {
           id: record.skill.id,
@@ -6168,7 +6304,7 @@ function wireEvents() {
         characteristics: Object.fromEntries(characteristics.map((entry) => [entry.id, foundryCharacteristicData(entry.id)])),
         fate: {
           max: finalFateThreshold(),
-          value: Number(character.fate?.current ?? finalFateThreshold()),
+          value: currentFatePoints(),
           rolled: Boolean(character.fate?.roll),
         },
         wounds: {

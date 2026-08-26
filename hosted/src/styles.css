@@ -1013,6 +1013,17 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 }
 .action-filter-list button .group-core { fill: currentColor; stroke: none; }
 .action-filter-list button.active { border-color: #e0b86d; background: rgba(168,106,42,.32); color: #fff2d7; box-shadow: inset 0 -2px 0 rgba(242,192,99,.32); }
+.action-filter-list .fate-action-filter {
+  border-color: rgba(231,190,91,.52);
+  color: #f0cc77;
+  background: linear-gradient(145deg,rgba(144,98,29,.2),rgba(9,12,11,.72));
+}
+.action-filter-list .fate-action-filter.active {
+  border-color: #ffd16b;
+  background: linear-gradient(145deg,rgba(168,109,29,.52),rgba(47,31,12,.72));
+  color: #fff4c9;
+  box-shadow: inset 0 -2px 0 #f2c763,0 0 14px rgba(224,172,63,.16);
+}
 .show-unavailable { display: flex; align-items: center; gap: 6px; min-height: 34px; color: #b5afa5; font-size: 8px; white-space: nowrap; }
 .show-unavailable input { width: 16px; height: 16px; accent-color: #b77b37; }
 .action-index-notice { margin: 0 0 8px; border-left: 2px solid #897046; padding: 6px 9px; background: rgba(111,80,35,.12); color: #b8ad9d; font-size: 8px; line-height: 1.35; }
@@ -1042,6 +1053,11 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 .action-card.action-group-utility { --action-accent: #d5ad67; --action-accent-rgb: 213,173,103; }
 .action-card.action-group-tactical { --action-accent: #e2c47e; --action-accent-rgb: 226,196,126; }
 .action-card.action-group-abilities { --action-accent: #d5d0c2; --action-accent-rgb: 213,208,194; }
+.action-card.uses-fate {
+  --action-accent: #efc45c;
+  --action-accent-rgb: 239,196,92;
+  box-shadow: inset 0 1px 0 rgba(255,236,178,.08),0 5px 18px rgba(0,0,0,.16),0 0 16px rgba(210,154,37,.08);
+}
 .action-card[hidden] { display: none; }
 .action-card.unavailable { --action-accent: #78756f; --action-accent-rgb: 120,117,111; opacity: .72; filter: saturate(.48); }
 .action-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0; }
@@ -1068,6 +1084,19 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
   stroke-linejoin: bevel;
 }
 .action-group-tag .group-core { fill: currentColor; stroke: none; }
+.action-fate-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  border-left: 1px solid rgba(240,200,105,.42);
+  padding-left: 7px;
+  color: #f2ca68;
+  font-size: 7px;
+  font-style: normal;
+  letter-spacing: .09em;
+}
+.action-fate-tag svg { width: 10px; height: 10px; }
 .action-card h4 {
   margin: 5px 0 0;
   color: #fff0d1;
@@ -3087,8 +3116,8 @@ dialog h2,
 }
 .review-dossier {
   display: grid;
-  grid-template-areas: "profile" "characteristics" "calculation" "vitals" "sheet";
-  grid-template-rows: auto auto auto auto minmax(0,1fr);
+  grid-template-areas: "profile" "characteristics" "calculation" "vitals" "quick" "sheet";
+  grid-template-rows: auto auto auto auto auto minmax(0,1fr);
   min-width: 0;
   overflow: hidden;
   padding: 15px 16px 16px;
@@ -3097,6 +3126,7 @@ dialog h2,
 .review-characteristics { grid-area: characteristics; }
 .review-dossier > .calculation-note { grid-area: calculation; }
 .review-vitals-strip { grid-area: vitals; }
+.review-quick-strip { grid-area: quick; }
 .review-sheet-body { grid-area: sheet; }
 .review-profile-heading {
   display: flex;
@@ -3120,7 +3150,7 @@ dialog h2,
 }
 .review-vitals-strip {
   display: grid;
-  grid-template-columns: minmax(210px,.72fr) minmax(345px,1.24fr) minmax(165px,.58fr);
+  grid-template-columns: minmax(210px,.72fr) minmax(345px,1.24fr) minmax(200px,.62fr);
   gap: 8px;
   min-width: 0;
   min-height: 0;
@@ -3128,6 +3158,7 @@ dialog h2,
 }
 .review-wounds-card,
 .review-armour-card,
+.review-fate-card,
 .review-quick-stats {
   min-width: 0;
   border: 1px solid rgba(225,187,118,.28);
@@ -3151,6 +3182,7 @@ dialog h2,
   text-transform: uppercase;
 }
 .review-vital-heading h3,
+.review-fate-card h3,
 .review-quick-stats h3 {
   margin: 0;
   color: #f2c97c;
@@ -3230,6 +3262,78 @@ dialog h2,
 .wound-adjust.damage { border-color: rgba(202,94,67,.5); color: #ffc0ad; }
 .wound-adjust:disabled { opacity: .42; cursor: not-allowed; }
 .wounds-critical { margin: 5px 0 0; color: #ff927a; font-weight: 700; text-align: center; }
+.review-fate-card {
+  display: grid;
+  grid-template-rows: auto auto auto auto auto;
+  align-content: start;
+  border-color: rgba(239,196,92,.58);
+  background:
+    radial-gradient(circle at 50% 38%,rgba(210,155,47,.18),transparent 48%),
+    linear-gradient(145deg,rgba(27,24,15,.95),rgba(4,8,7,.84));
+  box-shadow: inset 0 1px rgba(255,231,164,.12),0 0 18px rgba(210,155,47,.08);
+}
+.review-fate-card .review-vital-heading { display: grid; grid-template-columns: 1fr; align-items: start; gap: 2px; }
+.review-fate-card .review-vital-heading > small { max-width: none; text-align: left; }
+.fate-total {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 43px;
+}
+.fate-total > strong { color: #ffe08b; font: 700 38px/1 "Barlow Condensed",sans-serif; text-shadow: 0 0 14px rgba(235,180,57,.23); }
+.fate-total > span {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  color: #bdad83;
+  font: 500 17px "Barlow Condensed",sans-serif;
+}
+.fate-total > span small {
+  grid-column: 1 / -1;
+  color: #bbaa80;
+  font: 700 7px "Barlow Condensed",sans-serif;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.fate-pips { display: flex; justify-content: center; gap: 7px; min-height: 12px; margin: 1px 0 5px; }
+.fate-pips i {
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(232,195,107,.62);
+  background: rgba(5,9,8,.82);
+  transform: rotate(45deg);
+}
+.fate-pips i.filled { border-color: #ffe099; background: #d7a33e; box-shadow: 0 0 8px rgba(236,186,75,.5); }
+.fate-controls {
+  display: grid;
+  grid-template-columns: minmax(54px,auto) minmax(58px,1fr) minmax(54px,auto);
+  gap: 5px;
+  align-items: end;
+}
+.fate-controls label { display: grid; gap: 2px; min-width: 0; text-align: center; }
+.fate-controls label span { color: #cdbb8e; font: 700 7px "Barlow Condensed",sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.fate-controls input {
+  width: 100%;
+  min-height: 30px;
+  border: 1px solid rgba(239,196,92,.45);
+  padding: 4px;
+  background: #0d0e09;
+  color: #ffe7a8;
+  text-align: center;
+}
+.fate-adjust {
+  min-height: 30px;
+  border: 1px solid rgba(239,196,92,.45);
+  padding: 4px 6px;
+  background: rgba(140,91,35,.16);
+  color: #efd7a1;
+  font-weight: 700;
+  cursor: pointer;
+}
+.fate-adjust.spend { border-color: rgba(221,139,72,.58); color: #ffd0a3; }
+.fate-adjust:disabled { opacity: .4; cursor: not-allowed; }
+.view-fate-actions { width: 100%; min-height: 28px; margin-top: 6px; border-color: rgba(239,196,92,.48); color: #ffe2a0; }
 .review-armour-card { padding-bottom: 6px; }
 .armour-diagram {
   position: relative;
@@ -3290,6 +3394,16 @@ dialog h2,
   font-size: 9px;
   text-transform: uppercase;
 }
+.review-quick-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  margin: 0 0 8px;
+  padding: 0 10px;
+}
+.review-quick-strip h3 { margin: 0 12px 0 0; white-space: nowrap; }
+.review-quick-strip span { flex: 1 1 150px; min-height: 28px; align-items: center; border-top: 0; border-left: 1px solid rgba(255,255,255,.08); padding: 4px 8px; }
 .review-quick-stats h3 { margin-bottom: 3px; }
 .review-quick-stats span {
   display: flex;
@@ -3463,6 +3577,7 @@ dialog h2,
 html[data-text-size="extra-large"] .review-sheet-body { grid-template-columns: 1fr; }
 html[data-text-size="extra-large"] .review-summary-rail { display: none; }
 html[data-text-size="extra-large"] .review-vitals-strip { grid-template-columns: 1fr; }
+html[data-text-size="extra-large"] .review-quick-strip h3 { flex: 1 0 100%; margin: 0; padding: 6px 0; }
 html[data-text-size="extra-large"] .armour-diagram { width: 100%; max-width: 560px; min-width: 0; height: 205px; margin: 0 auto; }
 html[data-text-size="extra-large"] .armour-diagram > img { height: 198px; width: 102px; }
 html[data-text-size="extra-large"] .armour-location { width: 142px; min-height: 58px; }
@@ -3518,6 +3633,7 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
   .scene-review .validation-panel .valid { margin: 0; }
   .scene-review .validation-panel .export-status { grid-column: 1 / -1; }
   .review-sheet-body { grid-template-columns: minmax(205px,230px) minmax(0,1fr); }
+  .review-quick-strip h3 { flex: 1 0 100%; margin: 0; padding: 6px 0; }
   html[data-text-size="extra-large"] .scene-review .validation-panel { grid-template-columns: 1fr; }
 }
 
@@ -3527,6 +3643,7 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
   .review-profile-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
   .review-record-state { margin-bottom: 7px; }
   .review-vitals-strip { grid-template-columns: 1fr; }
+  .review-quick-strip span { flex-basis: 100%; }
   .armour-diagram { width: 100%; max-width: 520px; min-width: 0; margin: 0 auto; }
   .review-sheet-body { display: block; }
   .review-summary-rail { display: grid; grid-template-columns: 1fr; grid-template-rows: auto; margin-bottom: 10px; }
