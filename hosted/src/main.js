@@ -156,6 +156,9 @@ function prepareCharacter(input = {}) {
   prepared.xp.starting = Number.isFinite(Number(prepared.xp.starting))
     ? Math.max(0, Number(prepared.xp.starting))
     : 1000;
+  prepared.xp.awards = Array.isArray(prepared.xp.awards)
+    ? prepared.xp.awards.filter((entry) => Number(entry?.amount) > 0)
+    : [];
   return prepared;
 }
 
@@ -793,6 +796,9 @@ function applyTextScale(scope = root) {
     ".armour-location small",
     ".review-armour-card > p",
     ".review-record-state",
+    ".review-status-card > span",
+    ".review-status-card > small",
+    ".review-movement-card b small",
     ".review-summary-card > h3",
     ".review-workspace-tabs button",
     ".review-tab-select",
@@ -816,6 +822,10 @@ function applyTextScale(scope = root) {
     ".dossier-list em",
     ".dossier-list p",
     ".xp-ledger div",
+    ".advancement-balance span",
+    ".xp-award-form p",
+    ".xp-award-form label > span",
+    ".advancement-manager-actions button span",
     ".roster-card-heading span",
     ".roster-progress small",
     ".text-size-control",
@@ -1474,7 +1484,7 @@ function save({ markComplete = false } = {}) {
   syncGrantedEquipment();
   const now = new Date().toISOString();
   if (markComplete) character.completedAt = now;
-  else if (step < scenes.length - 1) character.completedAt = null;
+  else if (step < scenes.length - 1 && !character.completedAt) character.completedAt = null;
   const existingIndex = characterLibrary.findIndex((entry) => entry.id === activeCharacterId);
   const existing = characterLibrary[existingIndex];
   const record = {
@@ -2156,31 +2166,33 @@ function armourProtectionState(wornArmour = []) {
 
 function renderReviewArmour(wornArmour = []) {
   const protection = armourProtectionState(wornArmour);
+  const toughnessBonus = characteristicBonus("toughness");
   const tiles = protection.map((location) => {
+    const totalProtection = location.armourPoints + toughnessBonus;
     const layerRows = location.layers.length
       ? location.layers.map((entry) => [entry.item.name, `AP ${entry.armourPoints} · ${entry.item.profile?.type || "Armour"}`])
       : [["Protection", "No worn armour covers this location"]];
     const detailId = registerSheetDetail({
-      kind: "Armour Location",
+      kind: "Location Protection",
       name: location.label,
       summary: location.armourPoints
-        ? `${location.effectiveItem.name} provides the highest worn Armour value at this location. Armour Points from separate worn pieces do not add together.`
-        : "No currently worn armour provides Armour Points at this location.",
+        ? `${location.effectiveItem.name} provides the highest worn Armour value at this location. The displayed total adds Toughness Bonus for ordinary damage reduction; Armour Points from separate worn pieces do not add together.`
+        : "No worn armour covers this location, but Toughness Bonus still normally reduces damage. Penetration reduces Armour Points, not Toughness Bonus.",
       source: "Current inventory and worn-armour state",
-      rows: [["Hit roll", location.range], ["Effective AP", location.armourPoints], ...layerRows],
+      rows: [["Hit roll", location.range], ["Total normal reduction", totalProtection], ["Armour Points", location.armourPoints], ["Toughness Bonus", toughnessBonus], ...layerRows],
     });
-    return `<button type="button" class="armour-location armour-location-${location.id}" data-sheet-detail="${detailId}" title="${escapeHtmlAttribute(`${location.label}: AP ${location.armourPoints}${location.effectiveItem ? ` from ${location.effectiveItem.name}` : ""}`)}">
-      <span>${location.label}</span><strong>${location.armourPoints}</strong><small>AP · ${location.range}</small>
+    return `<button type="button" class="armour-location armour-location-${location.id}" data-sheet-detail="${detailId}" title="${escapeHtmlAttribute(`${location.label} (${location.range}): ${totalProtection} normal damage reduction (AP ${location.armourPoints} + TB ${toughnessBonus})`)}">
+      <span>${location.label}</span><strong>${totalProtection}</strong><small>AP ${location.armourPoints} + TB ${toughnessBonus}</small>
     </button>`;
   }).join("");
   const covered = protection.filter((location) => location.armourPoints > 0).length;
   return `<section class="review-armour-card" aria-labelledby="review-armour-heading">
-    <div class="review-vital-heading"><div><span>Protection</span><h3 id="review-armour-heading">Armour</h3></div><small>${covered}/6 locations covered</small></div>
-    <div class="armour-diagram" aria-label="Armour Points by hit location">
+    <div class="review-vital-heading"><div><span>Normal Damage Reduction</span><h3 id="review-armour-heading">Protection</h3></div><small>${covered}/6 locations have worn armour</small></div>
+    <div class="armour-diagram" aria-label="Normal damage reduction by hit location, including Armour Points and Toughness Bonus">
       <img src="./public/assets/ui/acolyte-silhouette.svg" alt="" aria-hidden="true" />
       ${tiles}
     </div>
-    <p>Highest worn AP shown · Toughness Bonus ${characteristicBonus("toughness")}</p>
+    <p>Total = highest worn AP + TB ${toughnessBonus} · Penetration reduces AP only</p>
   </section>`;
 }
 
@@ -3452,7 +3464,7 @@ function renderAdvances() {
   return `
     <div class="management-shell advance-layout">
       <aside class="xp-meter">
-        <span>Starting XP</span><strong>${character.xp.starting}</strong>
+        <span>Total XP</span><strong>${character.xp.starting}</strong>
         <span>Spent</span><strong>${spent}</strong>
         <span>Remaining</span><strong class="${spent > character.xp.starting ? "invalid" : ""}">${character.xp.starting - spent}</strong>
       </aside>
@@ -5063,6 +5075,13 @@ function renderReview() {
     ...(psyRatingXpCost() ? [[`Psy Rating ${foundryPsyRating()}`, psyRatingXpCost()]] : []),
     ...character.advances.eliteAdvances.filter((entry) => entry?.name).map((entry) => [entry.name, Number(entry.cost || 0)]),
   ];
+  const xpAvailable = character.xp.starting - spent;
+  const xpAwards = [...character.xp.awards].reverse();
+  const xpAwardedTotal = character.xp.awards.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const initialXp = Math.max(0, character.xp.starting - xpAwardedTotal);
+  const agilityBonus = characteristicBonus("agility");
+  const toughnessBonus = characteristicBonus("toughness");
+  const willpowerBonus = characteristicBonus("willpower");
   const abilityEntries = [
     ["Home World", ruleValue(character.homeWorld, "Home World Bonus")],
     ["Background", ruleValue(character.background, "Background Bonus")],
@@ -5212,14 +5231,24 @@ function renderReview() {
           ${renderReviewArmour(equipmentState.wornArmour)}
           ${renderReviewFate()}
         </div>
-        <section class="review-meta review-quick-stats review-quick-strip" aria-label="At a glance">
-          <h3>At a Glance</h3>
-          <span>Fatigue Threshold <strong>${characteristicBonus("toughness") + characteristicBonus("willpower")}</strong></span>
-          <span>Move <strong>${characteristicBonus("agility")} / ${characteristicBonus("agility") * 2} / ${characteristicBonus("agility") * 3} / ${characteristicBonus("agility") * 6}</strong></span>
-          <span>XP Remaining <strong>${character.xp.starting - spent}</strong></span>
-          ${hasPsykerAccess() ? `<span>Psy Rating <strong>${foundryPsyRating()}</strong></span>` : ""}
-          ${Number(character.conditions.insanity || 0) ? `<span>Insanity <strong>${Number(character.conditions.insanity)}</strong></span>` : ""}
-          ${Number(character.conditions.corruption || 0) ? `<span>Corruption <strong>${Number(character.conditions.corruption)}</strong></span>` : ""}
+        <section class="review-status-strip" aria-label="Movement and character resources">
+          <article class="review-status-card">
+            <span>Fatigue Threshold</span>
+            <strong>${toughnessBonus + willpowerBonus}</strong>
+            <small>TB ${toughnessBonus} + WPB ${willpowerBonus}</small>
+          </article>
+          <article class="review-status-card review-movement-card">
+            <span>Movement · metres</span>
+            <div><b>${agilityBonus}<small>Half</small></b><b>${agilityBonus * 2}<small>Full</small></b><b>${agilityBonus * 3}<small>Charge</small></b><b>${agilityBonus * 6}<small>Run</small></b></div>
+          </article>
+          <button class="review-status-card review-xp-card" type="button" data-open-advancement-tab>
+            <span>Available XP</span>
+            <strong>${xpAvailable}</strong>
+            <small>${spent} spent · ${character.xp.starting} earned</small>
+          </button>
+          ${hasPsykerAccess() ? `<article class="review-status-card"><span>Psy Rating</span><strong>${foundryPsyRating()}</strong><small>Current rating</small></article>` : ""}
+          ${Number(character.conditions.insanity || 0) ? `<article class="review-status-card status-warning"><span>Insanity</span><strong>${Number(character.conditions.insanity)}</strong><small>Current points</small></article>` : ""}
+          ${Number(character.conditions.corruption || 0) ? `<article class="review-status-card status-warning"><span>Corruption</span><strong>${Number(character.conditions.corruption)}</strong><small>Current points</small></article>` : ""}
         </section>
         <div class="review-sheet-body">
           <aside class="review-summary-rail" aria-label="Character summary">
@@ -5243,7 +5272,30 @@ function renderReview() {
                 <div class="review-feature-grid"><section class="review-aptitudes-section"><h3>Aptitudes</h3>${aptitudeTags}</section><section class="review-talents-section"><h3>Talents</h3><div class="dossier-list">${talentRows}</div></section><section class="review-abilities-section"><h3>Traits and Special Abilities</h3><div class="dossier-list">${abilityRows}</div></section>${eliteAdvances.length ? `<section class="review-elites-section"><h3>Elite Advances</h3><div class="dossier-list">${eliteRows}</div></section>` : ""}</div>
               </div>
               <div class="review-tab-panel" id="review-panel-background" role="tabpanel" aria-labelledby="review-tab-background" data-review-panel="background" ${reviewTabState === "background" ? "" : "hidden"}><div class="review-background-grid"><section><h3>Identity and Origin</h3>${identityRows}</section><section><h3>Divination</h3><div class="dossier-list">${renderSheetEntry({ kind: "Divination", name: currentDivination()?.title || "Not recorded", summary: currentDivination()?.effect || "No effect recorded.", meta: character.divination.roll ? `Roll ${character.divination.roll}` : "", source: currentDivination()?.source || "Core Rulebook — Divinations" })}</div></section></div></div>
-              <div class="review-tab-panel" id="review-panel-advancement" role="tabpanel" aria-labelledby="review-tab-advancement" data-review-panel="advancement" ${reviewTabState === "advancement" ? "" : "hidden"}><section><div class="review-section-heading"><div><h3>XP Ledger</h3><p>All characteristic, skill, talent, psychic, and elite-advance purchases recorded for this character.</p></div></div><div class="xp-ledger">${xpLedger.map(([name, cost]) => `<div><span>${name}</span><strong>${cost} XP</strong></div>`).join("") || "<p>No XP purchases recorded.</p>"}<div class="total"><span>Remaining</span><strong>${character.xp.starting - spent} XP</strong></div></div></section></div>
+              <div class="review-tab-panel" id="review-panel-advancement" role="tabpanel" aria-labelledby="review-tab-advancement" data-review-panel="advancement" ${reviewTabState === "advancement" ? "" : "hidden"}><section class="review-advancement-section">
+                <div class="review-section-heading"><div><h3>Advancement</h3><p>Award experience, review purchases, or return to the rules-aware advancement and equipment tools.</p></div></div>
+                <div class="advancement-balance" aria-label="Experience totals">
+                  <div><span>Total earned</span><strong>${character.xp.starting} XP</strong></div>
+                  <div><span>Spent</span><strong>${spent} XP</strong></div>
+                  <div class="${xpAvailable < 0 ? "overspent" : "available"}"><span>Available</span><strong>${xpAvailable} XP</strong></div>
+                </div>
+                <div class="advancement-manager">
+                  <form class="xp-award-form" id="xp-award-form">
+                    <div><h4>Award XP</h4><p>Add experience granted by the GM. The new total is saved immediately.</p></div>
+                    <label><span>Amount</span><input id="xp-award-amount" name="amount" type="number" min="1" step="50" inputmode="numeric" placeholder="100" required /></label>
+                    <label class="xp-award-note"><span>Reason · optional</span><input id="xp-award-note" name="note" type="text" maxlength="80" placeholder="Investigation completed" /></label>
+                    <button class="primary-button" type="submit">Add XP <span>›</span></button>
+                  </form>
+                  <div class="advancement-manager-actions">
+                    <button class="compact-button" type="button" data-manage-advances><strong>Purchase Advances</strong><span>Characteristics, skills, talents, psychic powers, and eligible elite advances.</span></button>
+                    <button class="compact-button" type="button" data-manage-inventory><strong>Manage Inventory</strong><span>Acquire, equip, ready, wear, or carry items through the existing Armoury.</span></button>
+                  </div>
+                </div>
+                <div class="advancement-ledgers">
+                  <div><h4>XP Purchases</h4><div class="xp-ledger">${xpLedger.map(([name, cost]) => `<div><span>${name}</span><strong>${cost} XP</strong></div>`).join("") || "<p>No XP purchases recorded.</p>"}<div class="total"><span>Spent</span><strong>${spent} XP</strong></div></div></div>
+                  <div><h4>XP Awards</h4><div class="xp-ledger xp-award-ledger">${xpAwards.map((entry) => `<div><span>${escapeHtmlAttribute(entry.note || "GM award")}</span><strong>+${Number(entry.amount)} XP</strong><small>${entry.at ? new Date(entry.at).toLocaleDateString() : "Recorded"}</small></div>`).join("") || "<p>No later XP awards recorded.</p>"}<div class="total"><span>Initial ${initialXp} + awards ${xpAwardedTotal}</span><strong>${character.xp.starting} XP</strong></div></div></div>
+                </div>
+              </section></div>
             </div>
           </section>
         </div>
@@ -5351,11 +5403,11 @@ function render() {
         <p>${step > 2 ? catalogs.roles.find(x => x.id === character.role)?.name : "Role not chosen"}</p>
       </aside>
 
-      <footer class="controls" aria-label="Character creation navigation">
+      <footer class="controls ${scene.id === "review" ? "completed-sheet-controls" : ""}" aria-label="${scene.id === "review" ? "Completed character controls" : "Character creation navigation"}">
         <button class="text-button" id="back" ${step === 0 ? "disabled" : ""}>Back</button>
-        <div class="progress" aria-label="Step ${step + 1} of ${scenes.length}">
+        ${scene.id === "review" ? "" : `<div class="progress" aria-label="Step ${step + 1} of ${scenes.length}">
           ${scenes.map((entry, index) => `<i class="${index === step ? "active" : index < step ? "done" : ""}" ${index === step ? 'aria-current="step"' : ""}><span class="sr-only">${entry.title}${index === step ? ", current step" : index < step ? ", completed" : ""}</span></i>`).join("")}
-        </div>
+        </div>`}
         <div class="actions">
           ${isIdentity ? "" : `<button class="text-button" id="details">Rules</button>`}
           <button class="primary-button" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : scene.id === "review" ? "Export Character JSON" : scene.action}<span>›</span></button>
@@ -5773,6 +5825,46 @@ function wireEvents() {
   document.querySelector("#review-tab-select")?.addEventListener("change", (event) => {
     playMechanicalLock();
     activateReviewTab(event.target.value);
+  });
+  document.querySelector("[data-open-advancement-tab]")?.addEventListener("click", () => {
+    playMechanicalLock();
+    activateReviewTab("advancement");
+    document.querySelector('[data-review-panel="advancement"]')?.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  document.querySelector("#xp-award-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const amountInput = event.currentTarget.elements.amount;
+    const noteInput = event.currentTarget.elements.note;
+    const amount = Math.floor(Number(amountInput.value || 0));
+    if (!Number.isFinite(amount) || amount < 1) {
+      amountInput.focus();
+      return;
+    }
+    character.xp.starting += amount;
+    character.xp.awards.push({
+      id: globalThis.crypto?.randomUUID?.() || `xp-${Date.now()}`,
+      amount,
+      note: String(noteInput.value || "").trim(),
+      at: new Date().toISOString(),
+    });
+    playMechanicalLock();
+    save();
+    pendingFocusSelector = "#xp-award-amount";
+    render();
+  });
+  document.querySelector("[data-manage-advances]")?.addEventListener("click", () => {
+    playMechanicalLock();
+    step = scenes.findIndex((entry) => entry.id === "advances");
+    pendingFocusSelector = "#scene-content";
+    save();
+    render();
+  });
+  document.querySelector("[data-manage-inventory]")?.addEventListener("click", () => {
+    playMechanicalLock();
+    step = scenes.findIndex((entry) => entry.id === "equipment");
+    pendingFocusSelector = "#scene-content";
+    save();
+    render();
   });
 
   document.querySelector("[data-current-damage]")?.addEventListener("input", (event) => {

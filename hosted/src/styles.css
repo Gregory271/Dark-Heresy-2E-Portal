@@ -1417,6 +1417,67 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 .xp-ledger div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.08); padding: 4px 0; color: #aaa69d; font-size: 8px; }
 .xp-ledger strong { color: #dfbd83; }
 .xp-ledger .total { margin-top: 4px; border-top: 1px solid #a77a3e; border-bottom: 0; padding-top: 7px; color: #e9e0d1; text-transform: uppercase; }
+.review-advancement-section { display: grid; gap: 12px; }
+.advancement-balance {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
+}
+.advancement-balance > div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(225,187,118,.25);
+  padding: 10px 12px;
+  background: rgba(6,10,9,.6);
+}
+.advancement-balance span {
+  color: #aaa69d;
+  font: 700 9px "Barlow Condensed",sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.advancement-balance strong { color: #f0dfc0; font: 650 21px "Barlow Condensed",sans-serif; }
+.advancement-balance .available { border-color: rgba(113,166,116,.48); }
+.advancement-balance .available strong { color: #b9ddb9; }
+.advancement-balance .overspent { border-color: rgba(204,91,70,.58); }
+.advancement-balance .overspent strong { color: #ffb09d; }
+.advancement-manager {
+  display: grid;
+  grid-template-columns: minmax(0,1fr);
+  gap: 10px;
+}
+.xp-award-form {
+  display: grid;
+  grid-template-columns: minmax(150px,1fr) minmax(80px,.32fr) minmax(140px,.72fr) minmax(105px,auto);
+  align-items: end;
+  gap: 8px;
+  border: 1px solid rgba(225,187,118,.25);
+  padding: 10px;
+  background: rgba(9,14,13,.72);
+}
+.xp-award-form h4,
+.advancement-ledgers h4 { margin: 0 0 3px; color: #edc77f; font: 600 16px "CaslonAntique","Barlow Condensed",sans-serif; }
+.xp-award-form p { margin: 0; color: #aaa69d; font-size: 9px; line-height: 1.35; }
+.xp-award-form label { display: grid; gap: 4px; min-width: 0; }
+.xp-award-form label > span { color: #aaa69d; font: 700 8px "Barlow Condensed",sans-serif; letter-spacing: .07em; text-transform: uppercase; }
+.xp-award-form input { width: 100%; min-height: 38px; border: 1px solid rgba(225,187,118,.27); padding: 7px 9px; background: #080d0c; color: #f2e7d4; }
+.xp-award-form .primary-button { min-width: 130px; min-height: 38px; padding: 8px 10px; font-size: 10px; }
+.advancement-manager-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.advancement-manager-actions button {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-height: 72px;
+  text-align: left;
+  text-transform: none;
+}
+.advancement-manager-actions button strong { color: #f1dfbd; font: 700 11px "Barlow Condensed",sans-serif; letter-spacing: .04em; text-transform: uppercase; }
+.advancement-manager-actions button span { color: #aaa69d; font-family: Inter,sans-serif; font-size: 8px; font-weight: 400; letter-spacing: 0; line-height: 1.35; }
+.advancement-ledgers { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.advancement-ledgers > div { min-width: 0; border: 1px solid rgba(255,255,255,.1); padding: 10px; background: rgba(3,7,7,.42); }
+.xp-award-ledger div { display: grid; grid-template-columns: minmax(0,1fr) auto; }
+.xp-award-ledger div small { grid-column: 1 / -1; color: #8f8a82; font-size: 7px; }
+.xp-award-ledger .total { display: flex; }
 .validation-panel .warning { border-left: 2px solid #c45d46; padding-left: 8px; color: #e8b3a7; font-size: 11px; }
 .validation-panel .valid { color: #bdd49e; }
 .validation-panel .export-status { margin: 8px 0 0; color: #bdd49e; font-size: 9px; line-height: 1.35; overflow-wrap: anywhere; }
@@ -3195,14 +3256,19 @@ dialog h2,
   grid-template-areas: "profile" "characteristics" "calculation" "vitals" "quick" "sheet";
   grid-template-rows: auto auto auto auto auto minmax(0,1fr);
   min-width: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 15px 16px 16px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #a77a3e #090d0c;
 }
 .review-profile-heading { grid-area: profile; }
 .review-characteristics { grid-area: characteristics; }
 .review-dossier > .calculation-note { grid-area: calculation; }
 .review-vitals-strip { grid-area: vitals; }
 .review-quick-strip { grid-area: quick; }
+.review-status-strip { grid-area: quick; }
 .review-sheet-body { grid-area: sheet; }
 .review-profile-heading {
   display: flex;
@@ -3489,12 +3555,84 @@ dialog h2,
   padding: 4px 0;
 }
 .review-quick-stats strong { color: #fff0d1; text-align: right; }
+.review-status-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(145px,1fr));
+  gap: 8px;
+  min-width: 0;
+  margin: 0 0 8px;
+}
+.review-status-card {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-content: center;
+  gap: 3px 10px;
+  min-width: 0;
+  min-height: 66px;
+  border: 1px solid rgba(225,187,118,.28);
+  padding: 8px 10px;
+  background: linear-gradient(145deg,rgba(11,17,16,.93),rgba(3,7,7,.78));
+  color: #e7e1d5;
+  text-align: left;
+}
+button.review-status-card { cursor: pointer; }
+button.review-status-card:hover,
+button.review-status-card:focus-visible {
+  border-color: #e1bb76;
+  background: linear-gradient(145deg,rgba(40,34,22,.96),rgba(6,11,10,.9));
+}
+.review-status-card > span {
+  align-self: end;
+  color: #c8bda8;
+  font: 700 10px/1.2 "Barlow Condensed",sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.review-status-card > strong {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+  color: #fff0d1;
+  font: 650 28px/1 "Barlow Condensed",sans-serif;
+}
+.review-status-card > small {
+  grid-column: 1;
+  color: #aaa69d;
+  font-size: 9px;
+  line-height: 1.25;
+}
+.review-xp-card { border-color: rgba(226,176,85,.5); }
+.review-xp-card > strong { color: #ffe09c; }
+.review-status-card.status-warning { border-color: rgba(205,104,73,.55); }
+.review-status-card.status-warning > strong { color: #ffb29d; }
+.review-movement-card { display: grid; grid-column: span 2; grid-template-columns: minmax(0,1fr); }
+.review-movement-card > span { align-self: auto; }
+.review-movement-card > div {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(45px,1fr));
+  gap: 4px;
+}
+.review-movement-card b {
+  display: grid;
+  gap: 1px;
+  border-left: 1px solid rgba(255,255,255,.1);
+  padding-left: 7px;
+  color: #fff0d1;
+  font: 650 21px/1 "Barlow Condensed",sans-serif;
+}
+.review-movement-card b:first-child { border-left: 0; padding-left: 0; }
+.review-movement-card b small {
+  color: #aaa69d;
+  font: 700 8px/1.2 "Barlow Condensed",sans-serif;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
 .review-sheet-body {
   display: grid;
   grid-template-columns: minmax(215px,245px) minmax(0,1fr);
   gap: 10px;
   min-width: 0;
-  min-height: 0;
+  min-height: clamp(420px,55vh,680px);
 }
 .review-summary-rail {
   display: grid;
@@ -3653,6 +3791,12 @@ dialog h2,
 html[data-text-size="extra-large"] .review-sheet-body { grid-template-columns: 1fr; }
 html[data-text-size="extra-large"] .review-summary-rail { display: none; }
 html[data-text-size="extra-large"] .review-vitals-strip { grid-template-columns: 1fr; }
+html[data-text-size="extra-large"] .review-status-strip { grid-template-columns: repeat(2,minmax(0,1fr)); }
+html[data-text-size="extra-large"] .advancement-manager,
+html[data-text-size="extra-large"] .advancement-ledgers { grid-template-columns: 1fr; }
+html[data-text-size="extra-large"] .xp-award-form { grid-template-columns: repeat(2,minmax(0,1fr)); }
+html[data-text-size="extra-large"] .xp-award-form > div,
+html[data-text-size="extra-large"] .xp-award-form .primary-button { grid-column: 1 / -1; }
 html[data-text-size="extra-large"] .review-quick-strip h3 { flex: 1 0 100%; margin: 0; padding: 6px 0; }
 html[data-text-size="extra-large"] .armour-diagram { width: 100%; max-width: 560px; min-width: 0; height: 205px; margin: 0 auto; }
 html[data-text-size="extra-large"] .armour-diagram > img { height: 198px; width: 102px; }
@@ -3709,6 +3853,8 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
   .scene-review .validation-panel .valid { margin: 0; }
   .scene-review .validation-panel .export-status { grid-column: 1 / -1; }
   .review-sheet-body { grid-template-columns: minmax(205px,230px) minmax(0,1fr); }
+  .review-status-strip { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .advancement-manager { grid-template-columns: 1fr; }
   .review-quick-strip h3 { flex: 1 0 100%; margin: 0; padding: 6px 0; }
   html[data-text-size="extra-large"] .scene-review .validation-panel { grid-template-columns: 1fr; }
 }
@@ -3719,6 +3865,11 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
   .review-profile-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
   .review-record-state { margin-bottom: 7px; }
   .review-vitals-strip { grid-template-columns: 1fr; }
+  .review-status-strip { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .advancement-ledgers { grid-template-columns: 1fr; }
+  .xp-award-form { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .xp-award-form > div,
+  .xp-award-form .primary-button { grid-column: 1 / -1; }
   .review-quick-strip span { flex-basis: 100%; }
   .armour-diagram { width: 100%; max-width: 520px; min-width: 0; margin: 0 auto; }
   .review-sheet-body { display: block; }
@@ -3758,6 +3909,14 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
   .review-profile-heading h2 { font-size: 20px; }
   .review-meta { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
   .review-quick-stats { grid-template-columns: 1fr; }
+  .review-status-strip,
+  html[data-text-size="extra-large"] .review-status-strip,
+  .advancement-balance,
+  .advancement-manager-actions,
+  .xp-award-form { grid-template-columns: 1fr; }
+  .review-movement-card { grid-column: span 1; }
+  .xp-award-form > div,
+  .xp-award-form .primary-button { grid-column: 1; }
   .armour-diagram,
   html[data-text-size="extra-large"] .armour-diagram {
     display: grid;
