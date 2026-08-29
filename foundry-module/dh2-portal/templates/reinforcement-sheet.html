@@ -1,0 +1,90 @@
+<form class="dh2-reinforcement-sheet" autocomplete="off">
+  <header class="dh2-rf-header">
+    <img class="dh2-rf-portrait" src="{{actor.img}}" data-edit="img" alt="{{actor.name}}" />
+    <div class="dh2-rf-identity">
+      <p>Inquisitorial Reinforcement</p>
+      <input name="name" type="text" value="{{actor.name}}" aria-label="NPC name" />
+      <div class="dh2-rf-tags">
+        {{#each tags}}<span>{{this}}</span>{{/each}}
+      </div>
+      <strong>{{source.summary}}</strong>
+    </div>
+    <div class="dh2-rf-source">
+      <span>{{source.tier}}</span>
+      <strong>{{sourceLabel}}</strong>
+    </div>
+  </header>
+
+  <section class="dh2-rf-characteristics" aria-label="Characteristics">
+    {{#each characteristics}}
+      <button type="button" data-roll-characteristic="{{key}}" title="Roll {{label}}">
+        <span>{{short}}</span><strong>{{total}}</strong><small>Bonus {{bonus}}</small>
+      </button>
+    {{/each}}
+  </section>
+
+  <section class="dh2-rf-vitals">
+    <label><span>Wounds</span><div><input name="system.wounds.value" type="number" value="{{system.wounds.value}}" min="0" /><b>/</b><input name="system.wounds.max" type="number" value="{{system.wounds.max}}" min="0" /></div></label>
+    <label><span>Fate</span><div><input name="system.fate.value" type="number" value="{{system.fate.value}}" min="0" /><b>/</b><input name="system.fate.max" type="number" value="{{system.fate.max}}" min="0" /></div></label>
+    <div><span>Movement</span><strong>{{source.movement}}</strong></div>
+    <div><span>Armour</span><strong>{{source.armour}}</strong>{{#unless source.armour}}<strong>{{source.profileText}}</strong>{{/unless}}</div>
+    {{#if system.psy.rating}}<div><span>Psy Rating</span><strong>{{system.psy.rating}}</strong></div>{{/if}}
+  </section>
+
+  <main class="dh2-rf-body">
+    <div class="dh2-rf-column dh2-rf-combat-column">
+      {{#if itemGroups.weapons.length}}
+        <section class="dh2-rf-panel dh2-rf-weapons">
+          <h2>Weapons</h2>
+          {{#each itemGroups.weapons}}
+            <button type="button" class="dh2-rf-record" data-reinforcement-item="{{id}}"><strong>{{name}}</strong><span>{{description}}</span></button>
+          {{/each}}
+        </section>
+      {{/if}}
+      {{#if source.skills.length}}
+        <section class="dh2-rf-panel">
+          <h2>Skills</h2>
+          <ul class="dh2-rf-compact-list">{{#each source.skills}}<li>{{this}}</li>{{/each}}</ul>
+        </section>
+      {{/if}}
+      {{#if itemGroups.gear.length}}
+        <section class="dh2-rf-panel">
+          <h2>Armour & Gear</h2>
+          <div class="dh2-rf-chip-list">{{#each itemGroups.gear}}<button type="button" data-reinforcement-item="{{id}}">{{name}}</button>{{/each}}</div>
+        </section>
+      {{/if}}
+    </div>
+
+    <div class="dh2-rf-column">
+      {{#if itemGroups.talents.length}}
+        <section class="dh2-rf-panel">
+          <h2>Talents</h2>
+          <div class="dh2-rf-detail-list">{{#each itemGroups.talents}}<button type="button" data-reinforcement-item="{{id}}"><strong>{{name}}</strong><span>{{description}}</span></button>{{/each}}</div>
+        </section>
+      {{/if}}
+      {{#if itemGroups.traits.length}}
+        <section class="dh2-rf-panel">
+          <h2>Traits</h2>
+          <div class="dh2-rf-chip-list">{{#each itemGroups.traits}}<button type="button" data-reinforcement-item="{{id}}">{{name}}</button>{{/each}}</div>
+        </section>
+      {{/if}}
+      {{#if itemGroups.psychicPowers.length}}
+        <section class="dh2-rf-panel">
+          <h2>Psychic Powers</h2>
+          <div class="dh2-rf-detail-list">{{#each itemGroups.psychicPowers}}<button type="button" data-reinforcement-item="{{id}}"><strong>{{name}}</strong><span>{{description}}</span></button>{{/each}}</div>
+        </section>
+      {{/if}}
+      {{#if itemGroups.specialRules.length}}
+        <section class="dh2-rf-panel dh2-rf-special-rules">
+          <h2>Special Rules</h2>
+          <div class="dh2-rf-detail-list">{{#each itemGroups.specialRules}}<button type="button" data-reinforcement-item="{{id}}"><strong>{{name}}</strong><span>{{description}}</span></button>{{/each}}</div>
+        </section>
+      {{/if}}
+    </div>
+  </main>
+
+  <footer class="dh2-rf-footer">
+    <span>{{source.peer}}</span>
+    <span>{{sourceLabel}}</span>
+  </footer>
+</form>

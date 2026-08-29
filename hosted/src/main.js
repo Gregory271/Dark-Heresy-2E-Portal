@@ -2925,6 +2925,263 @@ function foundryActorLibraryPayload(records = characterLibrary) {
   };
 }
 
+const reinforcementCharacteristicDefinitions = {
+  ws: ["weaponSkill", "Weapon Skill", "WS"],
+  bs: ["ballisticSkill", "Ballistic Skill", "BS"],
+  strength: ["strength", "Strength", "S"],
+  toughness: ["toughness", "Toughness", "T"],
+  agility: ["agility", "Agility", "Ag"],
+  intelligence: ["intelligence", "Intelligence", "Int"],
+  perception: ["perception", "Perception", "Per"],
+  willpower: ["willpower", "Willpower", "WP"],
+  fellowship: ["fellowship", "Fellowship", "Fel"],
+  influence: ["influence", "Influence", "Inf"],
+};
+
+function reinforcementProfileNumber(profileText, abbreviation) {
+  const escaped = abbreviation.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = String(profileText || "").match(new RegExp(`(?:^|[·;])\\s*${escaped}\\s+(\\d+)`, "i"));
+  return Number(match?.[1] || 0);
+}
+
+function reinforcementCharacteristicPayload(entry) {
+  const source = entry.characteristics || {};
+  const payload = {};
+  for (const [sourceKey, [foundryKey, label, short]] of Object.entries(reinforcementCharacteristicDefinitions)) {
+    const base = Number(source[sourceKey] ?? reinforcementProfileNumber(entry.profileText, short) ?? 0);
+    const unnaturalMatch = (entry.traits || []).map((trait) => String(trait).match(new RegExp(`^Unnatural\\s+${label}\\s*\\((\\d+)\\)`, "i"))).find(Boolean);
+    payload[foundryKey] = {
+      label,
+      short,
+      base,
+      advance: 0,
+      modifier: 0,
+      unnatural: Number(unnaturalMatch?.[1] || 0),
+      cost: 0,
+    };
+  }
+  return payload;
+}
+
+function reinforcementWounds(entry) {
+  return Number(entry.characteristics?.wounds || reinforcementProfileNumber(entry.profileText, "Wounds") || 0);
+}
+
+function reinforcementSize(entry) {
+  const match = (entry.traits || []).map((trait) => String(trait).match(/^Size\s*\((\d+)\)/i)).find(Boolean);
+  return Number(match?.[1] || 4);
+}
+
+function reinforcementPsyRating(entry) {
+  const match = (entry.traits || []).map((trait) => String(trait).match(/Psyker\s*\(PR\s*(\d+)\)/i)).find(Boolean);
+  return Number(match?.[1] || 0);
+}
+
+function reinforcementSkillPayload(entry) {
+  const payload = {};
+  for (const skill of skills) {
+    const foundryKey = foundryCamelCase(skill.id);
+    const characteristic = characteristics.find((candidate) => candidate.name === skill.characteristic);
+    payload[foundryKey] = {
+      label: skill.name,
+      characteristics: characteristic ? [characteristic.abbreviation] : [],
+      characteristic: characteristic?.abbreviation || "",
+      advance: 0,
+      isSpecialist: isSpecialistSkill(skill.id),
+      specialities: {},
+      cost: 0,
+    };
+  }
+
+  for (const listedSkill of entry.skills || []) {
+    const rankMatch = String(listedSkill).match(/\+(10|20|30)\s*$/);
+    const rank = rankMatch ? Number(rankMatch[1]) / 10 + 1 : 1;
+    const withoutRank = String(listedSkill).replace(/\s*\+(?:10|20|30)\s*$/, "").trim();
+    const specialityMatch = withoutRank.match(/^(.+?)\s*\((.+)\)$/);
+    const familyName = specialityMatch?.[1] || withoutRank;
+    const skill = skills.find((candidate) => normaliseItemName(candidate.name) === normaliseItemName(familyName));
+    if (!skill) continue;
+    const record = payload[foundryCamelCase(skill.id)];
+    if (isSpecialistSkill(skill.id) && specialityMatch) {
+      for (const speciality of specialityMatch[2].split(",").map((value) => value.trim()).filter(Boolean)) {
+        record.specialities[foundryCamelCase(speciality)] = { label: speciality, advance: rank, cost: 0, taken: true, custom: !(skillSpecialities[skill.id] || []).includes(speciality) };
+      }
+    } else {
+      record.advance = Math.max(record.advance, rank);
+    }
+  }
+  return payload;
+}
+
+function reinforcementWeaponItem(profile, entry) {
+  const [namePart, ...profileParts] = String(profile).split(/\s+—\s+/);
+  const detail = profileParts.join(" — ");
+  const fields = detail.split(/\s*·\s*/).filter(Boolean);
+  const weaponClass = fields.find((field) => /^(Melee|Pistol|Basic|Heavy|Thrown)$/i.test(field)) || "";
+  const range = Number(fields.find((field) => /^\d+\s*m$/i.test(field))?.match(/\d+/)?.[0] || 0);
+  const rof = fields.find((field) => /^(?:S|-|\d+)\/(?:S|-|\d+)\/(?:S|-|\d+)$/i.test(field));
+  const damageField = fields.find((field) => /\dd(?:5|10)/i.test(field)) || "";
+  const damageTypeCode = damageField.match(/\s([IREX])\s*$/i)?.[1]?.toUpperCase() || "";
+  const damageType = { I: "Impact", R: "Rending", E: "Energy", X: "Explosive" }[damageTypeCode] || "";
+  const penetration = Number(fields.find((field) => /^Pen\s+\d+/i.test(field))?.match(/\d+/)?.[0] || 0);
+  const rofParts = rof?.split("/") || [];
+  return {
+    name: namePart.trim() || "Weapon",
+    type: "weapon",
+    system: {
+      description: String(profile),
+      source: `${entry.source}, p. ${entry.page}`,
+      class: weaponClass,
+      range,
+      damage: damageField.replace(/\s+[IREX]\s*$/i, ""),
+      damageType,
+      penetration,
+      rateOfFire: {
+        single: rofParts[0]?.toUpperCase() === "S" ? 1 : Number(rofParts[0] || 0),
+        burst: rofParts[1] === "-" ? 0 : Number(rofParts[1] || 0),
+        full: rofParts[2] === "-" ? 0 : Number(rofParts[2] || 0),
+      },
+      equipped: true,
+    },
+    flags: { dh2CharacterBuilder: { reinforcementId: entry.id, reinforcementGroup: "weapon", sourceText: String(profile) } },
+  };
+}
+
+function reinforcementTalentItem(name, entry) {
+  const talent = talentByName(name);
+  return {
+    name,
+    type: "talent",
+    system: {
+      benefit: talent?.benefit || "Listed on this sourcebook reinforcement profile.",
+      description: talent?.benefit || "Listed on this sourcebook reinforcement profile.",
+      prerequisites: talent?.prerequisites || "",
+      aptitudes: talent?.aptitudes?.join(", ") || "",
+      tier: Number(talent?.tier || 0),
+      cost: 0,
+      source: talent?.source || `${entry.source}, p. ${entry.page}`,
+    },
+    flags: { dh2CharacterBuilder: { reinforcementId: entry.id, reinforcementGroup: "talent" } },
+  };
+}
+
+function reinforcementSimpleItem(name, type, group, entry, description = "") {
+  return {
+    name,
+    type,
+    system: { description: description || `Listed on the ${entry.name} sourcebook profile.`, source: `${entry.source}, p. ${entry.page}` },
+    flags: { dh2CharacterBuilder: { reinforcementId: entry.id, reinforcementGroup: group } },
+  };
+}
+
+function reinforcementFoundryActorPayload(entry) {
+  if (!entry || entry.type !== "npc") throw new Error("Only reinforcement characters can be exported as NPC Actors.");
+  const wounds = reinforcementWounds(entry);
+  const psyRating = reinforcementPsyRating(entry);
+  const armourText = [entry.armour, entry.profileText].filter(Boolean).join(" · ");
+  const armourPoints = Number(armourText.match(/Armour\s+(\d+)/i)?.[1] || 0);
+  const armourItem = armourPoints ? [{
+    name: String(entry.armour || "Profile armour").split(/[;.]/)[0],
+    type: "armour",
+    system: {
+      description: entry.armour || `Armour ${armourPoints} to all locations.`,
+      source: `${entry.source}, p. ${entry.page}`,
+      equipped: true,
+      armourPoints: { head: armourPoints, leftArm: armourPoints, rightArm: armourPoints, body: armourPoints, leftLeg: armourPoints, rightLeg: armourPoints },
+    },
+    flags: { dh2CharacterBuilder: { reinforcementId: entry.id, reinforcementGroup: "armour" } },
+  }] : [];
+  const psychicItems = (entry.psychicPowers || []).map((name) => {
+    const power = psychicPowerCatalogue.find((candidate) => normaliseItemName(candidate.name) === normaliseItemName(name));
+    return {
+      ...reinforcementSimpleItem(name, "psychicPower", "psychic-power", entry, power?.summary || power?.description || "Listed on this sourcebook reinforcement profile."),
+      system: {
+        description: power?.summary || power?.description || "Listed on this sourcebook reinforcement profile.",
+        benefit: power?.summary || power?.description || "",
+        discipline: power?.discipline || "",
+        action: power?.action || "Half Action",
+        focusPower: power?.focus || "",
+        range: power?.range || "",
+        sustained: power?.sustained || "No",
+        subtype: power?.subtype || "Concentration",
+        source: power?.source || `${entry.source}, p. ${entry.page}`,
+      },
+    };
+  });
+  const artwork = reinforcementArtwork(entry);
+  return {
+    name: entry.name,
+    type: "npc",
+    img: artwork,
+    system: {
+      characteristics: reinforcementCharacteristicPayload(entry),
+      wounds: { max: wounds, value: wounds, critical: 0, rolled: true },
+      fatigue: { max: 0, value: 0 },
+      fate: { max: Number(entry.fate || 0), value: Number(entry.fate || 0), rolled: true },
+      psy: { rating: psyRating, sustained: 0, defaultPR: psyRating, class: "bound", cost: 0, hasFocus: false },
+      size: reinforcementSize(entry),
+      skills: reinforcementSkillPayload(entry),
+      faction: entry.tags?.[0] || "",
+      subfaction: entry.tags?.[1] || "",
+      type: String(entry.tier || "Troop").toLowerCase(),
+      threatLevel: 0,
+    },
+    items: [
+      ...(entry.weapons || []).map((profile) => reinforcementWeaponItem(profile, entry)),
+      ...armourItem,
+      ...(entry.talents || []).map((name) => reinforcementTalentItem(name, entry)),
+      ...(entry.traits || []).map((name) => reinforcementSimpleItem(name, "trait", "trait", entry)),
+      ...(entry.gear || []).filter((name) => !entry.armour || !normaliseItemName(entry.armour).includes(normaliseItemName(name))).map((name) => reinforcementSimpleItem(name, "gear", "gear", entry)),
+      ...psychicItems,
+      ...(entry.notes || []).map((note, index) => reinforcementSimpleItem(`Special Rule ${index + 1}`, "specialAbility", "special-rule", entry, note)),
+    ],
+    flags: {
+      core: { sheetClass: "dh2-portal.PortalReinforcementSheet" },
+      dh2CharacterBuilder: {
+        format: "mrkeathley-dark-heresy-2nd",
+        schemaVersion: 1,
+        reinforcementId: entry.id,
+        reinforcement: { ...structuredClone(entry), artwork },
+      },
+    },
+  };
+}
+
+function exportReinforcementNpc(entry) {
+  const payload = reinforcementFoundryActorPayload(entry);
+  const status = document.querySelector("#reinforcement-export-status");
+  if (!foundryEmbeddedMode) {
+    downloadJson(`${entry.name}.foundry-npc.json`, payload);
+    if (status) status.textContent = `Download started for ${entry.name}.`;
+    return;
+  }
+  const requestId = globalThis.crypto?.randomUUID?.() || `dh2-reinforcement-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  if (status) status.textContent = `Creating ${entry.name} in Foundry…`;
+  const parentOrigin = foundryParentOrigin();
+  const targetOrigin = parentOrigin && parentOrigin !== location.origin ? parentOrigin : location.origin;
+  window.parent.postMessage({ source: "dh2-portal-frame", type: "create-reinforcement", requestId, payload }, targetOrigin);
+}
+
+function reinforcementFoundryLibraryPayload() {
+  const actors = reinforcementCatalogue.filter((entry) => entry.type === "npc").map((entry) => ({
+    reinforcementId: entry.id,
+    actor: reinforcementFoundryActorPayload(entry),
+  }));
+  return { format: "dh2-reinforcement-actor-library", version: 1, exportedAt: new Date().toISOString(), actorCount: actors.length, actors };
+}
+
+function exportAllReinforcementNpcs() {
+  const payload = reinforcementFoundryLibraryPayload();
+  if (!foundryEmbeddedMode) {
+    downloadJson("dark-heresy-reinforcement-npcs.foundry-library.json", payload);
+    return;
+  }
+  const requestId = globalThis.crypto?.randomUUID?.() || `dh2-reinforcements-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const parentOrigin = foundryParentOrigin();
+  const targetOrigin = parentOrigin && parentOrigin !== location.origin ? parentOrigin : location.origin;
+  window.parent.postMessage({ source: "dh2-portal-frame", type: "create-reinforcement-library", requestId, payload }, targetOrigin);
+}
+
 function sendCharacterToFoundry() {
   if (!foundryEmbeddedMode || foundryActorSheetMode) return;
   const requestId = globalThis.crypto?.randomUUID?.() || `dh2-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -3061,10 +3318,10 @@ if (foundryEmbeddedMode) {
       loadFoundryActor(event.data.actor, event.data.actorId);
       return;
     }
-    if (event.data?.type !== "create-actor-result" && event.data?.type !== "update-actor-result") return;
+    if (!["create-actor-result", "create-reinforcement-result", "update-actor-result"].includes(event.data?.type)) return;
     if (foundryRequestTimeout) window.clearTimeout(foundryRequestTimeout);
     foundryRequestTimeout = null;
-    const status = document.querySelector("#export-status");
+    const status = document.querySelector("#reinforcement-library-status") || document.querySelector("#reinforcement-export-status") || document.querySelector("#export-status");
     if (!status) return;
     if (event.data.type === "update-actor-result") {
       const revision = foundryActorSaveRequests.get(event.data.requestId) ?? foundryActorRevision;
@@ -3079,9 +3336,10 @@ if (foundryEmbeddedMode) {
       );
       return;
     }
+    const actorKind = event.data.type === "create-reinforcement-result" ? "NPC" : "Acolyte";
     status.textContent = event.data.ok
-      ? `${event.data.name || "Acolyte"} is ready in Foundry's Actors directory.`
-      : event.data.error || "Foundry could not create this Acolyte.";
+      ? `${event.data.name || actorKind} is ready in Foundry's Actors directory.`
+      : event.data.error || `Foundry could not create this ${actorKind}.`;
   });
 }
 
@@ -5561,10 +5819,11 @@ function reinforcementDetail(entry) {
   const statGrid = entry.characteristics ? `<section class="reinforcement-stat-section"><h3>Characteristics</h3><div class="reinforcement-stat-grid">${reinforcementStatCells(entry)}</div></section>` : entry.profileText ? `<section class="reinforcement-stat-section"><h3>Profile</h3><p class="reinforcement-profile-text">${escapeHtmlAttribute(entry.profileText)}</p></section>` : "";
   const vehicleFacts = entry.profile ? `<dl class="reinforcement-facts vehicle-facts"><div><dt>Armour</dt><dd>Front ${escapeHtmlAttribute(entry.profile.front)} · Side ${escapeHtmlAttribute(entry.profile.side)} · Rear ${escapeHtmlAttribute(entry.profile.rear)}</dd></div><div><dt>Speed</dt><dd>${escapeHtmlAttribute(entry.profile.cruising)} cruising · ${escapeHtmlAttribute(entry.profile.tactical)} tactical</dd></div><div><dt>Manoeuvrability</dt><dd>${escapeHtmlAttribute(entry.profile.manoeuvrability)}</dd></div><div><dt>Size</dt><dd>${escapeHtmlAttribute(entry.profile.size)}</dd></div><div><dt>Carrying</dt><dd>${escapeHtmlAttribute(entry.profile.carrying)} · Integrity ${escapeHtmlAttribute(entry.profile.integrity)}</dd></div><div><dt>Crew</dt><dd>${escapeHtmlAttribute(entry.profile.crew)}</dd></div></dl>` : "";
   const listBlock = (title, values) => values?.length ? `<section class="reinforcement-text-block"><h3>${title}</h3><ul>${values.map((value) => `<li>${escapeHtmlAttribute(value)}</li>`).join("")}</ul></section>` : "";
+  const foundryControl = entry.type === "npc" ? `<section class="reinforcement-foundry-control"><div><span>Foundry Actor</span><strong>Use this complete profile as an NPC.</strong></div><button class="compact-button" type="button" data-export-reinforcement-npc="${escapeHtmlAttribute(entry.id)}">${foundryEmbeddedMode ? "Create Foundry NPC" : "Export Foundry NPC JSON"}</button><p id="reinforcement-export-status" role="status" aria-live="polite"></p></section>` : "";
   return `<article class="reinforcement-record">
     <header class="reinforcement-record-header"><div class="reinforcement-record-art" style="--record-image:url('${reinforcementArtwork(entry)}')" aria-hidden="true"></div><div><p class="eyebrow">${escapeHtmlAttribute(entry.category || "Sourcebook record")}${entry.tier ? ` · ${escapeHtmlAttribute(entry.tier)}` : ""}</p><h2>${escapeHtmlAttribute(entry.name)}</h2><p>${escapeHtmlAttribute(entry.summary)}</p></div><span class="reinforcement-record-mark">${entry.type === "vehicle" ? "◇" : "✦"}</span></header>
     <div class="reinforcement-tags">${tags}</div>${influence}${entry.peer ? `<p class="reinforcement-callout"><strong>Calling this support:</strong> ${escapeHtmlAttribute(entry.peer)}</p>` : ""}${entry.requirements ? `<p class="reinforcement-callout warning"><strong>Requirement:</strong> ${escapeHtmlAttribute(entry.requirements)}</p>` : ""}
-    ${statGrid}${vehicleFacts}<div class="reinforcement-columns">${listBlock("Weapons", entry.weapons)}${listBlock("Skills", entry.skills)}${listBlock("Talents", entry.talents)}${listBlock("Traits", entry.traits)}${listBlock("Gear", entry.gear)}${listBlock("Psychic powers", entry.psychicPowers)}${listBlock("Special rules", entry.notes)}</div>
+    ${statGrid}${vehicleFacts}<div class="reinforcement-columns">${listBlock("Weapons", entry.weapons)}${listBlock("Skills", entry.skills)}${listBlock("Talents", entry.talents)}${listBlock("Traits", entry.traits)}${listBlock("Gear", entry.gear)}${listBlock("Psychic powers", entry.psychicPowers)}${listBlock("Special rules", entry.notes)}</div>${foundryControl}
     <footer class="reinforcement-record-footer"><span>${escapeHtmlAttribute(entry.source || "Sourcebook catalogue")}${entry.page ? ` · p. ${escapeHtmlAttribute(entry.page)}` : ""}${entry.statBlockPage ? ` · statblock p. ${escapeHtmlAttribute(entry.statBlockPage)}` : ""}</span>${entry.fate !== undefined ? `<span>Fate ${escapeHtmlAttribute(entry.fate)}</span>` : ""}</footer>
   </article>`;
 }
@@ -5581,7 +5840,7 @@ function renderReinforcements() {
   root.innerHTML = `<main class="reinforcement-scene theme-assessment">
     <header class="topbar reinforcement-topbar">${portalEmblem}<div class="brand"><strong>Dark Heresy Field Archive</strong><span>Reinforcements</span></div>${renderPortalSectionNav("reinforcements")}<label class="text-size-control" title="Interface text size"><span aria-hidden="true">TEXT</span><input id="text-size" type="range" min="80" max="160" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" /><output id="text-size-value" for="text-size">${Math.round(textScale * 100)}%</output></label></header>
     <section class="reinforcement-content" id="reinforcement-content" tabindex="-1">
-      <div class="reinforcement-heading"><div><p class="eyebrow">Warband support and reference</p><h1>Reinforcements</h1><p class="lede">Search sourcebook NPCs, vehicles, and Armoury equipment. The Reinforcement Characters also provide examples of affiliations, talents, and play styles for building your own Acolyte. The GM decides when they enter the warband.</p></div><div class="reinforcement-count" aria-live="polite"><strong>${filtered.length}</strong><span>records</span></div></div>
+      <div class="reinforcement-heading"><div><p class="eyebrow">Warband support and reference</p><h1>Reinforcements</h1><p class="lede">Search sourcebook NPCs, vehicles, and Armoury equipment. The Reinforcement Characters also provide examples of affiliations, talents, and play styles for building your own Acolyte. The GM decides when they enter the warband.</p></div><div class="reinforcement-count" aria-live="polite"><strong>${filtered.length}</strong><span>records</span><button class="compact-button" id="export-all-reinforcement-npcs" type="button">${foundryEmbeddedMode ? "Create All NPCs" : "Export NPC Library"}</button><small id="reinforcement-library-status" role="status"></small></div></div>
       <div class="reinforcement-toolbar"><label class="reinforcement-search"><span>Search the archive</span><input id="reinforcement-search" type="search" value="${escapeHtmlAttribute(reinforcementState.query)}" placeholder="Search names, factions, traits, or weapons…" autocomplete="off" /></label><div class="reinforcement-filter-group" role="tablist" aria-label="Record type">${categories.map((category) => `<button type="button" role="tab" class="${reinforcementState.category === category ? "active" : ""}" aria-selected="${reinforcementState.category === category}" data-reinforcement-category="${category}">${category}</button>`).join("")}</div><label class="reinforcement-filter-select"><span>Record type</span><select id="reinforcement-category-select">${categories.map((category) => `<option value="${category}" ${reinforcementState.category === category ? "selected" : ""}>${category}</option>`).join("")}</select></label></div>
       <div class="reinforcement-layout"><aside class="reinforcement-list" aria-label="Archive records"><div class="reinforcement-list-heading"><span>Archive records</span><strong>${filtered.length}</strong></div><div id="reinforcement-results">${reinforcementListEntries(filtered, reinforcementState.selectedId)}</div></aside><section class="reinforcement-inspector" aria-live="polite" id="reinforcement-inspector">${reinforcementDetail(selected)}</section></div>
     </section>
@@ -5600,6 +5859,16 @@ function wireReinforcementEvents() {
   });
   document.querySelector("#open-roster")?.addEventListener("click", () => { appView = "roster"; save(); render(); });
   document.querySelector("#open-compendium")?.addEventListener("click", () => { appView = "compendium"; save(); render(); });
+  document.querySelector("#export-all-reinforcement-npcs")?.addEventListener("click", () => {
+    const status = document.querySelector("#reinforcement-library-status");
+    try {
+      if (status) status.textContent = foundryEmbeddedMode ? "Creating reinforcement Actors…" : "Preparing NPC library…";
+      exportAllReinforcementNpcs();
+      if (!foundryEmbeddedMode && status) status.textContent = "NPC library download started.";
+    } catch (error) {
+      if (status) status.textContent = error instanceof Error ? error.message : "The NPC library could not be prepared.";
+    }
+  });
   document.querySelectorAll("[data-reinforcement-category]").forEach((button) => button.addEventListener("click", () => {
     reinforcementState.category = button.dataset.reinforcementCategory;
     localStorage.setItem("dh2-reinforcement-category", reinforcementState.category);
@@ -5621,6 +5890,16 @@ function wireReinforcementEvents() {
     localStorage.setItem("dh2-reinforcement-selected", reinforcementState.selectedId);
     renderReinforcements();
   }));
+  document.querySelector("[data-export-reinforcement-npc]")?.addEventListener("click", (event) => {
+    const entry = reinforcementCatalogue.find((candidate) => candidate.id === event.currentTarget.dataset.exportReinforcementNpc);
+    if (!entry) return;
+    try {
+      exportReinforcementNpc(entry);
+    } catch (error) {
+      const status = document.querySelector("#reinforcement-export-status");
+      if (status) status.textContent = error instanceof Error ? error.message : "The reinforcement NPC could not be prepared.";
+    }
+  });
 }
 
 function renderRoster() {

@@ -139,17 +139,85 @@ class PortalAcolyteSheet extends PortalSheetBase {
   }
 }
 
+class PortalReinforcementSheet extends PortalSheetBase {
+  static get defaultOptions() {
+    const base = super.defaultOptions || {};
+    return foundry.utils.mergeObject(base, {
+      id: "dh2-portal-reinforcement-sheet",
+      title: "Dark Heresy Reinforcement",
+      template: `modules/${MODULE_ID}/templates/reinforcement-sheet.html`,
+      classes: ["dh2-reinforcement-window"],
+      width: Math.min(1180, Math.max(920, window.innerWidth - 120)),
+      height: Math.min(940, Math.max(680, window.innerHeight - 120)),
+      resizable: true,
+      minimizable: true,
+      submitOnChange: true,
+      closeOnSubmit: false,
+    });
+  }
+
+  async getData(options = {}) {
+    const context = typeof super.getData === "function" ? await super.getData(options) : {};
+    const source = cloneData(this.actor.flags?.[PORTAL_FLAG]?.reinforcement || {});
+    const characteristicOrder = ["weaponSkill", "ballisticSkill", "strength", "toughness", "agility", "intelligence", "perception", "willpower", "fellowship", "influence"];
+    const characteristics = characteristicOrder.map((key) => {
+      const characteristic = this.actor.system?.characteristics?.[key] || {};
+      const total = Number(characteristic.total ?? (Number(characteristic.base || 0) + Number(characteristic.advance || 0) * 5 + Number(characteristic.modifier || 0)));
+      return { key, label: characteristic.label || key, short: characteristic.short || key, total, bonus: Math.floor(total / 10) + Number(characteristic.unnatural || 0) };
+    });
+    const itemGroups = { weapons: [], talents: [], traits: [], gear: [], psychicPowers: [], specialRules: [] };
+    for (const item of this.actor.items?.contents || this.actor.items || []) {
+      const group = item.flags?.[PORTAL_FLAG]?.reinforcementGroup || "";
+      const record = {
+        id: item.id,
+        name: item.name,
+        description: item.flags?.[PORTAL_FLAG]?.sourceText || item.system?.benefit || item.system?.description || "",
+      };
+      if (group === "weapon" || item.type === "weapon") itemGroups.weapons.push(record);
+      else if (group === "talent" || item.type === "talent") itemGroups.talents.push(record);
+      else if (group === "trait" || item.type === "trait") itemGroups.traits.push(record);
+      else if (group === "psychic-power" || item.type === "psychicPower") itemGroups.psychicPowers.push(record);
+      else if (group === "special-rule" || item.type === "specialAbility") itemGroups.specialRules.push(record);
+      else if (group === "gear" || group === "armour" || ["gear", "armour", "tool"].includes(item.type)) itemGroups.gear.push(record);
+    }
+    return {
+      ...context,
+      actor: this.actor,
+      system: this.actor.system,
+      source,
+      characteristics,
+      itemGroups,
+      tags: source.tags || [],
+      sourceLabel: [source.source, source.page ? `p. ${source.page}` : ""].filter(Boolean).join(", "),
+    };
+  }
+
+  activateListeners(html) {
+    if (typeof super.activateListeners === "function") super.activateListeners(html);
+    const root = html?.[0] ?? html;
+    root?.querySelectorAll?.("[data-roll-characteristic]").forEach((button) => button.addEventListener("click", () => {
+      this.actor.rollCharacteristic?.(button.dataset.rollCharacteristic);
+    }));
+    root?.querySelectorAll?.("[data-reinforcement-item]").forEach((button) => button.addEventListener("click", () => {
+      this.actor.items?.get?.(button.dataset.reinforcementItem)?.sheet?.render(true);
+    }));
+  }
+}
+
 Hooks.once("init", () => {
   const module = game.modules.get(MODULE_ID);
   if (module) {
     module.api = Object.freeze({
       importActorData,
       importActorLibrary,
+      importReinforcementActorData,
+      importReinforcementActorLibrary,
       openActorImport,
       openActorLibraryImport,
       openPortal,
       validateActorData,
       validateActorLibrary,
+      validateReinforcementActorData,
       updateActorFromPortal,
     });
   }
@@ -158,6 +226,11 @@ Hooks.once("init", () => {
       types: ["acolyte"],
       makeDefault: true,
       label: "Dark Heresy Portal Sheet",
+    });
+    Actors.registerSheet(MODULE_ID, PortalReinforcementSheet, {
+      types: ["npc"],
+      makeDefault: false,
+      label: "Portal Reinforcement Statblock",
     });
   }
 });
@@ -230,7 +303,9 @@ async function openActorImport() {
     const file = await chooseJsonFile();
     if (!file) return null;
     const payload = await readJsonFile(file);
+    if (looksLikeReinforcementLibrary(payload)) return await importReinforcementActorLibrary(payload);
     if (looksLikeActorLibrary(payload)) return await importActorLibrary(payload);
+    if (payload?.type === "npc" && payload?.flags?.[PORTAL_FLAG]?.reinforcementId) return await importReinforcementActorData(payload);
     return await importActorData(payload);
   } catch (error) {
     console.error(`${MODULE_ID} | Character import failed`, error);
@@ -281,6 +356,46 @@ async function handlePortalMessage(event) {
       reply({ ok: true, actorId: actor.id, name: actor.name });
     } catch (error) {
       reply({ ok: false, error: error instanceof Error ? error.message : "Foundry could not save this Acolyte." });
+    }
+    return;
+  }
+
+  if (event.data.type === "create-reinforcement" && context.kind === "portal") {
+    const reply = (result) => event.source?.postMessage({
+      source: "dh2-portal-module",
+      type: "create-reinforcement-result",
+      requestId: event.data.requestId,
+      ...result,
+    }, event.origin === "null" ? "*" : event.origin);
+    if (!game.user.isGM) {
+      reply({ ok: false, error: "Only a Gamemaster can create reinforcement NPCs." });
+      return;
+    }
+    try {
+      const actor = await importReinforcementActorData(event.data.payload, { openSheet: true });
+      reply({ ok: true, actorId: actor.id, name: actor.name });
+    } catch (error) {
+      reply({ ok: false, error: error instanceof Error ? error.message : "Foundry could not create this reinforcement NPC." });
+    }
+    return;
+  }
+
+  if (event.data.type === "create-reinforcement-library" && context.kind === "portal") {
+    const reply = (result) => event.source?.postMessage({
+      source: "dh2-portal-module",
+      type: "create-reinforcement-result",
+      requestId: event.data.requestId,
+      ...result,
+    }, event.origin === "null" ? "*" : event.origin);
+    if (!game.user.isGM) {
+      reply({ ok: false, error: "Only a Gamemaster can create reinforcement NPCs." });
+      return;
+    }
+    try {
+      const result = await importReinforcementActorLibrary(event.data.payload);
+      reply({ ok: true, name: `${result.created.length} reinforcement NPC${result.created.length === 1 ? "" : "s"} created${result.skipped.length ? `; ${result.skipped.length} already existed` : ""}` });
+    } catch (error) {
+      reply({ ok: false, error: error instanceof Error ? error.message : "Foundry could not create the reinforcement NPC library." });
     }
     return;
   }
@@ -445,6 +560,58 @@ async function importActorLibrary(payload, { folderName = "Imported Acolytes" } 
   return result;
 }
 
+async function importReinforcementActorData(payload, { openSheet = true, notify = true } = {}) {
+  if (!game.user.isGM) throw new Error("Only a Gamemaster can create reinforcement NPCs.");
+  if (game.system.id !== SYSTEM_ID) throw new Error("Activate the Dark Heresy 2nd Edition system before creating this NPC.");
+  const actorData = validateReinforcementActorData(payload);
+  const reinforcementId = actorData.flags?.[PORTAL_FLAG]?.reinforcementId;
+  const existing = game.actors?.find?.((actor) => actor.type === "npc" && actor.flags?.[PORTAL_FLAG]?.reinforcementId === reinforcementId);
+  if (existing) {
+    if (notify) ui.notifications.info(`${existing.name} already exists in the Reinforcement Characters folder.`);
+    if (openSheet) existing.sheet?.render(true);
+    return existing;
+  }
+  const folder = await findOrCreateActorFolder("Reinforcement Characters");
+  if (folder?.id) actorData.folder = folder.id;
+  const actor = await Actor.create(actorData);
+  if (!actor) throw new Error("Foundry did not create the reinforcement NPC.");
+  if (notify) ui.notifications.info(`${actor.name} was created as a reinforcement NPC.`);
+  if (openSheet) actor.sheet?.render(true);
+  return actor;
+}
+
+async function importReinforcementActorLibrary(payload) {
+  if (!game.user.isGM) throw new Error("Only a Gamemaster can create reinforcement NPCs.");
+  if (!payload || typeof payload !== "object" || payload.format !== "dh2-reinforcement-actor-library" || !Array.isArray(payload.actors)) {
+    throw new Error("This is not a Dark Heresy Portal reinforcement NPC library.");
+  }
+  if (!payload.actors.length) throw new Error("The reinforcement NPC library is empty.");
+  if (payload.actors.length > 100) throw new Error("The reinforcement NPC library exceeds the 100-Actor safety limit.");
+  const result = { created: [], skipped: [], failed: [] };
+  for (const entry of payload.actors) {
+    const actorData = validateReinforcementActorData(entry?.actor || entry);
+    const reinforcementId = actorData.flags?.[PORTAL_FLAG]?.reinforcementId;
+    const existing = game.actors?.find?.((actor) => actor.type === "npc" && actor.flags?.[PORTAL_FLAG]?.reinforcementId === reinforcementId);
+    if (existing) {
+      result.skipped.push(existing);
+      continue;
+    }
+    try {
+      result.created.push(await importReinforcementActorData(actorData, { openSheet: false, notify: false }));
+    } catch (error) {
+      result.failed.push({ name: actorData.name, error: error instanceof Error ? error.message : "Foundry could not create this NPC." });
+    }
+  }
+  const summary = `${result.created.length} reinforcement NPC${result.created.length === 1 ? "" : "s"} created${result.skipped.length ? `; ${result.skipped.length} duplicate${result.skipped.length === 1 ? "" : "s"} skipped` : ""}${result.failed.length ? `; ${result.failed.length} failed` : ""}.`;
+  if (result.failed.length) {
+    console.error(`${MODULE_ID} | Some reinforcement NPCs failed`, result.failed);
+    ui.notifications.warn(summary);
+  } else {
+    ui.notifications.info(summary);
+  }
+  return result;
+}
+
 async function updateActorFromPortal(actor, payload) {
   if (!actor || typeof actor.update !== "function") throw new Error("The Foundry Acolyte no longer exists.");
   const actorData = validateActorData(payload);
@@ -539,9 +706,41 @@ function validateActorLibrary(payload) {
   });
 }
 
+function validateReinforcementActorData(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Choose a valid Portal reinforcement NPC file.");
+  const source = payload.actor && typeof payload.actor === "object" ? payload.actor : payload;
+  const reinforcementId = String(source.flags?.[PORTAL_FLAG]?.reinforcementId || "").trim();
+  if (source.type !== "npc" || !source.system || typeof source.system !== "object" || !reinforcementId) {
+    throw new Error("This file is not a Dark Heresy Portal reinforcement NPC export.");
+  }
+  const flags = cloneData(source.flags || {});
+  flags.core ||= {};
+  flags.core.sheetClass = `${MODULE_ID}.PortalReinforcementSheet`;
+  return {
+    name: String(source.name || "Unnamed Reinforcement"),
+    type: "npc",
+    img: normalisePortalAssetPath(source.img),
+    system: cloneData(source.system),
+    items: Array.isArray(source.items) ? cloneData(source.items) : [],
+    flags,
+  };
+}
+
+function normalisePortalAssetPath(value = "") {
+  const path = String(value || "").split("?")[0];
+  if (path.startsWith("./")) return `modules/${MODULE_ID}/portal/${path.slice(2)}`;
+  if (path.startsWith("public/")) return `modules/${MODULE_ID}/portal/${path}`;
+  return path || "icons/svg/mystery-man.svg";
+}
+
 function looksLikeActorLibrary(payload) {
   return Boolean(payload && typeof payload === "object" && !Array.isArray(payload)
     && (String(payload.format || "").trim() === "dh2-foundry-actor-library" || Array.isArray(payload.actors)));
+}
+
+function looksLikeReinforcementLibrary(payload) {
+  return Boolean(payload && typeof payload === "object" && !Array.isArray(payload)
+    && String(payload.format || "").trim() === "dh2-reinforcement-actor-library" && Array.isArray(payload.actors));
 }
 
 function findMatchingPortalActor(entry) {
