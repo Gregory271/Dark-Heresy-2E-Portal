@@ -3402,6 +3402,44 @@ function renderStartingConsequences() {
   return `<div class="starting-consequences" aria-label="Starting consequences">${panels.join("")}</div>`;
 }
 
+function renderGrantDetailEntry({ name, meta = "", summary = "", source = "" } = {}) {
+  const cleanSummary = cleanRulesSummary(summary) || "No mechanical summary is recorded.";
+  const sourceLabel = source || "Source not recorded";
+  return `<details class="grant-entry grant-entry-detail">
+    <summary><strong>${escapeHtmlAttribute(name || "Unnamed grant")}</strong><span>${escapeHtmlAttribute(meta || "Granted")}</span></summary>
+    <div class="grant-entry-detail-body"><p>${escapeHtmlAttribute(cleanSummary)}</p><small>${escapeHtmlAttribute(sourceLabel)}</small></div>
+  </details>`;
+}
+
+function renderGrantedSkillEntry(entry) {
+  const rule = ruleTermsById[`skill-${entry.id}`];
+  const speciality = entry.speciality ? ` · ${entry.speciality}` : "";
+  return renderGrantDetailEntry({
+    name: `${entry.name}${speciality}`,
+    meta: `Known · ${entry.source || "Character creation"}`,
+    summary: rule?.summary,
+    source: rule ? `${rule.book}, p. ${rule.page}` : entry.source || "Character creation",
+  });
+}
+
+function renderGrantedTalentEntry(entry) {
+  return renderGrantDetailEntry({
+    name: entry.displayName || entry.name,
+    meta: entry.source || "Character creation",
+    summary: entry.benefit,
+    source: entry.source || entry.sourceBook || "Character creation",
+  });
+}
+
+function renderGrantedTraitEntry(entry) {
+  return renderGrantDetailEntry({
+    name: entry.name,
+    meta: entry.source || "Character creation",
+    summary: entry.summary,
+    source: entry.source || "Character creation",
+  });
+}
+
 function renderGrants() {
   const backgroundRows = mechanicsByChoice[character.background] || [];
   const roleRows = mechanicsByChoice[character.role] || [];
@@ -3410,9 +3448,9 @@ function renderGrants() {
   const freeTalents = Object.values(resolvedGrantedTalents());
   const freeTraits = automaticTraits();
   const groups = [
-    ["Initial Skills", freeSkills.map((skill) => `${skill.displayName} · Known · ${skill.source}`)],
-    ["Initial Talents", freeTalents.map((talent) => `${talent.displayName} · ${talent.source}`)],
-    ["Initial Traits", freeTraits.map((trait) => `${trait.name} · ${trait.source}`)],
+    ["Initial Skills", freeSkills.map(renderGrantedSkillEntry)],
+    ["Initial Talents", freeTalents.map(renderGrantedTalentEntry)],
+    ["Initial Traits", freeTraits.map(renderGrantedTraitEntry)],
     ["Home World Bonus", [homeRows.find(([label]) => label === "Home World Bonus")?.[1]].filter(Boolean)],
     ["Background Bonus", [backgroundRows.find(([label]) => label === "Background Bonus")?.[1]].filter(Boolean)],
     ["Role Talent", [roleRows.find(([label]) => label === "Talent Choice")?.[1]].filter(Boolean)],
@@ -3423,7 +3461,7 @@ function renderGrants() {
       ${groups.map(([title, entries]) => `
         <section class="grant-panel" data-grant-group="${title.toLowerCase().replace(/\s+/g, "-")}">
           <h2>${title}</h2>
-          ${entries.map((entry) => `<div class="grant-entry">${entry}</div>`).join("") || "<p>None recorded.</p>"}
+          ${entries.map((entry) => String(entry).trimStart().startsWith("<details") ? entry : `<div class="grant-entry">${entry}</div>`).join("") || "<p>None recorded.</p>"}
         </section>`).join("")}
       <section class="grant-panel choice-resolution" data-grant-group="granted-choices">
         <h2>Granted Choices</h2>

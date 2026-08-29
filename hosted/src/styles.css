@@ -4181,3 +4181,90 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
   .reinforcement-record-footer { display: grid; }
   .reinforcement-scene .roster-footer { display: grid; grid-template-columns: 1fr; margin-top: 12px; }
 }
+
+/* Compact, expandable explanations for the Starting Abilities record. */
+.scene-grants .grant-entry-detail {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 4px 0;
+  padding: 0;
+  border: 1px solid rgba(225,187,118,.2);
+  border-left: 2px solid rgba(225,187,118,.58);
+  background: rgba(4,8,7,.5);
+  overflow: hidden;
+}
+.scene-grants .grant-entry-detail summary {
+  display: grid;
+  position: relative;
+  grid-template-columns: minmax(0,1fr) minmax(90px,.8fr);
+  align-items: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 9px;
+  color: #ddd8ce;
+  cursor: pointer;
+  list-style: none;
+}
+.scene-grants .grant-entry-detail summary::-webkit-details-marker { display: none; }
+.scene-grants .grant-entry-detail summary::after {
+  content: "+";
+  position: absolute;
+  right: 6px;
+  color: #d9b778;
+  font: 700 14px/1 "Barlow Condensed", sans-serif;
+}
+.scene-grants .grant-entry-detail[open] summary::after { content: "−"; }
+.scene-grants .grant-entry-detail summary strong {
+  min-width: 0;
+  padding-right: 12px;
+  color: #fff0d5;
+  font: 600 14px/1.2 "Barlow Condensed", sans-serif;
+  overflow-wrap: anywhere;
+}
+.scene-grants .grant-entry-detail summary span {
+  min-width: 0;
+  color: #b7b1a6;
+  font-size: 8px;
+  line-height: 1.25;
+  letter-spacing: .03em;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.scene-grants .grant-entry-detail-body {
+  min-width: 0;
+  border-top: 1px solid rgba(255,255,255,.09);
+  padding: 7px 9px 8px;
+}
+.scene-grants .grant-entry-detail-body p {
+  margin: 0 0 5px;
+  color: #d1cbc0;
+  font-size: 10px;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+.scene-grants .grant-entry-detail-body small {
+  display: block;
+  color: #948e84;
+  font-size: 8px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.scene-grants .starting-talent-comparison,
+.scene-grants .starting-talent-option { min-width: 0; overflow: hidden; }
+.scene-grants .starting-talent-option p,
+.scene-grants .starting-talent-option footer,
+.scene-grants .starting-talent-option header { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 800px), (max-height: 820px) {
+  .scene-grants .grant-entry-detail summary { grid-template-columns: minmax(0,1fr); padding-right: 24px; }
+  .scene-grants .grant-entry-detail summary span { text-align: left; }
+  .scene-grants .grant-entry-detail summary strong { font-size: 15px; }
+}
+
+html[data-text-size="large"] .scene-grants .grant-entry-detail summary,
+html[data-text-size="extra-large"] .scene-grants .grant-entry-detail summary { grid-template-columns: minmax(0,1fr); padding-right: 24px; }
+html[data-text-size="large"] .scene-grants .grant-entry-detail summary span,
+html[data-text-size="extra-large"] .scene-grants .grant-entry-detail summary span { text-align: left; font-size: 9px; }
+html[data-text-size="large"] .scene-grants .grant-entry-detail-body p,
+html[data-text-size="extra-large"] .scene-grants .grant-entry-detail-body p { font-size: 11px; }
