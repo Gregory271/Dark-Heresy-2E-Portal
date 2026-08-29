@@ -3407,8 +3407,16 @@ dialog h2,
   min-width: 0;
 }
 .review-profile-heading > div { min-width: 0; }
-.review-profile-heading .choice-source { margin: 0; color: #f1c779; }
-.review-profile-heading h2 { margin: 2px 0 8px; overflow-wrap: anywhere; }
+.review-profile-heading h2 {
+  margin: 0 0 4px;
+  color: #fff0d5;
+  font: 600 clamp(28px,3.3vw,42px)/.95 "Barlow Condensed",sans-serif;
+  letter-spacing: .02em;
+  overflow-wrap: anywhere;
+  text-transform: none;
+  text-shadow: 0 1px 0 #000,0 0 16px rgba(205,146,62,.16);
+}
+.review-profile-details { margin: 0; color: #f1c779; font: 600 11px/1.35 "Barlow Condensed",sans-serif; letter-spacing: .09em; text-transform: uppercase; }
 .review-record-state {
   flex: 0 0 auto;
   margin-bottom: 9px;
@@ -4039,7 +4047,7 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
 
 @media (max-width: 520px) {
   .review-summary-rail { grid-template-columns: 1fr; }
-  .review-profile-heading h2 { font-size: 20px; }
+  .review-profile-heading h2 { font-size: 26px; }
   .review-meta { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
   .review-quick-stats { grid-template-columns: 1fr; }
   .review-status-strip,

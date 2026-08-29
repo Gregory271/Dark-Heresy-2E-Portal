@@ -2437,7 +2437,7 @@ function renderReviewArmour(wornArmour = []) {
   }).join("");
   const covered = protection.filter((location) => location.armourPoints > 0).length;
   return `<section class="review-armour-card" aria-labelledby="review-armour-heading">
-    <div class="review-vital-heading"><div><span>Normal Damage Reduction</span><h3 id="review-armour-heading">Protection</h3></div><small>${covered}/6 locations have worn armour</small></div>
+    <div class="review-vital-heading"><h3 id="review-armour-heading">Armour</h3><small>${covered}/6 locations have worn armour</small></div>
     <div class="armour-diagram" aria-label="Normal damage reduction by hit location, including Armour Points and Toughness Bonus">
       <img src="./public/assets/ui/acolyte-silhouette.svg" alt="" aria-hidden="true" />
       ${tiles}
@@ -2461,7 +2461,7 @@ function woundStatus() {
 function renderReviewWounds() {
   const status = woundStatus();
   return `<section class="review-wounds-card" aria-labelledby="review-wounds-heading">
-    <div class="review-vital-heading"><div><span>Condition</span><h3 id="review-wounds-heading">Wounds</h3></div><small>Damage counts upward</small></div>
+    <div class="review-vital-heading"><h3 id="review-wounds-heading">Wounds</h3></div>
     <div class="wounds-total"><strong data-wounds-remaining>${status.threshold ? status.remaining : "—"}</strong><span>/ <b data-wounds-threshold>${status.threshold || "—"}</b><small>Remaining / Threshold</small></span></div>
     <div class="wounds-track" role="img" aria-label="${status.threshold ? `${status.remaining} of ${status.threshold} Wounds remaining` : "Wounds not recorded"}"><i data-wounds-track style="--wounds-remaining:${status.percentRemaining}%"></i></div>
     <div class="wounds-controls">
@@ -2496,7 +2496,7 @@ function renderReviewFate() {
   const status = fateStatus();
   const pips = Array.from({ length: status.threshold }, (_, index) => `<i class="${index < status.current ? "filled" : ""}"></i>`).join("");
   return `<section class="review-fate-card" aria-labelledby="review-fate-heading">
-    <div class="review-vital-heading"><div><span>Resource</span><h3 id="review-fate-heading">Fate</h3></div><small>Spend, then restore next session</small></div>
+    <div class="review-vital-heading"><h3 id="review-fate-heading">Fate</h3><small>Spend, then restore next session</small></div>
     <div class="fate-total"><strong data-fate-current-display>${status.threshold ? status.current : "—"}</strong><span>/ <b data-fate-threshold>${status.threshold || "—"}</b><small>Current / Threshold</small></span></div>
     <div class="fate-pips" data-fate-pips role="img" aria-label="${status.threshold ? `${status.current} of ${status.threshold} Fate points available` : "Fate has not been determined"}">${pips}</div>
     <div class="fate-controls">
@@ -5658,7 +5658,7 @@ function renderReview() {
     <div class="management-shell review-layout">
       <section class="review-dossier">
         <header class="review-profile-heading">
-          <div><p class="choice-source">${character.name || "Unnamed Acolyte"}</p><h2>${homeWorldName} · ${backgroundName} · ${roleName}</h2></div>
+          <div><h2>${character.name || "Unnamed Acolyte"}</h2><p class="review-profile-details">${homeWorldName} · ${backgroundName} · ${roleName}</p></div>
           <span class="review-record-state">${warnings.length ? `${warnings.length} item${warnings.length === 1 ? "" : "s"} to review` : "Ready to play"}</span>
         </header>
         <div class="review-characteristics">${characteristics.map((entry) => {
