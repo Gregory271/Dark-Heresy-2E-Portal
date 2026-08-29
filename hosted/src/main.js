@@ -3486,17 +3486,20 @@ function renderGrants() {
         <h2>Granted Choices</h2>
         <p>Select each alternative granted by the character's Home World, Background, or Role.</p>
         <div class="grant-choice-list">
-          ${grantAlternatives().map((choice) => `
-            <div class="grant-choice-item">
-              <label>
-                <span>${choice.label}<small>${choice.source}</small></span>
-                <select data-grant-choice="${choice.id}">
-                  <option value="">Choose...</option>
-                  ${choice.options.map((option) => `<option value="${option}" ${character.grantChoices[choice.id] === option ? "selected" : ""}>${option}</option>`).join("")}
-                </select>
-              </label>
-              ${renderStartingTalentComparison(choice)}
-            </div>`).join("") || "<p>No unresolved alternatives were detected.</p>"}
+          ${grantAlternatives().map((choice) => {
+            const talentComparison = renderStartingTalentComparison(choice);
+            return `
+              <div class="grant-choice-item ${talentComparison ? "has-talent-comparison" : ""}">
+                <label>
+                  <span>${choice.label}<small>${choice.source}</small></span>
+                  <select data-grant-choice="${choice.id}">
+                    <option value="">Choose...</option>
+                    ${choice.options.map((option) => `<option value="${option}" ${character.grantChoices[choice.id] === option ? "selected" : ""}>${option}</option>`).join("")}
+                  </select>
+                </label>
+                ${talentComparison}
+              </div>`;
+          }).join("") || "<p>No unresolved alternatives were detected.</p>"}
         </div>
       </section>
       ${renderStartingConsequences()}

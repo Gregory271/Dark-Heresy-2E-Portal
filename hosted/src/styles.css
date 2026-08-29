@@ -535,6 +535,7 @@ select,.acquisition-list input,.choice-resolution textarea { border: 1px solid r
 .grant-choice-list label span { min-width: 0; }
 .grant-choice-list small { display: block; overflow: hidden; color: #99958c; font-size: 8px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
 .grant-choice-item { display: grid; align-content: start; gap: 8px; min-width: 0; }
+.grant-choice-item.has-talent-comparison { grid-column: 1 / -1; }
 .starting-talent-comparison { display: grid; gap: 8px; border: 1px solid rgba(225,187,118,.32); padding: 9px; background: rgba(3,7,7,.7); }
 .starting-talent-comparison > p { margin: 0; color: #c7c1b5; font-size: 10px; line-height: 1.45; }
 .starting-talent-comparison > p strong { color: #f2d29b; }
@@ -548,8 +549,14 @@ select,.acquisition-list input,.choice-resolution textarea { border: 1px solid r
 .starting-talent-option footer { border-top: 1px solid rgba(255,255,255,.08); padding-top: 6px; color: #b7b1a6; font-size: 8px; line-height: 1.35; }
 .starting-talent-option footer span { min-width: 0; }
 .starting-talent-option footer small { flex: 0 0 auto; overflow: visible; color: #8f8a81; text-overflow: clip; white-space: normal; }
-.starting-consequences { display: contents; }
-.exceptional-panel { grid-column: span 2; display: grid; align-content: start; gap: 9px; }
+.starting-consequences {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(min(360px,100%),1fr));
+  min-width: 0;
+}
+.starting-consequences .exceptional-panel { grid-column: auto; }
+.exceptional-panel { display: grid; align-content: start; gap: 9px; }
 .exceptional-panel h2,.exceptional-panel p { margin: 0; }
 .exceptional-result { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 5px 10px; border: 1px solid rgba(225,187,118,.26); padding: 10px; background: rgba(4,8,7,.62); }
 .exceptional-result > span { grid-row: 1 / span 2; min-width: 38px; color: #e8c88e; font: 700 12px "Barlow Condensed",sans-serif; }
@@ -579,6 +586,7 @@ select,.acquisition-list input,.choice-resolution textarea { border: 1px solid r
   min-height: 0;
   max-height: none;
   margin-top: 0;
+  grid-auto-rows: max-content;
   overflow: auto;
   align-content: start;
 }
@@ -625,7 +633,7 @@ html[data-text-size="extra-large"] .scene-grants .grant-choice-list {
 }
 html[data-text-size="large"] .starting-talent-option footer,
 html[data-text-size="extra-large"] .starting-talent-option footer { align-items: flex-start; flex-wrap: wrap; }
-.scene-grants .grant-entry,.scene-grants .grant-panel p { overflow-wrap: anywhere; }
+.scene-grants .grant-entry,.scene-grants .grant-panel p { overflow-wrap: break-word; word-break: normal; }
 .acquisition-list { display: grid; gap: 11px; margin-top: 15px; }
 .scene-equipment .management-content > .eyebrow { margin-bottom: 2px; }
 .scene-equipment .management-content > .kicker { margin-top: 2px; }
@@ -3208,6 +3216,7 @@ dialog h2,
 
 @media (max-width: 800px) {
   .exceptional-panel { grid-column: 1; }
+  .starting-talent-options { grid-template-columns: 1fr; }
   html[data-text-size="large"] .scene-grants .grants-grid,
   html[data-text-size="extra-large"] .scene-grants .grants-grid {
     grid-template-columns: 1fr;
@@ -4346,10 +4355,16 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
   overflow-wrap: anywhere;
 }
 .scene-grants .starting-talent-comparison,
-.scene-grants .starting-talent-option { min-width: 0; overflow: hidden; }
+.scene-grants .starting-talent-option { min-width: 0; overflow: visible; }
 .scene-grants .starting-talent-option p,
 .scene-grants .starting-talent-option footer,
-.scene-grants .starting-talent-option header { min-width: 0; overflow-wrap: anywhere; }
+.scene-grants .starting-talent-option header { min-width: 0; overflow-wrap: break-word; word-break: normal; }
+.scene-grants .starting-talent-option .rule-term {
+  display: inline;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  white-space: nowrap;
+}
 
 @media (max-width: 800px), (max-height: 820px) {
   .scene-grants .grant-entry-detail summary { grid-template-columns: minmax(0,1fr); padding-right: 24px; }
