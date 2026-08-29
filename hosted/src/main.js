@@ -3147,6 +3147,74 @@ function reinforcementFoundryActorPayload(entry) {
   };
 }
 
+function vehicleProfileNumber(value) {
+  const match = String(value ?? "").match(/[+-]?\d+(?:\.\d+)?/);
+  return Number(match?.[0] || 0);
+}
+
+function vehicleFoundryType(entry) {
+  const supportedTypes = ["Walker", "Wheeled", "Tracked", "Skimmer", "Aircraft", "Spacecraft"];
+  const searchable = [entry.name, ...(entry.profile?.traits || []), ...(entry.tags || [])].map((value) => String(value).toLowerCase());
+  return supportedTypes.find((type) => searchable.some((value) => value.includes(type.toLowerCase()))) || "";
+}
+
+function vehicleArmamentIsOption(profile) {
+  return /\bchoice\s*:|\bmay mount\b|\boptional\b|^none\b|^no standard weapons\b/i.test(String(profile));
+}
+
+function vehicleFoundryActorPayload(entry) {
+  if (!entry || entry.type !== "vehicle") throw new Error("Only sourcebook vehicles can be exported as vehicle Actors.");
+  const profile = entry.profile || {};
+  const artwork = reinforcementArtwork(entry);
+  const weaponItems = (entry.weapons || [])
+    .filter((weapon) => !vehicleArmamentIsOption(weapon))
+    .map((weapon) => reinforcementWeaponItem(weapon, entry));
+  const armamentOptions = (entry.weapons || [])
+    .filter(vehicleArmamentIsOption)
+    .map((description, index) => reinforcementSimpleItem(`Armament Option${(entry.weapons || []).filter(vehicleArmamentIsOption).length > 1 ? ` ${index + 1}` : ""}`, "trait", "vehicle-armament", entry, description));
+  const summaryItem = entry.summary ? [reinforcementSimpleItem("Sourcebook Profile", "trait", "vehicle-profile", entry, entry.summary)] : [];
+  const traitItems = (profile.traits || []).map((name) => reinforcementSimpleItem(name, "trait", "vehicle-trait", entry));
+  const sizeItem = profile.size ? [reinforcementSimpleItem(`Size: ${profile.size}`, "trait", "vehicle-profile", entry, `Vehicle size: ${profile.size}.`)] : [];
+  const ruleItems = (entry.notes || []).map((description, index) => reinforcementSimpleItem(`Special Rule ${index + 1}`, "trait", "vehicle-rule", entry, description));
+
+  return {
+    name: entry.name,
+    type: "vehicle",
+    img: artwork,
+    system: {
+      front: Number(profile.front || 0),
+      side: Number(profile.side || 0),
+      rear: Number(profile.rear || 0),
+      availability: String(profile.availability || ""),
+      speed: {
+        cruising: vehicleProfileNumber(profile.cruising),
+        tactical: vehicleProfileNumber(profile.tactical),
+      },
+      crew: String(profile.crew || ""),
+      manoeuverability: vehicleProfileNumber(profile.manoeuvrability),
+      carryingCapacity: Number(profile.carrying || 0),
+      integrity: {
+        max: Number(profile.integrity || 0),
+        value: Number(profile.integrity || 0),
+        critical: 0,
+      },
+      faction: entry.tags?.[0] || "",
+      subfaction: entry.tags?.[1] || "",
+      type: vehicleFoundryType(entry),
+      threatLevel: Number(profile.threat || 0),
+    },
+    items: [...weaponItems, ...armamentOptions, ...summaryItem, ...traitItems, ...sizeItem, ...ruleItems],
+    flags: {
+      dh2CharacterBuilder: {
+        format: "mrkeathley-dark-heresy-2nd",
+        schemaVersion: 1,
+        vehicleId: entry.id,
+        vehicle: { ...structuredClone(entry), artwork },
+      },
+    },
+  };
+}
+
 function exportReinforcementNpc(entry) {
   const payload = reinforcementFoundryActorPayload(entry);
   const status = document.querySelector("#reinforcement-export-status");
@@ -3180,6 +3248,38 @@ function exportAllReinforcementNpcs() {
   const parentOrigin = foundryParentOrigin();
   const targetOrigin = parentOrigin && parentOrigin !== location.origin ? parentOrigin : location.origin;
   window.parent.postMessage({ source: "dh2-portal-frame", type: "create-reinforcement-library", requestId, payload }, targetOrigin);
+}
+
+function exportVehicleActor(entry) {
+  const payload = vehicleFoundryActorPayload(entry);
+  const status = document.querySelector("#reinforcement-export-status");
+  if (!foundryEmbeddedMode) {
+    downloadJson(`${entry.name}.foundry-vehicle.json`, payload);
+    if (status) status.textContent = `Download started for ${entry.name}.`;
+    return;
+  }
+  const requestId = globalThis.crypto?.randomUUID?.() || `dh2-vehicle-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  if (status) status.textContent = `Creating ${entry.name} in Foundry…`;
+  const parentOrigin = foundryParentOrigin();
+  const targetOrigin = parentOrigin && parentOrigin !== location.origin ? parentOrigin : location.origin;
+  window.parent.postMessage({ source: "dh2-portal-frame", type: "create-vehicle", requestId, payload }, targetOrigin);
+}
+
+function vehicleFoundryLibraryPayload() {
+  const actors = vehicleCatalogue.map((entry) => ({ vehicleId: entry.id, actor: vehicleFoundryActorPayload(entry) }));
+  return { format: "dh2-vehicle-actor-library", version: 1, exportedAt: new Date().toISOString(), actorCount: actors.length, actors };
+}
+
+function exportAllVehicles() {
+  const payload = vehicleFoundryLibraryPayload();
+  if (!foundryEmbeddedMode) {
+    downloadJson("dark-heresy-vehicles.foundry-library.json", payload);
+    return;
+  }
+  const requestId = globalThis.crypto?.randomUUID?.() || `dh2-vehicles-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const parentOrigin = foundryParentOrigin();
+  const targetOrigin = parentOrigin && parentOrigin !== location.origin ? parentOrigin : location.origin;
+  window.parent.postMessage({ source: "dh2-portal-frame", type: "create-vehicle-library", requestId, payload }, targetOrigin);
 }
 
 function sendCharacterToFoundry() {
@@ -3318,7 +3418,7 @@ if (foundryEmbeddedMode) {
       loadFoundryActor(event.data.actor, event.data.actorId);
       return;
     }
-    if (!["create-actor-result", "create-reinforcement-result", "update-actor-result"].includes(event.data?.type)) return;
+    if (!["create-actor-result", "create-reinforcement-result", "create-vehicle-result", "update-actor-result"].includes(event.data?.type)) return;
     if (foundryRequestTimeout) window.clearTimeout(foundryRequestTimeout);
     foundryRequestTimeout = null;
     const status = document.querySelector("#reinforcement-library-status") || document.querySelector("#reinforcement-export-status") || document.querySelector("#export-status");
@@ -3336,7 +3436,7 @@ if (foundryEmbeddedMode) {
       );
       return;
     }
-    const actorKind = event.data.type === "create-reinforcement-result" ? "NPC" : "Acolyte";
+    const actorKind = event.data.type === "create-reinforcement-result" ? "NPC" : event.data.type === "create-vehicle-result" ? "vehicle" : "Acolyte";
     status.textContent = event.data.ok
       ? `${event.data.name || actorKind} is ready in Foundry's Actors directory.`
       : event.data.error || `Foundry could not create this ${actorKind}.`;
@@ -5774,8 +5874,33 @@ function reinforcementStatCells(entry) {
   return labels.filter(([id]) => stats[id] !== undefined).map(([id, label]) => `<div><span>${label}</span><strong>${escapeHtmlAttribute(stats[id])}</strong></div>`).join("");
 }
 
+function vehicleStatBlock(entry) {
+  const profile = entry.profile;
+  if (!profile) return "";
+  return `<section class="vehicle-statblock" aria-label="${escapeHtmlAttribute(entry.name)} vehicle profile">
+    <div class="vehicle-statblock-heading"><div><span>Vehicle profile</span><strong>${escapeHtmlAttribute(entry.name)}</strong></div><span>${escapeHtmlAttribute(profile.size || "Vehicle")}</span></div>
+    <div class="vehicle-armour-facing" aria-label="Vehicle armour facings">
+      <div><span>Front</span><strong>${escapeHtmlAttribute(profile.front)}</strong></div>
+      <div><span>Side</span><strong>${escapeHtmlAttribute(profile.side)}</strong></div>
+      <div><span>Rear</span><strong>${escapeHtmlAttribute(profile.rear)}</strong></div>
+    </div>
+    <dl class="vehicle-statblock-facts">
+      <div><dt>Tactical Speed</dt><dd>${escapeHtmlAttribute(profile.tactical)}</dd></div>
+      <div><dt>Cruising Speed</dt><dd>${escapeHtmlAttribute(profile.cruising)}</dd></div>
+      <div><dt>Manoeuvrability</dt><dd>${escapeHtmlAttribute(profile.manoeuvrability)}</dd></div>
+      <div><dt>Integrity</dt><dd>${escapeHtmlAttribute(profile.integrity)}</dd></div>
+      <div><dt>Carrying Capacity</dt><dd>${escapeHtmlAttribute(profile.carrying)}</dd></div>
+      <div><dt>Crew</dt><dd>${escapeHtmlAttribute(profile.crew)}</dd></div>
+      <div><dt>Availability</dt><dd>${escapeHtmlAttribute(profile.availability)}</dd></div>
+      <div><dt>Threat</dt><dd>${escapeHtmlAttribute(profile.threat)}</dd></div>
+    </dl>
+  </section>`;
+}
+
 function reinforcementArtwork(entry) {
-  if (entry.type === "vehicle") return stageArtById.equipment;
+  // The supplied vehicle records do not include vehicle artwork. Leave the
+  // art well neutral rather than showing an unrelated character illustration.
+  if (entry.type === "vehicle") return "";
   const tags = (entry.tags || []).map((tag) => String(tag).toLowerCase());
   const artId = tags.includes("assassin") ? "assassin"
     : tags.includes("adeptus astartes") || tags.includes("grey knights") ? "crusader"
@@ -5817,15 +5942,29 @@ function reinforcementDetail(entry) {
   }
   const influence = entry.influenceMinimum ? `<div class="reinforcement-influence"><span>Influence minimum <strong>${escapeHtmlAttribute(entry.influenceMinimum)}</strong></span><span>Influence cost <strong>${escapeHtmlAttribute(entry.influenceCost)}</strong></span></div>` : "";
   const statGrid = entry.characteristics ? `<section class="reinforcement-stat-section"><h3>Characteristics</h3><div class="reinforcement-stat-grid">${reinforcementStatCells(entry)}</div></section>` : entry.profileText ? `<section class="reinforcement-stat-section"><h3>Profile</h3><p class="reinforcement-profile-text">${escapeHtmlAttribute(entry.profileText)}</p></section>` : "";
-  const vehicleFacts = entry.profile ? `<dl class="reinforcement-facts vehicle-facts"><div><dt>Armour</dt><dd>Front ${escapeHtmlAttribute(entry.profile.front)} · Side ${escapeHtmlAttribute(entry.profile.side)} · Rear ${escapeHtmlAttribute(entry.profile.rear)}</dd></div><div><dt>Speed</dt><dd>${escapeHtmlAttribute(entry.profile.cruising)} cruising · ${escapeHtmlAttribute(entry.profile.tactical)} tactical</dd></div><div><dt>Manoeuvrability</dt><dd>${escapeHtmlAttribute(entry.profile.manoeuvrability)}</dd></div><div><dt>Size</dt><dd>${escapeHtmlAttribute(entry.profile.size)}</dd></div><div><dt>Carrying</dt><dd>${escapeHtmlAttribute(entry.profile.carrying)} · Integrity ${escapeHtmlAttribute(entry.profile.integrity)}</dd></div><div><dt>Crew</dt><dd>${escapeHtmlAttribute(entry.profile.crew)}</dd></div></dl>` : "";
+  const vehicleProfile = vehicleStatBlock(entry);
   const listBlock = (title, values) => values?.length ? `<section class="reinforcement-text-block"><h3>${title}</h3><ul>${values.map((value) => `<li>${escapeHtmlAttribute(value)}</li>`).join("")}</ul></section>` : "";
-  const foundryControl = entry.type === "npc" ? `<section class="reinforcement-foundry-control"><div><span>Foundry Actor</span><strong>Use this complete profile as an NPC.</strong></div><button class="compact-button" type="button" data-export-reinforcement-npc="${escapeHtmlAttribute(entry.id)}">${foundryEmbeddedMode ? "Create Foundry NPC" : "Export Foundry NPC JSON"}</button><p id="reinforcement-export-status" role="status" aria-live="polite"></p></section>` : "";
-  return `<article class="reinforcement-record">
+  const foundryControl = entry.type === "npc"
+    ? `<section class="reinforcement-foundry-control"><div><span>Foundry Actor</span><strong>Use this complete profile as an NPC.</strong></div><button class="compact-button" type="button" data-export-reinforcement-npc="${escapeHtmlAttribute(entry.id)}">${foundryEmbeddedMode ? "Create Foundry NPC" : "Export Foundry NPC JSON"}</button><p id="reinforcement-export-status" role="status" aria-live="polite"></p></section>`
+    : entry.type === "vehicle"
+      ? `<section class="reinforcement-foundry-control"><div><span>Foundry Vehicle</span><strong>Create a native vehicle Actor with this sourcebook profile.</strong></div><button class="compact-button" type="button" data-export-vehicle="${escapeHtmlAttribute(entry.id)}">${foundryEmbeddedMode ? "Create Foundry Vehicle" : "Export Foundry Vehicle JSON"}</button><p id="reinforcement-export-status" role="status" aria-live="polite"></p></section>`
+      : "";
+  return `<article class="reinforcement-record ${entry.type === "vehicle" ? "vehicle-record" : ""}">
     <header class="reinforcement-record-header"><div class="reinforcement-record-art" style="--record-image:url('${reinforcementArtwork(entry)}')" aria-hidden="true"></div><div><p class="eyebrow">${escapeHtmlAttribute(entry.category || "Sourcebook record")}${entry.tier ? ` · ${escapeHtmlAttribute(entry.tier)}` : ""}</p><h2>${escapeHtmlAttribute(entry.name)}</h2><p>${escapeHtmlAttribute(entry.summary)}</p></div><span class="reinforcement-record-mark">${entry.type === "vehicle" ? "◇" : "✦"}</span></header>
     <div class="reinforcement-tags">${tags}</div>${influence}${entry.peer ? `<p class="reinforcement-callout"><strong>Calling this support:</strong> ${escapeHtmlAttribute(entry.peer)}</p>` : ""}${entry.requirements ? `<p class="reinforcement-callout warning"><strong>Requirement:</strong> ${escapeHtmlAttribute(entry.requirements)}</p>` : ""}
-    ${statGrid}${vehicleFacts}<div class="reinforcement-columns">${listBlock("Weapons", entry.weapons)}${listBlock("Skills", entry.skills)}${listBlock("Talents", entry.talents)}${listBlock("Traits", entry.traits)}${listBlock("Gear", entry.gear)}${listBlock("Psychic powers", entry.psychicPowers)}${listBlock("Special rules", entry.notes)}</div>${foundryControl}
+    ${statGrid}${vehicleProfile}<div class="reinforcement-columns">${listBlock("Weapons", entry.weapons)}${listBlock("Skills", entry.skills)}${listBlock("Talents", entry.talents)}${listBlock("Traits", entry.traits || entry.profile?.traits)}${listBlock("Gear", entry.gear)}${listBlock("Psychic powers", entry.psychicPowers)}${listBlock("Special rules", entry.notes)}</div>${foundryControl}
     <footer class="reinforcement-record-footer"><span>${escapeHtmlAttribute(entry.source || "Sourcebook catalogue")}${entry.page ? ` · p. ${escapeHtmlAttribute(entry.page)}` : ""}${entry.statBlockPage ? ` · statblock p. ${escapeHtmlAttribute(entry.statBlockPage)}` : ""}</span>${entry.fate !== undefined ? `<span>Fate ${escapeHtmlAttribute(entry.fate)}</span>` : ""}</footer>
   </article>`;
+}
+
+function reinforcementBulkControls(category) {
+  const showNpcs = category === "All" || category === "NPCs";
+  const showVehicles = category === "All" || category === "Vehicles";
+  if (!showNpcs && !showVehicles) return "";
+  return `<div class="reinforcement-bulk-actions" aria-label="Foundry export options">
+    ${showNpcs ? `<button class="compact-button" id="export-all-reinforcement-npcs" type="button">${foundryEmbeddedMode ? "Create All NPCs" : "Export NPC Library"}</button>` : ""}
+    ${showVehicles ? `<button class="compact-button" id="export-all-vehicles" type="button">${foundryEmbeddedMode ? "Create All Vehicles" : "Export Vehicle Library"}</button>` : ""}
+  </div><small id="reinforcement-library-status" role="status"></small>`;
 }
 
 function renderReinforcements() {
@@ -5840,7 +5979,7 @@ function renderReinforcements() {
   root.innerHTML = `<main class="reinforcement-scene theme-assessment">
     <header class="topbar reinforcement-topbar">${portalEmblem}<div class="brand"><strong>Dark Heresy Field Archive</strong><span>Reinforcements</span></div>${renderPortalSectionNav("reinforcements")}<label class="text-size-control" title="Interface text size"><span aria-hidden="true">TEXT</span><input id="text-size" type="range" min="80" max="160" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" /><output id="text-size-value" for="text-size">${Math.round(textScale * 100)}%</output></label></header>
     <section class="reinforcement-content" id="reinforcement-content" tabindex="-1">
-      <div class="reinforcement-heading"><div><p class="eyebrow">Warband support and reference</p><h1>Reinforcements</h1><p class="lede">Search sourcebook NPCs, vehicles, and Armoury equipment. The Reinforcement Characters also provide examples of affiliations, talents, and play styles for building your own Acolyte. The GM decides when they enter the warband.</p></div><div class="reinforcement-count" aria-live="polite"><strong>${filtered.length}</strong><span>records</span><button class="compact-button" id="export-all-reinforcement-npcs" type="button">${foundryEmbeddedMode ? "Create All NPCs" : "Export NPC Library"}</button><small id="reinforcement-library-status" role="status"></small></div></div>
+      <div class="reinforcement-heading"><div><p class="eyebrow">Warband support and reference</p><h1>Reinforcements</h1><p class="lede">Search sourcebook NPCs, vehicles, and Armoury equipment. The Reinforcement Characters also provide examples of affiliations, talents, and play styles for building your own Acolyte. The GM decides when they enter the warband.</p></div><div class="reinforcement-count" aria-live="polite"><strong>${filtered.length}</strong><span>records</span>${reinforcementBulkControls(reinforcementState.category)}</div></div>
       <div class="reinforcement-toolbar"><label class="reinforcement-search"><span>Search the archive</span><input id="reinforcement-search" type="search" value="${escapeHtmlAttribute(reinforcementState.query)}" placeholder="Search names, factions, traits, or weapons…" autocomplete="off" /></label><div class="reinforcement-filter-group" role="tablist" aria-label="Record type">${categories.map((category) => `<button type="button" role="tab" class="${reinforcementState.category === category ? "active" : ""}" aria-selected="${reinforcementState.category === category}" data-reinforcement-category="${category}">${category}</button>`).join("")}</div><label class="reinforcement-filter-select"><span>Record type</span><select id="reinforcement-category-select">${categories.map((category) => `<option value="${category}" ${reinforcementState.category === category ? "selected" : ""}>${category}</option>`).join("")}</select></label></div>
       <div class="reinforcement-layout"><aside class="reinforcement-list" aria-label="Archive records"><div class="reinforcement-list-heading"><span>Archive records</span><strong>${filtered.length}</strong></div><div id="reinforcement-results">${reinforcementListEntries(filtered, reinforcementState.selectedId)}</div></aside><section class="reinforcement-inspector" aria-live="polite" id="reinforcement-inspector">${reinforcementDetail(selected)}</section></div>
     </section>
@@ -5867,6 +6006,16 @@ function wireReinforcementEvents() {
       if (!foundryEmbeddedMode && status) status.textContent = "NPC library download started.";
     } catch (error) {
       if (status) status.textContent = error instanceof Error ? error.message : "The NPC library could not be prepared.";
+    }
+  });
+  document.querySelector("#export-all-vehicles")?.addEventListener("click", () => {
+    const status = document.querySelector("#reinforcement-library-status");
+    try {
+      if (status) status.textContent = foundryEmbeddedMode ? "Creating vehicle Actors…" : "Preparing vehicle library…";
+      exportAllVehicles();
+      if (!foundryEmbeddedMode && status) status.textContent = "Vehicle library download started.";
+    } catch (error) {
+      if (status) status.textContent = error instanceof Error ? error.message : "The vehicle library could not be prepared.";
     }
   });
   document.querySelectorAll("[data-reinforcement-category]").forEach((button) => button.addEventListener("click", () => {
@@ -5898,6 +6047,16 @@ function wireReinforcementEvents() {
     } catch (error) {
       const status = document.querySelector("#reinforcement-export-status");
       if (status) status.textContent = error instanceof Error ? error.message : "The reinforcement NPC could not be prepared.";
+    }
+  });
+  document.querySelector("[data-export-vehicle]")?.addEventListener("click", (event) => {
+    const entry = vehicleCatalogue.find((candidate) => candidate.id === event.currentTarget.dataset.exportVehicle);
+    if (!entry) return;
+    try {
+      exportVehicleActor(entry);
+    } catch (error) {
+      const status = document.querySelector("#reinforcement-export-status");
+      if (status) status.textContent = error instanceof Error ? error.message : "The vehicle could not be prepared.";
     }
   });
 }

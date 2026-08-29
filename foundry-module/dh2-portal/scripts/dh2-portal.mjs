@@ -212,12 +212,15 @@ Hooks.once("init", () => {
       importActorLibrary,
       importReinforcementActorData,
       importReinforcementActorLibrary,
+      importVehicleActorData,
+      importVehicleActorLibrary,
       openActorImport,
       openActorLibraryImport,
       openPortal,
       validateActorData,
       validateActorLibrary,
       validateReinforcementActorData,
+      validateVehicleActorData,
       updateActorFromPortal,
     });
   }
@@ -304,8 +307,10 @@ async function openActorImport() {
     if (!file) return null;
     const payload = await readJsonFile(file);
     if (looksLikeReinforcementLibrary(payload)) return await importReinforcementActorLibrary(payload);
+    if (looksLikeVehicleLibrary(payload)) return await importVehicleActorLibrary(payload);
     if (looksLikeActorLibrary(payload)) return await importActorLibrary(payload);
     if (payload?.type === "npc" && payload?.flags?.[PORTAL_FLAG]?.reinforcementId) return await importReinforcementActorData(payload);
+    if (payload?.type === "vehicle" && payload?.flags?.[PORTAL_FLAG]?.vehicleId) return await importVehicleActorData(payload);
     return await importActorData(payload);
   } catch (error) {
     console.error(`${MODULE_ID} | Character import failed`, error);
@@ -396,6 +401,46 @@ async function handlePortalMessage(event) {
       reply({ ok: true, name: `${result.created.length} reinforcement NPC${result.created.length === 1 ? "" : "s"} created${result.skipped.length ? `; ${result.skipped.length} already existed` : ""}` });
     } catch (error) {
       reply({ ok: false, error: error instanceof Error ? error.message : "Foundry could not create the reinforcement NPC library." });
+    }
+    return;
+  }
+
+  if (event.data.type === "create-vehicle" && context.kind === "portal") {
+    const reply = (result) => event.source?.postMessage({
+      source: "dh2-portal-module",
+      type: "create-vehicle-result",
+      requestId: event.data.requestId,
+      ...result,
+    }, event.origin === "null" ? "*" : event.origin);
+    if (!game.user.isGM) {
+      reply({ ok: false, error: "Only a Gamemaster can create vehicle Actors." });
+      return;
+    }
+    try {
+      const actor = await importVehicleActorData(event.data.payload, { openSheet: true });
+      reply({ ok: true, actorId: actor.id, name: actor.name });
+    } catch (error) {
+      reply({ ok: false, error: error instanceof Error ? error.message : "Foundry could not create this vehicle." });
+    }
+    return;
+  }
+
+  if (event.data.type === "create-vehicle-library" && context.kind === "portal") {
+    const reply = (result) => event.source?.postMessage({
+      source: "dh2-portal-module",
+      type: "create-vehicle-result",
+      requestId: event.data.requestId,
+      ...result,
+    }, event.origin === "null" ? "*" : event.origin);
+    if (!game.user.isGM) {
+      reply({ ok: false, error: "Only a Gamemaster can create vehicle Actors." });
+      return;
+    }
+    try {
+      const result = await importVehicleActorLibrary(event.data.payload);
+      reply({ ok: true, name: `${result.created.length} vehicle${result.created.length === 1 ? "" : "s"} created${result.skipped.length ? `; ${result.skipped.length} already existed` : ""}` });
+    } catch (error) {
+      reply({ ok: false, error: error instanceof Error ? error.message : "Foundry could not create the vehicle library." });
     }
     return;
   }
@@ -612,6 +657,58 @@ async function importReinforcementActorLibrary(payload) {
   return result;
 }
 
+async function importVehicleActorData(payload, { openSheet = true, notify = true } = {}) {
+  if (!game.user.isGM) throw new Error("Only a Gamemaster can create vehicle Actors.");
+  if (game.system.id !== SYSTEM_ID) throw new Error("Activate the Dark Heresy 2nd Edition system before creating this vehicle.");
+  const actorData = validateVehicleActorData(payload);
+  const vehicleId = actorData.flags?.[PORTAL_FLAG]?.vehicleId;
+  const existing = game.actors?.find?.((actor) => actor.type === "vehicle" && actor.flags?.[PORTAL_FLAG]?.vehicleId === vehicleId);
+  if (existing) {
+    if (notify) ui.notifications.info(`${existing.name} already exists in the Vehicles folder.`);
+    if (openSheet) existing.sheet?.render(true);
+    return existing;
+  }
+  const folder = await findOrCreateActorFolder("Vehicles");
+  if (folder?.id) actorData.folder = folder.id;
+  const actor = await Actor.create(actorData);
+  if (!actor) throw new Error("Foundry did not create the vehicle Actor.");
+  if (notify) ui.notifications.info(`${actor.name} was created as a vehicle Actor.`);
+  if (openSheet) actor.sheet?.render(true);
+  return actor;
+}
+
+async function importVehicleActorLibrary(payload) {
+  if (!game.user.isGM) throw new Error("Only a Gamemaster can create vehicle Actors.");
+  if (!payload || typeof payload !== "object" || payload.format !== "dh2-vehicle-actor-library" || !Array.isArray(payload.actors)) {
+    throw new Error("This is not a Dark Heresy Portal vehicle library.");
+  }
+  if (!payload.actors.length) throw new Error("The vehicle library is empty.");
+  if (payload.actors.length > 100) throw new Error("The vehicle library exceeds the 100-Actor safety limit.");
+  const result = { created: [], skipped: [], failed: [] };
+  for (const entry of payload.actors) {
+    const actorData = validateVehicleActorData(entry?.actor || entry);
+    const vehicleId = actorData.flags?.[PORTAL_FLAG]?.vehicleId;
+    const existing = game.actors?.find?.((actor) => actor.type === "vehicle" && actor.flags?.[PORTAL_FLAG]?.vehicleId === vehicleId);
+    if (existing) {
+      result.skipped.push(existing);
+      continue;
+    }
+    try {
+      result.created.push(await importVehicleActorData(actorData, { openSheet: false, notify: false }));
+    } catch (error) {
+      result.failed.push({ name: actorData.name, error: error instanceof Error ? error.message : "Foundry could not create this vehicle." });
+    }
+  }
+  const summary = `${result.created.length} vehicle${result.created.length === 1 ? "" : "s"} created${result.skipped.length ? `; ${result.skipped.length} duplicate${result.skipped.length === 1 ? "" : "s"} skipped` : ""}${result.failed.length ? `; ${result.failed.length} failed` : ""}.`;
+  if (result.failed.length) {
+    console.error(`${MODULE_ID} | Some vehicles failed`, result.failed);
+    ui.notifications.warn(summary);
+  } else {
+    ui.notifications.info(summary);
+  }
+  return result;
+}
+
 async function updateActorFromPortal(actor, payload) {
   if (!actor || typeof actor.update !== "function") throw new Error("The Foundry Acolyte no longer exists.");
   const actorData = validateActorData(payload);
@@ -726,6 +823,25 @@ function validateReinforcementActorData(payload) {
   };
 }
 
+function validateVehicleActorData(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Choose a valid Portal vehicle file.");
+  const source = payload.actor && typeof payload.actor === "object" ? payload.actor : payload;
+  const vehicleId = String(source.flags?.[PORTAL_FLAG]?.vehicleId || "").trim();
+  if (source.type !== "vehicle" || !source.system || typeof source.system !== "object" || !vehicleId) {
+    throw new Error("This file is not a Dark Heresy Portal vehicle export.");
+  }
+  const flags = cloneData(source.flags || {});
+  if (flags.core?.sheetClass) delete flags.core.sheetClass;
+  return {
+    name: String(source.name || "Unnamed Vehicle"),
+    type: "vehicle",
+    img: normalisePortalAssetPath(source.img),
+    system: cloneData(source.system),
+    items: Array.isArray(source.items) ? cloneData(source.items) : [],
+    flags,
+  };
+}
+
 function normalisePortalAssetPath(value = "") {
   const path = String(value || "").split("?")[0];
   if (path.startsWith("./")) return `modules/${MODULE_ID}/portal/${path.slice(2)}`;
@@ -741,6 +857,11 @@ function looksLikeActorLibrary(payload) {
 function looksLikeReinforcementLibrary(payload) {
   return Boolean(payload && typeof payload === "object" && !Array.isArray(payload)
     && String(payload.format || "").trim() === "dh2-reinforcement-actor-library" && Array.isArray(payload.actors));
+}
+
+function looksLikeVehicleLibrary(payload) {
+  return Boolean(payload && typeof payload === "object" && !Array.isArray(payload)
+    && String(payload.format || "").trim() === "dh2-vehicle-actor-library" && Array.isArray(payload.actors));
 }
 
 function findMatchingPortalActor(entry) {
