@@ -2891,6 +2891,40 @@ function foundryActorPayload() {
   };
 }
 
+function foundryActorPayloadForCharacter(sourceCharacter, record = {}) {
+  const previousCharacter = character;
+  try {
+    character = prepareCharacter(sourceCharacter);
+    syncCreationConsequences();
+    syncGrantedEquipment();
+    const actor = foundryActorPayload();
+    actor.flags.dh2CharacterBuilder.libraryRecordId = String(record.id || "");
+    actor.flags.dh2CharacterBuilder.libraryUpdatedAt = String(record.updatedAt || "");
+    actor.flags.dh2CharacterBuilder.libraryOrigin = String(record.origin || "Web roster");
+    return actor;
+  } finally {
+    character = previousCharacter;
+  }
+}
+
+function foundryActorLibraryPayload(records = characterLibrary) {
+  const actors = records
+    .filter((record) => record?.id && record?.character)
+    .map((record) => ({
+      recordId: record.id,
+      updatedAt: record.updatedAt || "",
+      origin: record.origin || "Web roster",
+      actor: foundryActorPayloadForCharacter(record.character, record),
+    }));
+  return {
+    format: "dh2-foundry-actor-library",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    actorCount: actors.length,
+    actors,
+  };
+}
+
 function sendCharacterToFoundry() {
   if (!foundryEmbeddedMode || foundryActorSheetMode) return;
   const requestId = globalThis.crypto?.randomUUID?.() || `dh2-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -5636,12 +5670,13 @@ function renderRoster() {
             <button class="primary-button" id="new-character" type="button">Create Your Acolyte <span>›</span></button>
             <button class="compact-button" id="shared-archive" type="button">${savedCampaignConnection() ? "Shared Campaign" : "Connect Campaign"}</button>
             <button class="compact-button" id="import-character" type="button">Import Shared Character</button>
+            <button class="compact-button" id="export-foundry-library" type="button">Export Roster for Foundry</button>
             <input class="sr-only" id="character-file" type="file" accept=".json,application/json" />
           </div>
         </div>
         <div class="roster-notice" role="status">
           <strong>${repositoryLabel}</strong>
-          <span>${repositoryMessage}</span>
+          <span id="roster-status">${repositoryMessage}</span>
         </div>
         <div class="roster-grid" aria-label="${orderedRecords.length} saved character${orderedRecords.length === 1 ? "" : "s"}">
           ${orderedRecords.map((record) => {
@@ -5828,6 +5863,15 @@ function wireRosterEvents() {
     renderRoster();
   });
   document.querySelector("#import-character")?.addEventListener("click", () => document.querySelector("#character-file")?.click());
+  document.querySelector("#export-foundry-library")?.addEventListener("click", () => {
+    const payload = foundryActorLibraryPayload();
+    if (!payload.actors.length) {
+      document.querySelector("#roster-status").textContent = "There are no saved Acolytes to transfer.";
+      return;
+    }
+    downloadJson("dark-heresy-acolyte-roster.foundry-library.json", payload);
+    document.querySelector("#roster-status").textContent = `${payload.actors.length} Acolyte${payload.actors.length === 1 ? "" : "s"} prepared for Foundry. In Foundry, use Import Web Roster in the Actors directory.`;
+  });
   document.querySelector("#character-file")?.addEventListener("change", async (event) => {
     const [file] = event.target.files || [];
     if (!file) return;

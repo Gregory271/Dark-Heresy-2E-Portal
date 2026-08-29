@@ -1,12 +1,13 @@
 .dh2-portal-directory-controls {
   display: grid;
   gap: 0.3rem;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
 }
 
 .dh2-portal-open-button,
-.dh2-portal-import-button {
+.dh2-portal-import-button,
+.dh2-portal-library-import-button {
   align-items: center;
   display: inline-flex;
   gap: 0.45rem;
@@ -14,8 +15,13 @@
   margin: 0;
 }
 
+.dh2-portal-open-button {
+  grid-column: 1 / -1;
+}
+
 .dh2-portal-open-button i,
-.dh2-portal-import-button i {
+.dh2-portal-import-button i,
+.dh2-portal-library-import-button i {
   color: var(--color-warm-1, #d8b765);
 }
 

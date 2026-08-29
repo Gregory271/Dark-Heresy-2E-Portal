@@ -142,7 +142,16 @@ class PortalAcolyteSheet extends PortalSheetBase {
 Hooks.once("init", () => {
   const module = game.modules.get(MODULE_ID);
   if (module) {
-    module.api = Object.freeze({ importActorData, openActorImport, openPortal, validateActorData, updateActorFromPortal });
+    module.api = Object.freeze({
+      importActorData,
+      importActorLibrary,
+      openActorImport,
+      openActorLibraryImport,
+      openPortal,
+      validateActorData,
+      validateActorLibrary,
+      updateActorFromPortal,
+    });
   }
   if (game.system.id === SYSTEM_ID && globalThis.Actors?.registerSheet) {
     Actors.registerSheet(MODULE_ID, PortalAcolyteSheet, {
@@ -180,6 +189,13 @@ Hooks.on("renderActorDirectory", (_application, html) => {
   controls.append(openButton);
 
   if (game.user.isGM) {
+    const libraryButton = document.createElement("button");
+    libraryButton.type = "button";
+    libraryButton.className = "dh2-portal-library-import-button";
+    libraryButton.innerHTML = '<i class="fa-solid fa-users" aria-hidden="true"></i><span>Import Web Roster</span>';
+    libraryButton.addEventListener("click", openActorLibraryImport);
+    controls.append(libraryButton);
+
     const importButton = document.createElement("button");
     importButton.type = "button";
     importButton.className = "dh2-portal-import-button";
@@ -218,6 +234,24 @@ async function openActorImport() {
   } catch (error) {
     console.error(`${MODULE_ID} | Character import failed`, error);
     ui.notifications.error(error instanceof Error ? error.message : "The Portal character could not be imported.");
+    return null;
+  }
+}
+
+async function openActorLibraryImport() {
+  if (!game.user.isGM) {
+    ui.notifications.warn("Only a Gamemaster can import a Portal web roster.");
+    return null;
+  }
+
+  try {
+    const file = await chooseJsonFile();
+    if (!file) return null;
+    const payload = JSON.parse(await file.text());
+    return await importActorLibrary(payload);
+  } catch (error) {
+    console.error(`${MODULE_ID} | Web roster import failed`, error);
+    ui.notifications.error(error instanceof Error ? error.message : "The Portal web roster could not be imported.");
     return null;
   }
 }
@@ -343,7 +377,12 @@ async function handleSocketMessage(message) {
   }
 }
 
-async function importActorData(payload, { ownerUserId = game.user.id, openSheet = true, notify = true } = {}) {
+async function importActorData(payload, {
+  ownerUserId = game.user.id,
+  openSheet = true,
+  notify = true,
+  folderId = null,
+} = {}) {
   if (game.system.id !== SYSTEM_ID) {
     throw new Error("Activate the Dark Heresy 2nd Edition system before importing this character.");
   }
@@ -353,6 +392,7 @@ async function importActorData(payload, { ownerUserId = game.user.id, openSheet 
     const ownerLevel = globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
     actorData.ownership = { default: 0, [ownerUserId]: ownerLevel };
   }
+  if (folderId) actorData.folder = folderId;
 
   const actor = await Actor.create(actorData);
   if (!actor) throw new Error("Foundry did not create the Acolyte Actor.");
@@ -360,6 +400,48 @@ async function importActorData(payload, { ownerUserId = game.user.id, openSheet 
   if (notify) ui.notifications.info(`${actor.name} was imported from the Dark Heresy 2E Portal.`);
   if (openSheet) actor.sheet?.render(true);
   return actor;
+}
+
+async function importActorLibrary(payload, { folderName = "Imported Acolytes" } = {}) {
+  if (!game.user.isGM) throw new Error("Only a Gamemaster can import a Portal web roster.");
+  if (game.system.id !== SYSTEM_ID) {
+    throw new Error("Activate the Dark Heresy 2nd Edition system before importing this roster.");
+  }
+
+  const entries = validateActorLibrary(payload);
+  const folder = await findOrCreateActorFolder(folderName);
+  const result = { created: [], skipped: [], failed: [] };
+  for (const entry of entries) {
+    const duplicate = findMatchingPortalActor(entry);
+    if (duplicate) {
+      result.skipped.push({ recordId: entry.recordId, name: entry.actor.name, actorId: duplicate.id });
+      continue;
+    }
+    try {
+      const actor = await importActorData(entry.actor, {
+        ownerUserId: game.user.id,
+        openSheet: false,
+        notify: false,
+        folderId: folder?.id || null,
+      });
+      result.created.push(actor);
+    } catch (error) {
+      result.failed.push({
+        recordId: entry.recordId,
+        name: entry.actor.name,
+        error: error instanceof Error ? error.message : "Foundry could not create this Actor.",
+      });
+    }
+  }
+
+  const summary = `${result.created.length} Acolyte${result.created.length === 1 ? "" : "s"} imported${result.skipped.length ? `; ${result.skipped.length} existing duplicate${result.skipped.length === 1 ? "" : "s"} skipped` : ""}${result.failed.length ? `; ${result.failed.length} failed` : ""}.`;
+  if (result.failed.length) {
+    console.error(`${MODULE_ID} | Some web roster entries failed`, result.failed);
+    ui.notifications.warn(summary);
+  } else {
+    ui.notifications.info(summary);
+  }
+  return result;
 }
 
 async function updateActorFromPortal(actor, payload) {
@@ -425,6 +507,55 @@ function validateActorData(payload) {
     items: Array.isArray(source.items) ? cloneData(source.items) : [],
     flags: cloneData(source.flags || {}),
   };
+}
+
+function validateActorLibrary(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("Choose a valid Portal Foundry roster file.");
+  }
+  if (payload.format !== "dh2-foundry-actor-library" || !Array.isArray(payload.actors)) {
+    throw new Error('This is not a Portal roster transfer. In the web app, open Your Acolytes and use “Export Roster for Foundry”.');
+  }
+  if (!payload.actors.length) throw new Error("This Portal roster does not contain any Acolytes.");
+  if (payload.actors.length > 250) throw new Error("This roster contains more than the 250-character safety limit.");
+
+  return payload.actors.map((entry, index) => {
+    const recordId = String(entry?.recordId || entry?.actor?.flags?.[PORTAL_FLAG]?.libraryRecordId || "").trim();
+    if (!recordId) throw new Error(`Roster entry ${index + 1} is missing its character identifier.`);
+    const actor = validateActorData(entry?.actor || entry);
+    actor.flags ||= {};
+    actor.flags[PORTAL_FLAG] ||= {};
+    actor.flags[PORTAL_FLAG].libraryRecordId = recordId;
+    actor.flags[PORTAL_FLAG].libraryUpdatedAt = String(entry?.updatedAt || actor.flags[PORTAL_FLAG].libraryUpdatedAt || "");
+    actor.flags[PORTAL_FLAG].libraryOrigin = String(entry?.origin || actor.flags[PORTAL_FLAG].libraryOrigin || "Web roster");
+    return { recordId, actor };
+  });
+}
+
+function findMatchingPortalActor(entry) {
+  const incomingFlags = entry.actor.flags?.[PORTAL_FLAG] || {};
+  const incomingSource = serialiseForComparison(incomingFlags.source);
+  return game.actors?.find?.((actor) => {
+    const existingFlags = actor.flags?.[PORTAL_FLAG] || {};
+    if (entry.recordId && existingFlags.libraryRecordId === entry.recordId) return true;
+    return Boolean(incomingSource && serialiseForComparison(existingFlags.source) === incomingSource);
+  }) || null;
+}
+
+async function findOrCreateActorFolder(name) {
+  const existing = game.folders?.find?.((folder) => folder.type === "Actor" && folder.name === name);
+  if (existing) return existing;
+  if (typeof globalThis.Folder?.create !== "function") return null;
+  return Folder.create({ name, type: "Actor", sorting: "a" });
+}
+
+function serialiseForComparison(value) {
+  if (!value || typeof value !== "object") return "";
+  try {
+    return JSON.stringify(value);
+  } catch (_error) {
+    return "";
+  }
 }
 
 function primaryActiveGM() {
