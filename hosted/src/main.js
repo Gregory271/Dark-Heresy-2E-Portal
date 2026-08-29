@@ -1714,7 +1714,7 @@ function refreshCharacteristicDisplay(characteristicId) {
     article.classList.remove("complete");
     resultBox.innerHTML = "<strong>—</strong><small>Awaiting result</small>";
     if (rollButton) {
-      rollButton.textContent = "Roll 3D Dice";
+      rollButton.textContent = "Roll for Characteristic";
       rollButton.disabled = false;
     }
   }
@@ -1990,7 +1990,7 @@ function renderCharacteristics() {
                 ${result ? `<small>${result.source === "manual" ? "Entered manually" : `Dice: ${result.dice.join(", ")}`}</small>` : ""}
               </div>
               <div class="roll-actions">
-                <button class="compact-button roll-characteristic" data-characteristic="${entry.id}" type="button" ${rerollUnavailable ? "disabled" : ""}>${result ? character.characteristicReroll === entry.id ? "Re-roll kept" : "Use one re-roll" : "Roll 3D Dice"}</button>
+                <button class="compact-button roll-characteristic" data-characteristic="${entry.id}" type="button" ${rerollUnavailable ? "disabled" : ""}>${result ? character.characteristicReroll === entry.id ? "Re-roll kept" : "Use one re-roll" : "Roll for Characteristic"}</button>
                 <label class="manual-result">
                   <span>Enter result</span>
                   <input type="number" min="22" max="50" value="${result?.source === "manual" ? result.value : ""}" data-manual-characteristic="${entry.id}" placeholder="—" />
