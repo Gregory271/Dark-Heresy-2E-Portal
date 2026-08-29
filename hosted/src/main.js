@@ -98,6 +98,9 @@ function characterId() {
 
 function prepareCharacter(input = {}) {
   const prepared = { ...defaultCharacter, ...structuredClone(input || {}) };
+  prepared.gmOverrides ||= {};
+  prepared.gmOverrides.highCharacteristics = Boolean(prepared.gmOverrides.highCharacteristics);
+  prepared.gmOverrides.eliteAdvances = Boolean(prepared.gmOverrides.eliteAdvances);
   prepared.rolls ||= {};
   prepared.characteristicReroll ||= null;
   prepared.fate ||= {};
@@ -1989,12 +1992,21 @@ function renderIdentity() {
 
 function renderCharacteristics() {
   const complete = characteristics.filter((entry) => character.rolls[entry.id]?.value).length;
+  const highCharacteristicOverride = Boolean(character.gmOverrides?.highCharacteristics);
+  const manualMaximum = highCharacteristicOverride ? 100 : 50;
   return `
     <div class="management-shell characteristics-stage">
       <div class="management-heading">
         <span>${complete} / ${characteristics.length} recorded</span>
         <strong>Roll each characteristic or enter a result rolled elsewhere.</strong>
       </div>
+      <details class="gm-tools">
+        <summary>GM controls</summary>
+        <div class="gm-tools-body">
+          <label><input type="checkbox" data-gm-high-characteristics ${highCharacteristicOverride ? "checked" : ""} /><span>Allow starting values above the normal generation range (up to 100)</span></label>
+          <p id="gm-characteristic-status" aria-live="polite">Player mode accepts generation results up to 50. Turn this on only when the GM is deliberately creating a higher-tier character, such as an Inquisitor. The override is saved with this character.</p>
+        </div>
+      </details>
       <div class="characteristic-grid">
         ${characteristics.map((entry) => {
           const config = characteristicRollConfig(entry.id);
@@ -2018,7 +2030,7 @@ function renderCharacteristics() {
                 <button class="compact-button roll-characteristic" data-characteristic="${entry.id}" type="button" ${rerollUnavailable ? "disabled" : ""}>${result ? character.characteristicReroll === entry.id ? "Re-roll kept" : "Use one re-roll" : "Roll for Characteristic"}</button>
                 <label class="manual-result">
                   <span>Enter result</span>
-                  <input type="number" min="22" max="50" value="${result?.source === "manual" ? result.value : ""}" data-manual-characteristic="${entry.id}" placeholder="—" />
+                  <input type="number" min="22" max="${manualMaximum}" value="${result?.source === "manual" ? result.value : ""}" data-manual-characteristic="${entry.id}" placeholder="—" />
                 </label>
               </div>
             </article>`;
@@ -2738,7 +2750,7 @@ function hasPsykerAccess() {
 
 function eliteAdvanceStatus(advance) {
   const automaticGrant = automaticEliteAdvances().find((entry) => entry.id === advance.id);
-  if (automaticGrant) return { missing: [], owned: true, automatic: true };
+  if (automaticGrant) return { missing: [], originalMissing: [], owned: true, automatic: true, gmOverride: false };
   const missing = [];
   const activeIds = new Set(activeEliteAdvances().map((entry) => entry.id));
   for (const [id, minimum] of Object.entries(advance.prerequisites?.characteristics || {})) {
@@ -2754,7 +2766,14 @@ function eliteAdvanceStatus(advance) {
     if (activeIds.has(id)) missing.push(`Incompatible with ${eliteAdvanceById(id)?.name || id}`);
   }
   if (!character.eliteSetup.gmApproved?.[advance.id] && !advance.automatic) missing.push("GM approval");
-  return { missing: [...new Set(missing)], owned: activeIds.has(advance.id) };
+  const originalMissing = [...new Set(missing)];
+  const gmOverride = Boolean(character.gmOverrides?.eliteAdvances);
+  return {
+    missing: gmOverride ? [] : originalMissing,
+    originalMissing,
+    owned: activeIds.has(advance.id),
+    gmOverride,
+  };
 }
 
 function purchasedPsychicPowerIds() {
@@ -3851,9 +3870,29 @@ function renderEliteAdvanceShop() {
   const status = eliteAdvanceStatus(selected);
   const active = activeEliteAdvances();
   const includedByMystic = selected.id === "psyker" && character.role === "mystic";
+  const gmGrantMode = Boolean(character.gmOverrides?.eliteAdvances) && !includedByMystic;
+  const normalPurchaseBlocked = status.missing.length || xpSpent() + selected.cost > character.xp.starting;
+  const purchaseBlocked = status.owned || (!gmGrantMode && normalPurchaseBlocked);
+  const buttonLabel = includedByMystic
+    ? "Included by Mystic Role"
+    : status.owned
+      ? "Advance Already Active"
+      : gmGrantMode
+        ? "Grant for GM · 0 XP"
+        : status.missing.length
+          ? "Prerequisites Missing"
+          : xpSpent() + selected.cost > character.xp.starting
+            ? "Insufficient XP"
+            : "Purchase Elite Advance";
   return `<section class="elite-advance-shop" id="advance-elite">
     <div class="elite-compact-heading"><div><p class="choice-source">Optional, campaign-changing advances</p><h2>Elite Advances</h2></div><p>Choose an advance to inspect it. The builder checks mechanical prerequisites; the GM must still approve how it enters the story.</p></div>
-    <div class="active-elite-advances">${active.map((advance) => `<div class="active-elite-chip"><span>${advance.automatic ? "Granted" : "Purchased"}</span><strong>${advance.name}</strong><small>${advance.automatic ? advance.source : `${advance.cost} XP`}</small>${advance.automatic ? "" : `<button type="button" data-remove-elite-advance="${advance.id}" aria-label="Remove ${advance.name}">×</button>`}</div>`).join("") || "<span>No Elite Advance selected.</span>"}</div>
+    <div class="active-elite-advances">${active.map((advance) => `<div class="active-elite-chip"><span>${advance.automatic ? "Granted" : advance.gmGranted ? "GM grant" : "Purchased"}</span><strong>${advance.name}</strong><small>${advance.automatic ? advance.source : advance.gmGranted ? "No XP · GM grant" : `${advance.cost} XP`}</small>${advance.automatic ? "" : `<button type="button" data-remove-elite-advance="${advance.id}" aria-label="Remove ${advance.name}">×</button>`}</div>`).join("") || "<span>No Elite Advance selected.</span>"}</div>
+    <div class="gm-override-strip" role="note">
+      <label><input type="checkbox" data-gm-elite-overrides ${character.gmOverrides?.eliteAdvances ? "checked" : ""} /><span>GM grant mode</span></label>
+      <p>${character.gmOverrides?.eliteAdvances
+        ? "Enabled: the next Elite Advance is recorded as a GM grant for 0 XP and may bypass its listed prerequisites. This exception is saved with the character."
+        : "Player mode: Influence, prerequisites, GM approval, and XP costs are enforced. Enable this only when the GM is deliberately creating or elevating a character."}</p>
+    </div>
     <div class="elite-selector-grid">
       <label class="elite-select-control"><span>Inspect an Elite Advance</span><select data-elite-advance-inspect aria-label="Inspect an Elite Advance"><option value="">Choose an advance...</option>${eliteAdvanceCatalogue.map((entry) => `<option value="${entry.id}" ${entry.id === selected.id ? "selected" : ""}>${entry.name}${entry.id === "psyker" && character.role === "mystic" ? " — Included by Mystic" : ""}</option>`).join("")}</select></label>
       <article class="elite-inspector">
@@ -3864,9 +3903,14 @@ function renderEliteAdvanceShop() {
           <div><dt>Guidance</dt><dd>${selected.notes}</dd></div>
           ${selected.prerequisites?.narrative ? `<div><dt>Narrative prerequisite</dt><dd>${selected.prerequisites.narrative}</dd></div>` : ""}
           ${status.missing.filter((entry) => entry !== "GM approval").length ? `<div><dt>Missing</dt><dd class="missing-prerequisite">${status.missing.filter((entry) => entry !== "GM approval").join(" · ")}</dd></div>` : ""}
+          ${status.gmOverride && status.originalMissing.length ? `<div><dt>GM override</dt><dd class="gm-override-note">Bypasses: ${status.originalMissing.join(" · ")}</dd></div>` : ""}
         </dl>
-        ${includedByMystic ? psykerPathClarification() : `<label class="elite-gm-approval"><input type="checkbox" data-elite-gm-approval="${selected.id}" ${character.eliteSetup.gmApproved?.[selected.id] ? "checked" : ""} ${status.owned ? "disabled" : ""} /><span>GM approval confirmed for this character</span></label>`}
-        <button class="primary-button" type="button" data-purchase-elite-advance="${selected.id}" ${status.owned || status.missing.length || xpSpent() + selected.cost > character.xp.starting ? "disabled" : ""}>${includedByMystic ? "Included by Mystic Role" : status.owned ? "Advance Already Active" : status.missing.length ? "Prerequisites Missing" : xpSpent() + selected.cost > character.xp.starting ? "Insufficient XP" : "Purchase Elite Advance"}<span>${includedByMystic ? "✓" : "›"}</span></button>
+        ${includedByMystic
+          ? psykerPathClarification()
+          : gmGrantMode
+            ? `<p class="gm-grant-note">GM grant mode supplies the approval for this advance and records it at 0 XP.</p>`
+            : `<label class="elite-gm-approval"><input type="checkbox" data-elite-gm-approval="${selected.id}" ${character.eliteSetup.gmApproved?.[selected.id] ? "checked" : ""} ${status.owned ? "disabled" : ""} /><span>GM approval confirmed for this character</span></label>`}
+        <button class="primary-button" type="button" data-purchase-elite-advance="${selected.id}" ${purchaseBlocked ? "disabled" : ""}>${buttonLabel}<span>${includedByMystic ? "✓" : "›"}</span></button>
       </article>
     </div>
     ${active.map(eliteSetupControls).filter(Boolean).join("")}
@@ -5724,6 +5768,7 @@ function renderReview() {
   const ownedWeapons = inventoryItems.filter((item) => item.category === "Weapons");
   const psychicPowers = character.advances.psychicPowers.map((entry) => psychicPowerById(entry.id) || entry).filter((entry) => entry?.name);
   const eliteAdvances = activeEliteAdvances();
+  const gmOverridesActive = Boolean(character.gmOverrides?.highCharacteristics || character.gmOverrides?.eliteAdvances);
   const equipmentState = equipmentRulesState(inventoryItems);
   const currentActions = derivedCharacterActions(inventoryItems);
   const grantedEquipment = resolvedGrantedEquipment();
@@ -5734,7 +5779,7 @@ function renderReview() {
     ...purchasedTalents.map((talent) => [talent.name, talentCost(talent)]),
     ...character.advances.psychicPowers.filter((entry) => entry?.name).map((entry) => [entry.name, Number(entry.cost || 0)]),
     ...(psyRatingXpCost() ? [[`Psy Rating ${foundryPsyRating()}`, psyRatingXpCost()]] : []),
-    ...character.advances.eliteAdvances.filter((entry) => entry?.name).map((entry) => [entry.name, Number(entry.cost || 0)]),
+    ...character.advances.eliteAdvances.filter((entry) => entry?.name).map((entry) => [entry.gmGranted ? `${entry.name} · GM grant` : entry.name, Number(entry.cost || 0)]),
   ];
   const xpAvailable = character.xp.starting - spent;
   const xpAwards = [...(character.xp.awards || [])].reverse();
@@ -5844,8 +5889,8 @@ function renderReview() {
     kind: "Elite Advance",
     name: entry.name,
     summary: entry.summary,
-    meta: entry.automatic ? "Automatic · 0 XP" : `${entry.cost} XP`,
-    source: entry.ruleSource || `${entry.source}, p. ${entry.page}`,
+    meta: entry.automatic ? "Automatic · 0 XP" : entry.gmGranted ? "GM grant · 0 XP" : `${entry.cost} XP`,
+    source: entry.gmGranted ? entry.source : entry.ruleSource || `${entry.source}, p. ${entry.page}`,
     rows: [["Instant changes", entry.instantChanges?.join(" · ")], ["Guidance", entry.notes]],
   })).join("") || "<p>No elite advance recorded.</p>";
   const inventoryRows = [
@@ -5876,6 +5921,7 @@ function renderReview() {
           <div><h2>${character.name || "Unnamed Acolyte"}</h2><p class="review-profile-details">${homeWorldName} · ${backgroundName} · ${roleName}</p></div>
           <span class="review-record-state">${warnings.length ? `${warnings.length} item${warnings.length === 1 ? "" : "s"} to review` : "Ready to play"}</span>
         </header>
+        ${gmOverridesActive ? `<div class="gm-review-note" role="note"><strong>GM options recorded</strong><span>${[character.gmOverrides?.highCharacteristics ? "High characteristic values" : "", character.gmOverrides?.eliteAdvances ? "GM-granted Elite Advances" : ""].filter(Boolean).join(" · ")} are enabled for this character. They bypass normal player creation safeguards and remain visible in exported data.</span></div>` : ""}
         <div class="review-characteristics">${characteristics.map((entry) => {
           const breakdown = characteristicBreakdown(entry.id);
           const characteristicRuleId = `characteristic-${entry.id.replace(/([A-Z])/g, "-$1").toLowerCase()}`;
@@ -6766,6 +6812,19 @@ function wireEvents() {
     });
   });
 
+  document.querySelector("[data-gm-high-characteristics]")?.addEventListener("change", (event) => {
+    character.gmOverrides ||= {};
+    character.gmOverrides.highCharacteristics = event.target.checked;
+    const maximum = event.target.checked ? "100" : "50";
+    document.querySelectorAll("[data-manual-characteristic]").forEach((input) => { input.max = maximum; });
+    const status = document.querySelector("#gm-characteristic-status");
+    if (status) status.textContent = event.target.checked
+      ? "GM override enabled: manually entered results may be set up to 100. The exception is saved with this character and included in exports."
+      : "Player mode accepts generation results up to 50. Turn this on only when the GM is deliberately creating a higher-tier character, such as an Inquisitor. The override is saved with this character.";
+    playMechanicalLock();
+    save();
+  });
+
   document.querySelectorAll("[data-manual-characteristic]").forEach((input) => {
     input.addEventListener("input", () => {
       const id = input.dataset.manualCharacteristic;
@@ -7202,10 +7261,25 @@ function wireEvents() {
       rerenderAdvancesPreservingScroll(`[data-elite-gm-approval="${input.dataset.eliteGmApproval}"]`, "#advance-elite");
     });
   });
+  document.querySelector("[data-gm-elite-overrides]")?.addEventListener("change", (event) => {
+    character.gmOverrides ||= {};
+    character.gmOverrides.eliteAdvances = event.target.checked;
+    playMechanicalLock();
+    save();
+    rerenderAdvancesPreservingScroll("[data-gm-elite-overrides]", "#advance-elite");
+  });
   document.querySelector("[data-purchase-elite-advance]")?.addEventListener("click", (event) => {
     const advance = eliteAdvanceById(event.currentTarget.dataset.purchaseEliteAdvance);
-    if (!advance || eliteAdvanceStatus(advance).missing.length || hasEliteAdvance(advance.id)) return;
-    character.advances.eliteAdvances.push({ id: advance.id, name: advance.name, source: `${advance.source}, p. ${advance.page}`, cost: advance.cost });
+    const status = advance ? eliteAdvanceStatus(advance) : null;
+    const gmGranted = Boolean(character.gmOverrides?.eliteAdvances) && !status?.automatic;
+    if (!advance || !status || status.missing.length || hasEliteAdvance(advance.id)) return;
+    character.advances.eliteAdvances.push({
+      id: advance.id,
+      name: advance.name,
+      source: gmGranted ? `${advance.source}, p. ${advance.page} — GM grant` : `${advance.source}, p. ${advance.page}`,
+      cost: gmGranted ? 0 : advance.cost,
+      gmGranted,
+    });
     if (advance.id === "psyker" && character.background === "astra-telepathica") character.eliteSetup.psykerCorruption = 0;
     playMechanicalLock();
     syncGrantedEquipment();
@@ -7547,7 +7621,7 @@ function wireEvents() {
           name: entry.name,
           type: "specialAbility",
           system: { description: entry.summary || entry.notes, benefit: entry.instantChanges?.join("; ") || entry.summary },
-          flags: { dh2CharacterBuilder: { initial: Boolean(entry.automatic), eliteAdvance: true, source: entry.ruleSource || `${entry.source}, p. ${entry.page}` } },
+          flags: { dh2CharacterBuilder: { initial: Boolean(entry.automatic), eliteAdvance: true, gmGranted: Boolean(entry.gmGranted), source: entry.gmGranted ? entry.source : entry.ruleSource || `${entry.source}, p. ${entry.page}` } },
         })),
         ...character.advances.psychicPowers.map((entry) => psychicPowerById(entry.id) || entry).filter((entry) => entry?.name).map((entry) => ({
           name: entry.name,

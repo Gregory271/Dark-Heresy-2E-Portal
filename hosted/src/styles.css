@@ -3371,6 +3371,101 @@ dialog h2,
   .review-skills-list { grid-template-columns: 1fr; }
 }
 
+/* Explicit GM controls keep the player-facing safeguards intact while
+   providing a clear, recorded path for campaign-created higher-tier actors. */
+.gm-tools {
+  margin: 10px 12px 0;
+  border: 1px solid rgba(198, 143, 67, .32);
+  background: rgba(86, 53, 21, .16);
+}
+.gm-tools summary {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 10px;
+  color: #e7c689;
+  font: 700 10px "Barlow Condensed", sans-serif;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.gm-tools summary::marker { color: #d8ad68; }
+.gm-tools-body {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid rgba(198, 143, 67, .2);
+  padding: 9px 10px 10px;
+}
+.gm-tools-body label,
+.gm-override-strip label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #f0e4ce;
+  font-size: 11px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.gm-tools-body input,
+.gm-override-strip input { flex: 0 0 auto; width: 16px; height: 16px; margin: 1px 0 0; accent-color: #d8ad68; }
+.gm-tools-body p,
+.gm-override-strip p {
+  margin: 0;
+  color: #bdb3a3;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.gm-override-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 10px;
+  border-left: 2px solid #d8ad68;
+  padding: 8px 10px;
+  background: rgba(106, 70, 28, .15);
+}
+.gm-override-strip label {
+  align-items: center;
+  color: #f1cc8b;
+  font: 700 10px "Barlow Condensed", sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.gm-override-note { color: #f1cc8b !important; }
+.gm-grant-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  border-left: 2px solid #d8ad68;
+  padding: 6px 8px;
+  color: #e8c987 !important;
+  background: rgba(106, 70, 28, .12);
+  font-size: 10px !important;
+}
+.gm-review-note {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  margin: 8px 0;
+  border-left: 2px solid #d8ad68;
+  padding: 7px 10px;
+  background: rgba(106, 70, 28, .14);
+}
+.gm-review-note strong {
+  color: #f1cc8b;
+  font: 700 10px "Barlow Condensed", sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.gm-review-note span { color: #c7bba8; font-size: 10px; line-height: 1.45; }
+
+@media (max-width: 640px) {
+  .gm-override-strip,
+  .gm-review-note { grid-template-columns: 1fr; gap: 4px; }
+  .gm-override-strip label { white-space: normal; }
+}
+
 /* Character-sheet workspace: a persistent DH2 summary wrapped around one
    task-focused tab, following the clean information rhythm of modern digital
    character sheets without importing another product's visual assets. */
