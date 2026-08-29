@@ -997,6 +997,7 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 .validation-panel { overflow-y: auto; }
 .validation-panel { border-left: 1px solid var(--line); }
 .validation-panel .save-to-roster { width: 100%; margin: 10px 0 8px; }
+.validation-panel .save-to-foundry { width: 100%; margin: 10px 0 0; }
 .review-export-options { display: grid; gap: 5px; margin-top: 16px; border-top: 1px solid rgba(255,255,255,.11); padding-top: 12px; }
 .review-export-options h3 { margin: 0; color: #c9a96f; font: 600 13px "Barlow Condensed",sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .review-export-options p { margin: 0; color: #9e998f; font-size: 8px; line-height: 1.4; }
@@ -4078,6 +4079,62 @@ html[data-text-size="extra-large"] .review-tab-panel .action-card-grid,
 html[data-text-size="extra-large"] .review-feature-grid,
 html[data-text-size="extra-large"] .review-background-grid,
 html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-template-columns: 1fr; }
+
+/* Foundry windows and shorter desktop viewports keep the dossier fixed while
+   preserving useful room for the one intentionally scrollable detail tab. */
+@media (min-width: 801px) and (max-height: 820px) {
+  .scene-review { padding-top: 10px; padding-bottom: 10px; }
+  .scene-review .management-content { margin: 2px 0; }
+  .review-dossier {
+    grid-template-rows: auto auto auto auto auto minmax(125px,1fr);
+    padding: 8px 10px 10px;
+  }
+  .review-profile-heading h2 { font-size: clamp(26px,2.7vw,34px); }
+  .review-profile-details { font-size: 9px; }
+  .review-record-state { margin-bottom: 4px; padding: 3px 6px; }
+  .review-characteristics div { padding: 4px 3px; }
+  .review-characteristics strong { font-size: 19px; }
+  .review-characteristics small { min-height: 9px; font-size: 6px; }
+  .calculation-note { margin-top: 4px; padding: 3px 7px; font-size: 8px; line-height: 1.25; }
+  .review-vitals-strip { gap: 5px; margin: 5px 0; }
+  .review-wounds-card,
+  .review-armour-card,
+  .review-fate-card { padding: 5px 7px; }
+  .review-vital-heading { margin-bottom: 2px; }
+  .review-fate-card .review-vital-heading > small,
+  .review-armour-card > p,
+  .fate-controls label span { display: none; }
+  .armour-diagram { min-width: 270px; height: 94px; }
+  .armour-diagram > img { width: 48px; height: 93px; }
+  .armour-location { width: 84px; min-height: 29px; padding: 2px 4px; }
+  .armour-location strong { font-size: 18px; }
+  .armour-location-head { top: 0; }
+  .armour-location-body { top: 32px; }
+  .armour-location-leftArm,
+  .armour-location-rightArm { top: 23px; }
+  .armour-location-leftLeg,
+  .armour-location-rightLeg { bottom: 0; }
+  .fate-total { min-height: 30px; }
+  .fate-total > strong { font-size: 29px; }
+  .fate-pips { min-height: 8px; margin-bottom: 2px; }
+  .fate-pips i { width: 7px; height: 7px; }
+  .fate-controls input,
+  .fate-adjust { min-height: 24px; }
+  .view-fate-actions { min-height: 22px; margin-top: 2px; }
+  .review-status-strip { gap: 5px; margin-bottom: 5px; }
+  .review-status-card { min-height: 48px; padding: 5px 7px; }
+  .review-status-card > strong { font-size: 22px; }
+  .review-movement-card b { font-size: 17px; }
+  .review-workspace-tabs button { min-height: 34px; padding-top: 5px; padding-bottom: 3px; }
+  .validation-panel { padding: 10px; }
+  .validation-panel h2 { font-size: 21px; }
+  .validation-panel .primary-button { padding-top: 9px; padding-bottom: 9px; }
+  .review-export-options { margin-top: 9px; padding-top: 8px; }
+}
+
+@media (min-width: 801px) and (max-height: 740px) {
+  .view-fate-actions { display: none; }
+}
 
 @media (max-width: 1180px) {
   .scene-review .review-layout { grid-template-columns: 1fr; grid-template-rows: minmax(0,1fr) auto; }

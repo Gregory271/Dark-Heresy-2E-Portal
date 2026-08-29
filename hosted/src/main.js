@@ -61,7 +61,10 @@ const root = document.querySelector("#app");
 const portalEmblem = `<img class="sigil" src="./public/assets/brand/pax-historia-emblem.png?v=0.1.0" alt="" aria-hidden="true" />`;
 const hostedEdition = location.hostname.endsWith("github.io")
   || document.querySelector('meta[name="dh2-edition"]')?.content === "hosted";
+const foundryEmbeddedMode = new URLSearchParams(location.search).get("foundry") === "1"
+  && window.parent !== window;
 document.documentElement.dataset.edition = hostedEdition ? "hosted" : "local";
+document.documentElement.dataset.foundryEmbedded = String(foundryEmbeddedMode);
 const libraryStorageKey = "dh2-character-library";
 const activeCharacterStorageKey = "dh2-active-character-id";
 const repositorySaveTimers = new Map();
@@ -2749,6 +2752,151 @@ function foundryUnlinkedGrantedEquipment() {
       },
     },
   }));
+}
+
+function foundryActorPayload() {
+  const eliteAdvances = activeEliteAdvances();
+  const foundryAbilities = [
+    ["Home World", ruleValue(character.homeWorld, "Home World Bonus")],
+    ["Background", ruleValue(character.background, "Background Bonus")],
+    ["Role", ruleValue(character.role, "Role Bonus")],
+  ].filter(([, value]) => value);
+
+  return {
+    name: character.name || "Unnamed Acolyte",
+    type: "acolyte",
+    system: {
+      bio: {
+        homeWorld: foundryBioValue(catalogs.homeWorlds, character.homeWorld),
+        background: foundryBackgroundName(),
+        role: foundryBioValue(catalogs.roles, character.role),
+        elite: eliteAdvances.map((entry) => entry.name).join(", "),
+        divination: foundryDivinationName(),
+        gender: character.presentation || "",
+        notes: [
+          character.appearance ? `Appearance: ${character.appearance}` : "",
+          ...Object.entries({ desire: "Desire", hatred: "Hatred", sacrifice: "Sacrifice", meeting: "Meeting the Inquisitor", inquisitorMeaning: "Meaning of the Inquisitor", warbandBond: "Warband bond", base: "Base of operations" })
+            .map(([id, label]) => character.history?.[id] ? `${label}: ${character.history[id]}` : ""),
+        ].filter(Boolean).join("\n\n"),
+      },
+      characteristics: Object.fromEntries(characteristics.map((entry) => [entry.id, foundryCharacteristicData(entry.id)])),
+      fate: {
+        max: finalFateThreshold(),
+        value: currentFatePoints(),
+        rolled: Boolean(character.fate?.roll),
+      },
+      wounds: {
+        max: Number(character.wounds?.total || 0),
+        value: woundStatus().remaining,
+        critical: woundStatus().critical,
+        rolled: Boolean(character.wounds?.total),
+      },
+      fatigue: { value: 0 },
+      psy: {
+        rating: foundryPsyRating(),
+        sustained: 0,
+        defaultPR: foundryPsyRating(),
+        class: character.background === "astra-telepathica" ? "bound" : "unbound",
+        cost: psyRatingXpCost(),
+        hasFocus: character.equipment.inventory.some((id) => /psy-focus/i.test(armoury.find((item) => item.id === id)?.name || "")),
+      },
+      skills: foundrySkillData(),
+      experience: { total: character.xp.starting, used: xpSpent() },
+      insanity: Number(character.conditions.insanity || 0),
+      corruption: Number(character.conditions.corruption || 0),
+    },
+    items: [
+      ...resolvedAptitudes().aptitudes.map((aptitude) => ({
+        name: aptitude,
+        type: "aptitude",
+        system: { description: "Granted during character creation." },
+        flags: { dh2CharacterBuilder: { initial: true } },
+      })),
+      ...character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean).map(foundryEquipmentItem),
+      ...foundryUnlinkedGrantedEquipment(),
+      ...[
+        ...Object.values(resolvedGrantedTalents()).map((talent) => ({ talent, initial: true })),
+        ...paidTalentAdvanceEntries().map((entry) => ({ talent: talentCatalogue.find((candidate) => candidate.id === entry.id), initial: false })),
+      ].filter((entry) => entry.talent).map(({ talent, initial }) => ({
+        name: talent.displayName || talent.name,
+        type: "talent",
+        system: {
+          aptitudes: talent.aptitudes.join(", "),
+          benefit: talent.benefit,
+          prerequisites: talent.prerequisites,
+          source: talent.source,
+          tier: Number(talent.tier),
+          cost: initial ? 0 : talentCost(talent),
+        },
+        flags: { dh2CharacterBuilder: { initial } },
+      })),
+      ...[...automaticTraits(), ...equipmentGrantedTraits()].map((entry) => ({
+        name: entry.name,
+        type: "trait",
+        system: { description: entry.summary || entry.source, level: 0 },
+        flags: { dh2CharacterBuilder: { initial: true, conditional: Boolean(entry.conditional) } },
+      })),
+      ...foundryAbilities.map(foundrySpecialAbility),
+      ...eliteAdvances.map((entry) => ({
+        name: entry.name,
+        type: "specialAbility",
+        system: { description: entry.summary || entry.notes, benefit: entry.instantChanges?.join("; ") || entry.summary },
+        flags: { dh2CharacterBuilder: { initial: Boolean(entry.automatic), eliteAdvance: true, gmGranted: Boolean(entry.gmGranted), source: entry.gmGranted ? entry.source : entry.ruleSource || `${entry.source}, p. ${entry.page}` } },
+      })),
+      ...character.advances.psychicPowers.map((entry) => psychicPowerById(entry.id) || entry).filter((entry) => entry?.name).map((entry) => ({
+        name: entry.name,
+        type: "psychicPower",
+        system: {
+          description: entry.summary || entry.description || "Selected during character advancement.",
+          benefit: entry.summary || entry.description || "",
+          cost: Number(entry.cost || 0),
+          discipline: entry.discipline || "",
+          action: entry.action || "",
+          focusPower: entry.focus || "",
+          range: entry.range || "",
+          sustained: entry.sustained || "",
+          subtype: entry.subtype || "",
+          prerequisites: psychicPrerequisiteText(entry),
+        },
+        flags: { dh2CharacterBuilder: { initial: false, source: entry.page ? `${entry.source}, p. ${entry.page}` : "XP" } },
+      })),
+    ],
+    flags: {
+      dh2CharacterBuilder: {
+        format: "mrkeathley-dark-heresy-2nd",
+        schemaVersion: 2,
+        source: character,
+        derivedActions: serialisableCharacterActions(),
+        eliteAdvances,
+        psyRatingXp: psyRatingXpCost(),
+      },
+    },
+  };
+}
+
+function sendCharacterToFoundry() {
+  if (!foundryEmbeddedMode) return;
+  const requestId = globalThis.crypto?.randomUUID?.() || `dh2-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const status = document.querySelector("#export-status");
+  if (status) status.textContent = "Creating this Acolyte in Foundry…";
+  window.parent.postMessage({
+    source: "dh2-portal-frame",
+    type: "create-actor",
+    requestId,
+    payload: foundryActorPayload(),
+  }, location.origin);
+}
+
+if (foundryEmbeddedMode) {
+  window.addEventListener("message", (event) => {
+    if (event.origin !== location.origin || event.source !== window.parent) return;
+    if (event.data?.source !== "dh2-portal-module" || event.data?.type !== "create-actor-result") return;
+    const status = document.querySelector("#export-status");
+    if (!status) return;
+    status.textContent = event.data.ok
+      ? `${event.data.name || "Acolyte"} is ready in Foundry's Actors directory.`
+      : event.data.error || "Foundry could not create this Acolyte.";
+  });
 }
 
 function hasPsykerAccess() {
@@ -6030,6 +6178,7 @@ function renderReview() {
       </section>
       <aside class="validation-panel">
         <h2>Save Your Acolyte</h2>
+        ${foundryEmbeddedMode ? `<button class="primary-button save-to-foundry" type="button">Create Foundry Actor <span>›</span></button>` : ""}
         <button class="primary-button save-to-roster" type="button">Save &amp; Return to Acolytes <span>›</span></button>
         ${warnings.length ? warnings.map((warning) => `<p class="warning">${warning}</p>`).join("") : `<p class="valid">Character creation record is complete.</p>`}
         ${gmOverridesActive ? `<div class="gm-review-note" role="note"><strong>GM options recorded</strong><span>${[character.gmOverrides?.highCharacteristics ? "High characteristic values" : "", character.gmOverrides?.eliteAdvances ? "GM-granted Elite Advances" : ""].filter(Boolean).join(" · ")}. These exceptions bypass player creation limits and remain marked in exports.</span></div>` : ""}
@@ -7544,124 +7693,14 @@ function wireEvents() {
     save({ markComplete: true });
     render();
   });
+  document.querySelector(".save-to-foundry")?.addEventListener("click", () => {
+    playMechanicalLock();
+    save({ markComplete: true });
+    sendCharacterToFoundry();
+  });
   document.querySelector(".export-foundry")?.addEventListener("click", () => {
-    const eliteAdvances = activeEliteAdvances();
-    const foundryAbilities = [
-      ["Home World", ruleValue(character.homeWorld, "Home World Bonus")],
-      ["Background", ruleValue(character.background, "Background Bonus")],
-      ["Role", ruleValue(character.role, "Role Bonus")],
-    ].filter(([, value]) => value);
     const filename = `${character.name || "acolyte"}.foundry-actor.json`;
-    downloadJson(filename, {
-      name: character.name || "Unnamed Acolyte",
-      type: "acolyte",
-      system: {
-        bio: {
-          homeWorld: foundryBioValue(catalogs.homeWorlds, character.homeWorld),
-          background: foundryBackgroundName(),
-          role: foundryBioValue(catalogs.roles, character.role),
-          elite: eliteAdvances.map((entry) => entry.name).join(", "),
-          divination: foundryDivinationName(),
-          gender: character.presentation || "",
-          notes: [
-            character.appearance ? `Appearance: ${character.appearance}` : "",
-            ...Object.entries({ desire: "Desire", hatred: "Hatred", sacrifice: "Sacrifice", meeting: "Meeting the Inquisitor", inquisitorMeaning: "Meaning of the Inquisitor", warbandBond: "Warband bond", base: "Base of operations" })
-              .map(([id, label]) => character.history?.[id] ? `${label}: ${character.history[id]}` : ""),
-          ].filter(Boolean).join("\n\n"),
-        },
-        characteristics: Object.fromEntries(characteristics.map((entry) => [entry.id, foundryCharacteristicData(entry.id)])),
-        fate: {
-          max: finalFateThreshold(),
-          value: currentFatePoints(),
-          rolled: Boolean(character.fate?.roll),
-        },
-        wounds: {
-          max: Number(character.wounds?.total || 0),
-          value: woundStatus().remaining,
-          critical: woundStatus().critical,
-          rolled: Boolean(character.wounds?.total),
-        },
-        fatigue: { value: 0 },
-        psy: {
-          rating: foundryPsyRating(),
-          sustained: 0,
-          defaultPR: foundryPsyRating(),
-          class: character.background === "astra-telepathica" ? "bound" : "unbound",
-          cost: psyRatingXpCost(),
-          hasFocus: character.equipment.inventory.some((id) => /psy-focus/i.test(armoury.find((item) => item.id === id)?.name || "")),
-        },
-        skills: foundrySkillData(),
-        experience: { total: character.xp.starting, used: xpSpent() },
-        insanity: Number(character.conditions.insanity || 0),
-        corruption: Number(character.conditions.corruption || 0),
-      },
-      items: [
-        ...resolvedAptitudes().aptitudes.map((aptitude) => ({
-          name: aptitude,
-          type: "aptitude",
-          system: { description: "Granted during character creation." },
-          flags: { dh2CharacterBuilder: { initial: true } },
-        })),
-        ...character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean).map(foundryEquipmentItem),
-        ...foundryUnlinkedGrantedEquipment(),
-        ...[
-          ...Object.values(resolvedGrantedTalents()).map((talent) => ({ talent, initial: true })),
-           ...paidTalentAdvanceEntries().map((entry) => ({ talent: talentCatalogue.find((candidate) => candidate.id === entry.id), initial: false })),
-        ].filter((entry) => entry.talent).map(({ talent, initial }) => ({
-          name: talent.displayName || talent.name,
-          type: "talent",
-          system: {
-            aptitudes: talent.aptitudes.join(", "),
-            benefit: talent.benefit,
-            prerequisites: talent.prerequisites,
-            source: talent.source,
-            tier: Number(talent.tier),
-            cost: initial ? 0 : talentCost(talent),
-          },
-          flags: { dh2CharacterBuilder: { initial } },
-        })),
-        ...[...automaticTraits(), ...equipmentGrantedTraits()].map((entry) => ({
-          name: entry.name,
-          type: "trait",
-          system: { description: entry.summary || entry.source, level: 0 },
-          flags: { dh2CharacterBuilder: { initial: true, conditional: Boolean(entry.conditional) } },
-        })),
-        ...foundryAbilities.map(foundrySpecialAbility),
-        ...eliteAdvances.map((entry) => ({
-          name: entry.name,
-          type: "specialAbility",
-          system: { description: entry.summary || entry.notes, benefit: entry.instantChanges?.join("; ") || entry.summary },
-          flags: { dh2CharacterBuilder: { initial: Boolean(entry.automatic), eliteAdvance: true, gmGranted: Boolean(entry.gmGranted), source: entry.gmGranted ? entry.source : entry.ruleSource || `${entry.source}, p. ${entry.page}` } },
-        })),
-        ...character.advances.psychicPowers.map((entry) => psychicPowerById(entry.id) || entry).filter((entry) => entry?.name).map((entry) => ({
-          name: entry.name,
-          type: "psychicPower",
-          system: {
-            description: entry.summary || entry.description || "Selected during character advancement.",
-            benefit: entry.summary || entry.description || "",
-            cost: Number(entry.cost || 0),
-            discipline: entry.discipline || "",
-            action: entry.action || "",
-            focusPower: entry.focus || "",
-            range: entry.range || "",
-            sustained: entry.sustained || "",
-            subtype: entry.subtype || "",
-            prerequisites: psychicPrerequisiteText(entry),
-          },
-          flags: { dh2CharacterBuilder: { initial: false, source: entry.page ? `${entry.source}, p. ${entry.page}` : "XP" } },
-        })),
-      ],
-      flags: {
-        dh2CharacterBuilder: {
-          format: "mrkeathley-dark-heresy-2nd",
-          schemaVersion: 2,
-          source: character,
-          derivedActions: serialisableCharacterActions(),
-          eliteAdvances,
-          psyRatingXp: psyRatingXpCost(),
-        },
-      },
-    });
+    downloadJson(filename, foundryActorPayload());
     const status = document.querySelector("#export-status");
     if (status) status.textContent = `Download started: ${filename}`;
   });

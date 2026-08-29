@@ -26,3 +26,10 @@ rights holders.
 
 To prepare the public GitHub Pages edition after making changes, run
 `npm.cmd run build:hosted`.
+
+## Roadmap
+
+- Mobile accessibility audit: use remembered, single-level accordions for the
+  largest sheet sections without introducing nested scroll traps.
+- Foundry bridge first milestone: open the portal in Foundry and create native
+  Acolyte Actors; a native sheet and two-way Actor sync remain next.

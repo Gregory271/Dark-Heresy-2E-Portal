@@ -1,0 +1,49 @@
+.dh2-portal-directory-controls {
+  display: grid;
+  gap: 0.3rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
+}
+
+.dh2-portal-open-button,
+.dh2-portal-import-button {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.45rem;
+  justify-content: center;
+  margin: 0;
+}
+
+.dh2-portal-open-button i,
+.dh2-portal-import-button i {
+  color: var(--color-warm-1, #d8b765);
+}
+
+.dh2-portal-window .window-content {
+  overflow: hidden;
+  padding: 0;
+}
+
+.dh2-portal-frame-shell,
+.dh2-portal-frame {
+  border: 0;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+
+.dh2-portal-frame-shell {
+  background: #050808;
+  display: block;
+  overflow: hidden;
+}
+
+.dh2-portal-frame {
+  display: block;
+}
+
+@media (max-width: 720px) {
+  .dh2-portal-directory-controls {
+    grid-template-columns: 1fr;
+  }
+}
