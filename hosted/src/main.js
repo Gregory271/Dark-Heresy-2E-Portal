@@ -2,6 +2,7 @@ import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultChar
 import { armoury } from "./armoury-data.js?v=0.8.1";
 import { actionGroups, actionSource, combatActionCatalogue } from "./action-data.js?v=0.1.0";
 import { talentCatalogue as baseTalentCatalogue } from "./talent-data.js?v=0.9.1";
+import { reinforcementCatalogue, vehicleCatalogue } from "./reinforcement-data.js?v=0.1.0";
 import {
   disciplineId,
   eliteAdvanceById,
@@ -84,6 +85,11 @@ let armouryBrowserState = {
   query: "",
   category: "All",
   availability: "available",
+};
+const reinforcementState = {
+  query: localStorage.getItem("dh2-reinforcement-query") || "",
+  category: localStorage.getItem("dh2-reinforcement-category") || "All",
+  selectedId: localStorage.getItem("dh2-reinforcement-selected") || "",
 };
 
 function characterId() {
@@ -4172,10 +4178,7 @@ function legacyRenderCompendium() {
       <header class="topbar compendium-topbar">
         ${portalEmblem}
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
-        <nav class="section-nav" aria-label="Portal sections">
-          <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
-          <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
-        </nav>
+        ${renderPortalSectionNav("compendium")}
         <label class="text-size-control" title="Interface text size">
           <span aria-hidden="true">TEXT</span>
           <input id="text-size" type="range" min="80" max="160" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" />
@@ -4221,8 +4224,13 @@ function legacyRenderCompendium() {
 }
 
 function legacyWireCompendiumEvents() {
-  document.querySelector("#return-to-roster")?.addEventListener("click", () => {
+  document.querySelector("#open-roster")?.addEventListener("click", () => {
     appView = "roster";
+    save();
+    render();
+  });
+  document.querySelector("#open-reinforcements")?.addEventListener("click", () => {
+    appView = "reinforcements";
     save();
     render();
   });
@@ -4593,10 +4601,7 @@ function renderCompendium() {
       <header class="topbar compendium-topbar">
         ${portalEmblem}
         <div class="brand"><strong>Dark Heresy Rules Library</strong><span>Compendium</span></div>
-        <nav class="section-nav" aria-label="Portal sections">
-          <button class="roster-button" id="return-to-roster" type="button"><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
-          <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
-        </nav>
+        ${renderPortalSectionNav("compendium")}
         ${hostedEdition && compendiumData ? `<button class="compact-button sourcebook-control" id="replace-sourcebooks" type="button">Manage Sourcebooks</button>` : ""}
         <label class="text-size-control" title="Interface text size">
           <span aria-hidden="true">TEXT</span>
@@ -4773,8 +4778,13 @@ async function connectSourcebookFiles(files) {
 }
 
 function wireCompendiumEvents() {
-  document.querySelector("#return-to-roster")?.addEventListener("click", () => {
+  document.querySelector("#open-roster")?.addEventListener("click", () => {
     appView = "roster";
+    save();
+    render();
+  });
+  document.querySelector("#open-reinforcements")?.addEventListener("click", () => {
+    appView = "reinforcements";
     save();
     render();
   });
@@ -5019,6 +5029,164 @@ function createRosterCharacter(seed = {}, origin = "Created locally") {
   render();
 }
 
+function renderPortalSectionNav(active = "") {
+  const button = (id, label, narrow) => `<button class="roster-button" id="open-${id}" type="button" ${active === id ? 'aria-current="page" disabled' : ""}><span class="nav-wide">${label}</span><span class="nav-narrow">${narrow}</span></button>`;
+  return `<nav class="section-nav" aria-label="Portal sections">
+    ${button("roster", "Your Acolytes", "Acolytes")}
+    ${button("reinforcements", "Reinforcements", "Support")}
+    ${button("compendium", "Rules Compendium", "Rules")}
+  </nav>`;
+}
+
+function reinforcementEntries() {
+  return [
+    ...reinforcementCatalogue,
+    ...vehicleCatalogue,
+    ...armoury.map((item) => ({
+      id: `equipment-${item.id}`,
+      type: "equipment",
+      category: "Equipment",
+      name: item.name,
+      source: item.source || "Armoury",
+      page: Number(String(item.source || "").match(/p\.\s*(\d+)/i)?.[1] || 0) || null,
+      tags: [item.category, item.availability, item.documentType].filter(Boolean),
+      summary: item.description || "Equipment profile from the Armoury.",
+      item,
+    })),
+  ];
+}
+
+function reinforcementSearchText(entry) {
+  return [
+    entry.name,
+    entry.category,
+    entry.source,
+    entry.summary,
+    entry.tags?.join(" "),
+    entry.peer,
+    entry.requirements,
+    entry.profileText,
+    JSON.stringify(entry.characteristics || {}),
+    JSON.stringify(entry.profile || {}),
+    entry.weapons?.join(" "),
+    entry.skills?.join(" "),
+    entry.talents?.join(" "),
+    entry.traits?.join(" "),
+    entry.gear?.join(" "),
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
+function reinforcementStatCells(entry) {
+  const stats = entry.characteristics || {};
+  const labels = [
+    ["wounds", "Wounds"], ["ws", "WS"], ["bs", "BS"], ["strength", "S"], ["toughness", "T"],
+    ["agility", "Ag"], ["intelligence", "Int"], ["perception", "Per"], ["willpower", "WP"], ["fellowship", "Fel"],
+  ];
+  return labels.filter(([id]) => stats[id] !== undefined).map(([id, label]) => `<div><span>${label}</span><strong>${escapeHtmlAttribute(stats[id])}</strong></div>`).join("");
+}
+
+function reinforcementArtwork(entry) {
+  if (entry.type === "vehicle") return stageArtById.equipment;
+  const tags = (entry.tags || []).map((tag) => String(tag).toLowerCase());
+  const artId = tags.includes("assassin") ? "assassin"
+    : tags.includes("adeptus astartes") || tags.includes("grey knights") ? "crusader"
+      : tags.includes("ecclesiarchy") || tags.includes("adepta sororitas") ? "adepta-sororitas"
+        : tags.includes("daemonhost") || tags.includes("daemon") ? "daemon-world"
+          : tags.includes("eldar") ? "rogue-trader-fleet"
+            : tags.includes("ork") || tags.includes("kroot") ? "outcast"
+              : "review";
+  return artByChoice[artId] || stageArtById.review;
+}
+
+function reinforcementListEntries(entries, selectedId) {
+  return entries.map((entry) => `
+    <button class="reinforcement-list-entry ${entry.id === selectedId ? "selected" : ""}" type="button" data-reinforcement-id="${escapeHtmlAttribute(entry.id)}" aria-pressed="${entry.id === selectedId}">
+      <span class="reinforcement-list-kind">${escapeHtmlAttribute(entry.category || entry.type)}</span>
+      <strong>${escapeHtmlAttribute(entry.name)}</strong>
+      <small>${escapeHtmlAttribute(entry.source || "Sourcebook catalogue")}${entry.page ? ` · p. ${escapeHtmlAttribute(entry.page)}` : ""}</small>
+    </button>`).join("") || `<div class="reinforcement-empty"><strong>No matching records</strong><span>Try another name, sourcebook, or category.</span></div>`;
+}
+
+function reinforcementDetail(entry) {
+  if (!entry) return `<div class="reinforcement-empty reinforcement-empty-detail"><h2>Select a record</h2><p>Choose an NPC, vehicle, or equipment profile from the catalogue.</p></div>`;
+  const tags = (entry.tags || []).filter(Boolean).map((tag) => `<span>${escapeHtmlAttribute(tag)}</span>`).join("");
+  if (entry.type === "equipment") {
+    const item = entry.item || {};
+    const profile = item.profile || {};
+    return `<article class="reinforcement-record equipment-record">
+      <header class="reinforcement-record-header"><div class="reinforcement-record-art" style="--record-image:url('${reinforcementArtwork(entry)}')" aria-hidden="true"></div><div><p class="eyebrow">Equipment profile</p><h2>${escapeHtmlAttribute(entry.name)}</h2><p>${escapeHtmlAttribute(entry.summary)}</p></div><span class="reinforcement-record-mark">◆</span></header>
+      <div class="reinforcement-tags">${tags}</div>
+      <dl class="reinforcement-facts"><div><dt>Category</dt><dd>${escapeHtmlAttribute(item.category || "Equipment")}</dd></div><div><dt>Availability</dt><dd>${escapeHtmlAttribute(item.availability || profile.availability || "—")}</dd></div><div><dt>Weight</dt><dd>${profile.weight ?? item.weight ?? "—"}${profile.weight || item.weight ? " kg" : ""}</dd></div><div><dt>Craftsmanship</dt><dd>${escapeHtmlAttribute(item.craftsmanship || profile.craftsmanship || "Common")}</dd></div></dl>
+      <section class="reinforcement-text-block"><h3>Rules summary</h3><p>${escapeHtmlAttribute(item.description || entry.summary || "No summary recorded.")}</p></section>
+      <p class="reinforcement-source">${escapeHtmlAttribute(entry.source || "Armoury")}</p>
+    </article>`;
+  }
+  const influence = entry.influenceMinimum ? `<div class="reinforcement-influence"><span>Influence minimum <strong>${escapeHtmlAttribute(entry.influenceMinimum)}</strong></span><span>Influence cost <strong>${escapeHtmlAttribute(entry.influenceCost)}</strong></span></div>` : "";
+  const statGrid = entry.characteristics ? `<section class="reinforcement-stat-section"><h3>Characteristics</h3><div class="reinforcement-stat-grid">${reinforcementStatCells(entry)}</div></section>` : entry.profileText ? `<section class="reinforcement-stat-section"><h3>Profile</h3><p class="reinforcement-profile-text">${escapeHtmlAttribute(entry.profileText)}</p></section>` : "";
+  const vehicleFacts = entry.profile ? `<dl class="reinforcement-facts vehicle-facts"><div><dt>Armour</dt><dd>Front ${escapeHtmlAttribute(entry.profile.front)} · Side ${escapeHtmlAttribute(entry.profile.side)} · Rear ${escapeHtmlAttribute(entry.profile.rear)}</dd></div><div><dt>Speed</dt><dd>${escapeHtmlAttribute(entry.profile.cruising)} cruising · ${escapeHtmlAttribute(entry.profile.tactical)} tactical</dd></div><div><dt>Manoeuvrability</dt><dd>${escapeHtmlAttribute(entry.profile.manoeuvrability)}</dd></div><div><dt>Size</dt><dd>${escapeHtmlAttribute(entry.profile.size)}</dd></div><div><dt>Carrying</dt><dd>${escapeHtmlAttribute(entry.profile.carrying)} · Integrity ${escapeHtmlAttribute(entry.profile.integrity)}</dd></div><div><dt>Crew</dt><dd>${escapeHtmlAttribute(entry.profile.crew)}</dd></div></dl>` : "";
+  const listBlock = (title, values) => values?.length ? `<section class="reinforcement-text-block"><h3>${title}</h3><ul>${values.map((value) => `<li>${escapeHtmlAttribute(value)}</li>`).join("")}</ul></section>` : "";
+  return `<article class="reinforcement-record">
+    <header class="reinforcement-record-header"><div class="reinforcement-record-art" style="--record-image:url('${reinforcementArtwork(entry)}')" aria-hidden="true"></div><div><p class="eyebrow">${escapeHtmlAttribute(entry.category || "Sourcebook record")}${entry.tier ? ` · ${escapeHtmlAttribute(entry.tier)}` : ""}</p><h2>${escapeHtmlAttribute(entry.name)}</h2><p>${escapeHtmlAttribute(entry.summary)}</p></div><span class="reinforcement-record-mark">${entry.type === "vehicle" ? "◇" : "✦"}</span></header>
+    <div class="reinforcement-tags">${tags}</div>${influence}${entry.peer ? `<p class="reinforcement-callout"><strong>Calling this support:</strong> ${escapeHtmlAttribute(entry.peer)}</p>` : ""}${entry.requirements ? `<p class="reinforcement-callout warning"><strong>Requirement:</strong> ${escapeHtmlAttribute(entry.requirements)}</p>` : ""}
+    ${statGrid}${vehicleFacts}<div class="reinforcement-columns">${listBlock("Weapons", entry.weapons)}${listBlock("Skills", entry.skills)}${listBlock("Talents", entry.talents)}${listBlock("Traits", entry.traits)}${listBlock("Gear", entry.gear)}${listBlock("Psychic powers", entry.psychicPowers)}${listBlock("Special rules", entry.notes)}</div>
+    <footer class="reinforcement-record-footer"><span>${escapeHtmlAttribute(entry.source || "Sourcebook catalogue")}${entry.page ? ` · p. ${escapeHtmlAttribute(entry.page)}` : ""}${entry.statBlockPage ? ` · statblock p. ${escapeHtmlAttribute(entry.statBlockPage)}` : ""}</span>${entry.fate !== undefined ? `<span>Fate ${escapeHtmlAttribute(entry.fate)}</span>` : ""}</footer>
+  </article>`;
+}
+
+function renderReinforcements() {
+  const allEntries = reinforcementEntries();
+  const validCategories = new Set(["All", "NPCs", "Vehicles", "Equipment"]);
+  if (!validCategories.has(reinforcementState.category)) reinforcementState.category = "All";
+  const query = reinforcementState.query.trim().toLowerCase();
+  const filtered = allEntries.filter((entry) => (reinforcementState.category === "All" || entry.category === reinforcementState.category) && (!query || reinforcementSearchText(entry).includes(query)));
+  if (!filtered.some((entry) => entry.id === reinforcementState.selectedId)) reinforcementState.selectedId = filtered[0]?.id || "";
+  const selected = allEntries.find((entry) => entry.id === reinforcementState.selectedId);
+  const categories = ["All", "NPCs", "Vehicles", "Equipment"];
+  root.innerHTML = `<main class="reinforcement-scene theme-assessment">
+    <header class="topbar reinforcement-topbar">${portalEmblem}<div class="brand"><strong>Dark Heresy Field Archive</strong><span>Reinforcements</span></div>${renderPortalSectionNav("reinforcements")}<label class="text-size-control" title="Interface text size"><span aria-hidden="true">TEXT</span><input id="text-size" type="range" min="80" max="160" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" /><output id="text-size-value" for="text-size">${Math.round(textScale * 100)}%</output></label></header>
+    <section class="reinforcement-content" id="reinforcement-content" tabindex="-1">
+      <div class="reinforcement-heading"><div><p class="eyebrow">Warband support and reference</p><h1>Reinforcements</h1><p class="lede">Search sourcebook NPCs, vehicles, and Armoury equipment. The Reinforcement Characters also provide examples of affiliations, talents, and play styles for building your own Acolyte. The GM decides when they enter the warband.</p></div><div class="reinforcement-count" aria-live="polite"><strong>${filtered.length}</strong><span>records</span></div></div>
+      <div class="reinforcement-toolbar"><label class="reinforcement-search"><span>Search the archive</span><input id="reinforcement-search" type="search" value="${escapeHtmlAttribute(reinforcementState.query)}" placeholder="Search names, factions, traits, or weapons…" autocomplete="off" /></label><div class="reinforcement-filter-group" role="tablist" aria-label="Record type">${categories.map((category) => `<button type="button" role="tab" class="${reinforcementState.category === category ? "active" : ""}" aria-selected="${reinforcementState.category === category}" data-reinforcement-category="${category}">${category}</button>`).join("")}</div><label class="reinforcement-filter-select"><span>Record type</span><select id="reinforcement-category-select">${categories.map((category) => `<option value="${category}" ${reinforcementState.category === category ? "selected" : ""}>${category}</option>`).join("")}</select></label></div>
+      <div class="reinforcement-layout"><aside class="reinforcement-list" aria-label="Archive records"><div class="reinforcement-list-heading"><span>Archive records</span><strong>${filtered.length}</strong></div><div id="reinforcement-results">${reinforcementListEntries(filtered, reinforcementState.selectedId)}</div></aside><section class="reinforcement-inspector" aria-live="polite" id="reinforcement-inspector">${reinforcementDetail(selected)}</section></div>
+    </section>
+    <footer class="roster-footer"><span>Sourcebook reference · GM tools</span><span>Use the printed pages listed on each record for full rules context.</span></footer>
+  </main>`;
+  wireReinforcementEvents();
+  requestAnimationFrame(applyTextScale);
+}
+
+function wireReinforcementEvents() {
+  document.querySelector("#text-size")?.addEventListener("input", (event) => {
+    textScale = Number(event.target.value) / 100;
+    localStorage.setItem("dh2-text-scale", String(textScale));
+    document.querySelector("#text-size-value").textContent = `${Math.round(textScale * 100)}%`;
+    applyTextScale();
+  });
+  document.querySelector("#open-roster")?.addEventListener("click", () => { appView = "roster"; save(); render(); });
+  document.querySelector("#open-compendium")?.addEventListener("click", () => { appView = "compendium"; save(); render(); });
+  document.querySelectorAll("[data-reinforcement-category]").forEach((button) => button.addEventListener("click", () => {
+    reinforcementState.category = button.dataset.reinforcementCategory;
+    localStorage.setItem("dh2-reinforcement-category", reinforcementState.category);
+    renderReinforcements();
+  }));
+  document.querySelector("#reinforcement-category-select")?.addEventListener("change", (event) => {
+    reinforcementState.category = event.target.value;
+    localStorage.setItem("dh2-reinforcement-category", reinforcementState.category);
+    renderReinforcements();
+  });
+  document.querySelector("#reinforcement-search")?.addEventListener("input", (event) => {
+    reinforcementState.query = event.target.value;
+    localStorage.setItem("dh2-reinforcement-query", reinforcementState.query);
+    renderReinforcements();
+    requestAnimationFrame(() => { const input = document.querySelector("#reinforcement-search"); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length); });
+  });
+  document.querySelectorAll("[data-reinforcement-id]").forEach((button) => button.addEventListener("click", () => {
+    reinforcementState.selectedId = button.dataset.reinforcementId;
+    localStorage.setItem("dh2-reinforcement-selected", reinforcementState.selectedId);
+    renderReinforcements();
+  }));
+}
+
 function renderRoster() {
   const orderedRecords = [...characterLibrary].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   const repositoryLabel = cloudStatus === "connected"
@@ -5048,10 +5216,7 @@ function renderRoster() {
       <header class="topbar roster-topbar">
         ${portalEmblem}
         <div class="brand"><strong>Dark Heresy Character Creation</strong><span>Your Acolytes</span></div>
-        <nav class="section-nav" aria-label="Portal sections">
-          <button class="roster-button" type="button" aria-current="page" disabled><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
-          <button class="roster-button" id="open-compendium" type="button"><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
-        </nav>
+        ${renderPortalSectionNav("roster")}
         <label class="text-size-control" title="Interface text size">
           <span aria-hidden="true">TEXT</span>
           <input id="text-size" type="range" min="80" max="160" step="5" value="${Math.round(textScale * 100)}" aria-label="Interface text size" />
@@ -5177,6 +5342,11 @@ function wireRosterEvents() {
   document.querySelector("#new-character")?.addEventListener("click", () => createRosterCharacter());
   document.querySelector("#open-compendium")?.addEventListener("click", () => {
     appView = "compendium";
+    save();
+    render();
+  });
+  document.querySelector("#open-reinforcements")?.addEventListener("click", () => {
+    appView = "reinforcements";
     save();
     render();
   });
@@ -5792,6 +5962,10 @@ function render() {
     renderRoster();
     return;
   }
+  if (appView === "reinforcements") {
+    renderReinforcements();
+    return;
+  }
   if (appView === "compendium") {
     renderCompendium();
     return;
@@ -5818,10 +5992,7 @@ function render() {
           <strong>Dark Heresy Character Creation</strong>
           <span>Create Your Acolyte</span>
         </div>
-        <nav class="section-nav" aria-label="Portal sections">
-          <button class="roster-button" id="open-roster" type="button"><span class="nav-wide">Your Acolytes</span><span class="nav-narrow">Acolytes</span></button>
-          <button class="roster-button compendium-button" id="open-compendium" type="button"><span class="nav-wide">Rules Compendium</span><span class="nav-narrow">Rules</span></button>
-        </nav>
+        ${renderPortalSectionNav("")}
         <div class="audio-controls">
           <button class="sound ${soundtrackPlaying ? "playing" : ""}" id="sound-toggle" type="button" ${hostedEdition ? "disabled" : ""}
             aria-label="${soundtrackPlaying ? "Pause" : "Play"} ambient soundtrack"
@@ -6250,6 +6421,11 @@ function addDegreeToCurrentActionWithFate() {
 function wireEvents() {
   document.querySelector("#open-roster")?.addEventListener("click", () => {
     appView = "roster";
+    save();
+    render();
+  });
+  document.querySelector("#open-reinforcements")?.addEventListener("click", () => {
+    appView = "reinforcements";
     save();
     render();
   });
