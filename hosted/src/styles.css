@@ -4446,3 +4446,58 @@ html[data-text-size="large"] .scene-grants .grant-entry-detail summary span,
 html[data-text-size="extra-large"] .scene-grants .grant-entry-detail summary span { text-align: left; font-size: 9px; }
 html[data-text-size="large"] .scene-grants .grant-entry-detail-body p,
 html[data-text-size="extra-large"] .scene-grants .grant-entry-detail-body p { font-size: 11px; }
+
+/* Foundry owns the surrounding Actor window and persistence controls. The
+   embedded sheet therefore uses the whole dossier width and keeps file export
+   as a quiet, secondary tool inside Advancement. */
+html[data-foundry-actor-sheet="true"] .scene-review .review-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+html[data-foundry-actor-sheet="true"] .completed-sheet-controls .actions {
+  margin-left: auto;
+}
+.foundry-save-status {
+  max-width: 230px;
+  color: #aebba7;
+  font-size: 10px;
+  line-height: 1.3;
+  text-align: right;
+}
+.foundry-sheet-backup {
+  border-top: 1px solid rgba(225,187,118,.18);
+  padding-top: 7px;
+  color: #a9a39a;
+}
+.foundry-sheet-backup summary {
+  width: fit-content;
+  color: #bca778;
+  font: 700 10px "Barlow Condensed", sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.foundry-sheet-backup > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+}
+.foundry-sheet-backup p {
+  flex: 1 1 280px;
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.foundry-sheet-backup .compact-button {
+  min-height: 30px;
+  margin: 0;
+  padding: 5px 8px;
+  color: #c1b28f;
+  font-size: 8px;
+}
+
+@media (max-width: 700px) {
+  .foundry-save-status { display: none; }
+  .foundry-sheet-backup > div { display: grid; grid-template-columns: 1fr; }
+}

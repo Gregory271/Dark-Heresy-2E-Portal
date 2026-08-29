@@ -6285,14 +6285,17 @@ function renderReview() {
                   <div><h4>XP Purchases</h4><div class="xp-ledger">${xpLedger.map(([name, cost]) => `<div><span>${name}</span><strong>${cost} XP</strong></div>`).join("") || "<p>No XP purchases recorded.</p>"}<div class="total"><span>Spent</span><strong>${spent} XP</strong></div></div></div>
                   <div><h4>XP Awards</h4><div class="xp-ledger xp-award-ledger">${xpAwards.map((entry) => `<div><span>${escapeHtmlAttribute(entry.note || "GM award")}</span><strong>+${Number(entry.amount)} XP</strong><small>${entry.at ? new Date(entry.at).toLocaleDateString() : "Recorded"}</small></div>`).join("") || "<p>No later XP awards recorded.</p>"}<div class="total"><span>Initial ${initialXp} + awards ${xpAwardedTotal}</span><strong>${character.xp.starting} XP</strong></div></div></div>
                 </div>
+                ${foundryActorSheetMode ? `<details class="foundry-sheet-backup">
+                  <summary>Backup and export</summary>
+                  <div><p>Optional file backups for transferring or archiving this Acolyte.</p><button class="compact-button export-builder" type="button">Builder JSON</button><button class="compact-button export-foundry" type="button">Foundry Actor JSON</button></div>
+                </details>` : ""}
               </section></div>
             </div>
           </section>
         </div>
       </section>
-      <aside class="validation-panel">
+      ${foundryActorSheetMode ? "" : `<aside class="validation-panel">
         <h2>${foundryActorSheetMode ? "Save Changes" : "Save Your Acolyte"}</h2>
-        ${foundryActorSheetMode ? `<button class="primary-button save-actor-sheet" type="button">Save Changes <span>›</span></button>` : ""}
         ${!foundryActorSheetMode && foundryEmbeddedMode ? `<button class="primary-button save-to-foundry" type="button">Create Foundry Actor <span>›</span></button>` : ""}
         ${!foundryActorSheetMode ? `<button class="primary-button save-to-roster" type="button">Save &amp; Return to Acolytes <span>›</span></button>` : ""}
         ${warnings.length ? warnings.map((warning) => `<p class="warning">${warning}</p>`).join("") : `<p class="valid">Character creation record is complete.</p>`}
@@ -6304,7 +6307,7 @@ function renderReview() {
           <button class="compact-button export-foundry" type="button">Export Foundry Actor JSON</button>
         </section>
         <p class="export-status" id="export-status" role="status" aria-live="polite"></p>
-      </aside>
+      </aside>`}
     </div>`;
 }
 
@@ -6403,11 +6406,12 @@ function render() {
       </aside>
 
       <footer class="controls ${scene.id === "review" ? "completed-sheet-controls" : ""}" aria-label="${scene.id === "review" ? "Completed character controls" : "Character creation navigation"}">
-        <button class="text-button" id="back" ${step === 0 || actorSheetReview ? "disabled" : ""} ${actorSheetReview ? "aria-hidden=\"true\" tabindex=\"-1\"" : ""}>Back</button>
+        ${actorSheetReview ? "" : `<button class="text-button" id="back" ${step === 0 ? "disabled" : ""}>Back</button>`}
         ${scene.id === "review" ? "" : `<div class="progress" aria-label="Step ${step + 1} of ${scenes.length}">
           ${scenes.map((entry, index) => `<i class="${index === step ? "active" : index < step ? "done" : ""}" ${index === step ? 'aria-current="step"' : ""}><span class="sr-only">${entry.title}${index === step ? ", current step" : index < step ? ", completed" : ""}</span></i>`).join("")}
         </div>`}
         <div class="actions">
+          ${actorSheetReview ? `<span class="foundry-save-status" id="export-status" role="status" aria-live="polite">Changes save automatically.</span>` : ""}
           ${isIdentity ? "" : `<button class="text-button" id="details">Rules</button>`}
           <button class="primary-button" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : actorSheetReview ? "Save Changes" : scene.id === "review" ? "Save Acolyte & Return" : scene.action}<span>›</span></button>
         </div>
@@ -7019,7 +7023,7 @@ function wireEvents() {
     if (recordName) recordName.textContent = character.name || "Designation pending";
   });
 
-  document.querySelector("#back").addEventListener("click", () => {
+  document.querySelector("#back")?.addEventListener("click", () => {
     if (foundryActorSheetMode) return;
     if (step > 0) step -= 1;
     pendingFocusSelector = "#scene-content";
