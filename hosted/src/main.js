@@ -1696,6 +1696,20 @@ function rerenderEquipmentStatePreservingScroll(focusSelector = "") {
   });
 }
 
+function rerenderGrantsPreservingScroll(focusSelector = "") {
+  const grid = document.querySelector(".grants-grid");
+  const previousScroll = grid?.scrollTop || 0;
+  render();
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const nextGrid = document.querySelector(".grants-grid");
+      if (nextGrid) nextGrid.scrollTop = previousScroll;
+      const focusTarget = focusSelector ? document.querySelector(focusSelector) : null;
+      if (focusTarget instanceof HTMLElement) focusTarget.focus({ preventScroll: true });
+    });
+  });
+}
+
 function refreshCharacteristicDisplay(characteristicId) {
   const input = document.querySelector(`[data-manual-characteristic="${characteristicId}"]`);
   const article = input?.closest(".characteristic-entry");
@@ -3303,10 +3317,38 @@ function grantAlternatives() {
         .filter(Boolean);
       if (sourceId === "background-skills") options = options.flatMap(expandSpecialistGrantOption);
       if (options.length < 2) return;
-      alternatives.push({ id: `${sourceId}-${index}`, label, source: entry, options });
+      alternatives.push({ id: `${sourceId}-${index}`, sourceId, label, source: entry, options });
     });
   }
   return alternatives;
+}
+
+function talentForGrantOption(option = "") {
+  const direct = talentByName(option);
+  if (direct) return direct;
+  const target = normaliseItemName(option);
+  return [...talentCatalogue]
+    .sort((a, b) => b.name.length - a.name.length)
+    .find((talent) => {
+      const name = normaliseItemName(talent.name);
+      return target === name || target.endsWith(` ${name}`) || target.includes(` ${name} `);
+    });
+}
+
+function renderStartingTalentComparison(choice) {
+  const talents = choice.options.map((option) => ({ option, talent: talentForGrantOption(option) }));
+  if (!talents.every((entry) => entry.talent)) return "";
+  const selected = character.grantChoices[choice.id] || "";
+  return `<section class="starting-talent-comparison" aria-label="Compare talent choices">
+    <p><strong>Choose one free starting talent.</strong> Compare what each option lets your Acolyte do before making the selection above.</p>
+    <div class="starting-talent-options">
+      ${talents.map(({ option, talent }) => `<article class="starting-talent-option ${selected === option ? "selected" : ""}" ${selected === option ? 'aria-current="true"' : ""}>
+        <header><strong>${escapeHtmlAttribute(option)}</strong><span>${selected === option ? "Selected" : `Tier ${talent.tier}`}</span></header>
+        <p>${escapeHtmlAttribute(cleanRulesSummary(talent.benefit) || "No mechanical summary is recorded.")}</p>
+        <footer><span>${talent.aptitudes.join(" · ") || "No aptitudes recorded"}</span><small>${talent.source || "Source not recorded"}</small></footer>
+      </article>`).join("")}
+    </div>
+  </section>`;
 }
 
 function renderStartingConsequences() {
@@ -3372,13 +3414,16 @@ function renderGrants() {
         <p>Select each alternative granted by the character's Home World, Background, or Role.</p>
         <div class="grant-choice-list">
           ${grantAlternatives().map((choice) => `
-            <label>
-              <span>${choice.label}<small>${choice.source}</small></span>
-              <select data-grant-choice="${choice.id}">
-                <option value="">Choose...</option>
-                ${choice.options.map((option) => `<option value="${option}" ${character.grantChoices[choice.id] === option ? "selected" : ""}>${option}</option>`).join("")}
-              </select>
-            </label>`).join("") || "<p>No unresolved alternatives were detected.</p>"}
+            <div class="grant-choice-item">
+              <label>
+                <span>${choice.label}<small>${choice.source}</small></span>
+                <select data-grant-choice="${choice.id}">
+                  <option value="">Choose...</option>
+                  ${choice.options.map((option) => `<option value="${option}" ${character.grantChoices[choice.id] === option ? "selected" : ""}>${option}</option>`).join("")}
+                </select>
+              </label>
+              ${renderStartingTalentComparison(choice)}
+            </div>`).join("") || "<p>No unresolved alternatives were detected.</p>"}
         </div>
       </section>
       ${renderStartingConsequences()}
@@ -6648,9 +6693,10 @@ function wireEvents() {
   document.querySelectorAll("[data-grant-choice]").forEach((select) => {
     select.addEventListener("change", () => {
       playMechanicalLock();
-      character.grantChoices[select.dataset.grantChoice] = select.value;
+      const choiceId = select.dataset.grantChoice;
+      character.grantChoices[choiceId] = select.value;
       save();
-      render();
+      rerenderGrantsPreservingScroll(`[data-grant-choice="${choiceId}"]`);
     });
   });
   const filterArmoury = () => {

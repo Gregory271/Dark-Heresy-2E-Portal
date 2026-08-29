@@ -534,6 +534,20 @@ select,.acquisition-list input,.choice-resolution textarea { border: 1px solid r
 .grant-choice-list label { display: grid; grid-template-columns: minmax(0,1fr) minmax(130px,.8fr); align-items: center; gap: 8px; color: #ddd8ce; font-size: 10px; }
 .grant-choice-list label span { min-width: 0; }
 .grant-choice-list small { display: block; overflow: hidden; color: #99958c; font-size: 8px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.grant-choice-item { display: grid; align-content: start; gap: 8px; min-width: 0; }
+.starting-talent-comparison { display: grid; gap: 8px; border: 1px solid rgba(225,187,118,.32); padding: 9px; background: rgba(3,7,7,.7); }
+.starting-talent-comparison > p { margin: 0; color: #c7c1b5; font-size: 10px; line-height: 1.45; }
+.starting-talent-comparison > p strong { color: #f2d29b; }
+.starting-talent-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+.starting-talent-option { display: grid; align-content: start; gap: 6px; min-width: 0; border: 1px solid rgba(255,255,255,.13); padding: 9px; background: rgba(255,255,255,.025); }
+.starting-talent-option.selected { border-color: #dfb36c; background: linear-gradient(145deg,rgba(151,100,37,.25),rgba(8,12,11,.82)); box-shadow: inset 2px 0 #dfb36c; }
+.starting-talent-option header,.starting-talent-option footer { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.starting-talent-option header strong { color: #fff0d5; font: 600 14px/1.2 "Barlow Condensed",sans-serif; text-transform: uppercase; }
+.starting-talent-option header span { color: #d9b778; font: 700 8px/1.2 "Barlow Condensed",sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.starting-talent-option p { margin: 0; color: #ddd8ce; font-size: 10px; line-height: 1.5; }
+.starting-talent-option footer { border-top: 1px solid rgba(255,255,255,.08); padding-top: 6px; color: #b7b1a6; font-size: 8px; line-height: 1.35; }
+.starting-talent-option footer span { min-width: 0; }
+.starting-talent-option footer small { flex: 0 0 auto; overflow: visible; color: #8f8a81; text-overflow: clip; white-space: normal; }
 .starting-consequences { display: contents; }
 .exceptional-panel { grid-column: span 2; display: grid; align-content: start; gap: 9px; }
 .exceptional-panel h2,.exceptional-panel p { margin: 0; }
@@ -587,6 +601,31 @@ select,.acquisition-list input,.choice-resolution textarea { border: 1px solid r
   grid-template-columns: repeat(2,minmax(0,1fr));
   margin-top: 0;
 }
+html[data-text-size="large"] .scene-grants .management-content > .lede,
+html[data-text-size="extra-large"] .scene-grants .management-content > .lede { display: none; }
+html[data-text-size="large"] .scene-grants .management-content > h1,
+html[data-text-size="extra-large"] .scene-grants .management-content > h1 { font-size: 38px; }
+html[data-text-size="large"] .scene-grants .grants-grid,
+html[data-text-size="extra-large"] .scene-grants .grants-grid {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  grid-auto-rows: max-content;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+html[data-text-size="large"] .scene-grants .grant-panel,
+html[data-text-size="extra-large"] .scene-grants .grant-panel { min-height: 0; overflow: visible; }
+html[data-text-size="large"] .scene-grants .choice-resolution,
+html[data-text-size="extra-large"] .scene-grants .choice-resolution { display: block; }
+html[data-text-size="large"] .scene-grants .grant-choice-list,
+html[data-text-size="extra-large"] .scene-grants .grant-choice-list {
+  grid-template-columns: 1fr;
+  grid-column: 1;
+  grid-row: auto;
+  margin-top: 10px;
+}
+html[data-text-size="large"] .starting-talent-option footer,
+html[data-text-size="extra-large"] .starting-talent-option footer { align-items: flex-start; flex-wrap: wrap; }
+.scene-grants .grant-entry,.scene-grants .grant-panel p { overflow-wrap: anywhere; }
 .acquisition-list { display: grid; gap: 11px; margin-top: 15px; }
 .scene-equipment .management-content > .eyebrow { margin-bottom: 2px; }
 .scene-equipment .management-content > .kicker { margin-top: 2px; }
@@ -3129,6 +3168,15 @@ dialog h2,
 
 @media (max-width: 800px) {
   .exceptional-panel { grid-column: 1; }
+  html[data-text-size="large"] .scene-grants .grants-grid,
+  html[data-text-size="extra-large"] .scene-grants .grants-grid {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+  html[data-text-size="large"] .scene-grants [data-grant-group],
+  html[data-text-size="extra-large"] .scene-grants [data-grant-group] { grid-column: 1; }
+  html[data-text-size="large"] .starting-talent-options,
+  html[data-text-size="extra-large"] .starting-talent-options { grid-template-columns: 1fr; }
 }
 
 @media (min-width: 801px) and (max-height: 820px) {
