@@ -61,11 +61,19 @@ const root = document.querySelector("#app");
 const portalEmblem = `<img class="sigil" src="./public/assets/brand/pax-historia-emblem.png?v=0.1.0" alt="" aria-hidden="true" />`;
 const hostedEdition = location.hostname.endsWith("github.io")
   || document.querySelector('meta[name="dh2-edition"]')?.content === "hosted";
+const foundryQuery = new URLSearchParams(location.search);
 const foundryEmbeddedMode = window.parent !== window
-  && (new URLSearchParams(location.search).get("foundry") === "1"
+  && (foundryQuery.get("foundry") === "1"
     || document.querySelector('meta[name="dh2-embedded"]')?.content === "foundry");
+const foundryActorSheetMode = foundryEmbeddedMode
+  && (foundryQuery.get("actorSheet") === "1"
+    || document.querySelector('meta[name="dh2-actor-sheet"]')?.content === "true");
+let foundryActorId = foundryQuery.get("actorId")
+  || document.querySelector('meta[name="dh2-actor-id"]')?.content
+  || "";
 document.documentElement.dataset.edition = hostedEdition ? "hosted" : "local";
 document.documentElement.dataset.foundryEmbedded = String(foundryEmbeddedMode);
+document.documentElement.dataset.foundryActorSheet = String(foundryActorSheetMode);
 const libraryStorageKey = "dh2-character-library";
 const activeCharacterStorageKey = "dh2-active-character-id";
 const repositorySaveTimers = new Map();
@@ -239,6 +247,8 @@ let appView = "roster";
 let activeFloatingTooltipTarget = null;
 let floatingTooltipListenersReady = false;
 let foundryRequestTimeout = null;
+let foundryActorSyncTimeout = null;
+let foundryActorSheetReady = false;
 
 async function repositoryRequest(path = "", options = {}) {
   if (location.hostname.endsWith("github.io")) throw new Error("Local repository is not available on GitHub Pages.");
@@ -1682,7 +1692,8 @@ function save({ markComplete = false } = {}) {
   localStorage.setItem("dh2-character", JSON.stringify(character));
   sessionStorage.setItem("dh2-step", String(step));
   sessionStorage.setItem("dh2-app-view", appView);
-  queueRepositorySave(record);
+  if (!foundryActorSheetMode) queueRepositorySave(record);
+  if (foundryActorSheetMode && foundryActorSheetReady) queueFoundryActorSync();
 }
 
 function rerenderAdvancesPreservingScroll(focusSelector = "", anchorSelector = "#advance-talents") {
@@ -2877,7 +2888,7 @@ function foundryActorPayload() {
 }
 
 function sendCharacterToFoundry() {
-  if (!foundryEmbeddedMode) return;
+  if (!foundryEmbeddedMode || foundryActorSheetMode) return;
   const requestId = globalThis.crypto?.randomUUID?.() || `dh2-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const status = document.querySelector("#export-status");
   if (status) status.textContent = "Creating this Acolyte in Foundry…";
@@ -2890,7 +2901,7 @@ function sendCharacterToFoundry() {
       type: "create-actor",
       requestId,
       payload: foundryActorPayload(),
-    }, location.origin === "null" ? parentOrigin : location.origin);
+    }, parentOrigin && parentOrigin !== location.origin ? parentOrigin : location.origin);
     if (foundryRequestTimeout) window.clearTimeout(foundryRequestTimeout);
     foundryRequestTimeout = window.setTimeout(() => {
       if (status?.textContent === "Creating this Acolyte in Foundry…") {
@@ -2906,6 +2917,70 @@ function sendCharacterToFoundry() {
   }
 }
 
+function foundryParentOrigin() {
+  try { return new URL(document.referrer || document.baseURI).origin; } catch { return location.origin; }
+}
+
+function sendFoundryActorUpdate() {
+  if (!foundryActorSheetMode || !foundryActorSheetReady || !foundryActorId) return;
+  const requestId = globalThis.crypto?.randomUUID?.() || `dh2-update-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const status = document.querySelector("#export-status");
+  if (status) status.textContent = "Saving changes to Foundry…";
+  try {
+    const parentOrigin = foundryParentOrigin();
+    const targetOrigin = parentOrigin && parentOrigin !== location.origin ? parentOrigin : location.origin;
+    window.parent.postMessage({
+      source: "dh2-portal-frame",
+      type: "update-actor",
+      requestId,
+      actorId: foundryActorId,
+      payload: foundryActorPayload(),
+    }, targetOrigin);
+    if (foundryRequestTimeout) window.clearTimeout(foundryRequestTimeout);
+    foundryRequestTimeout = window.setTimeout(() => {
+      if (status?.textContent === "Saving changes to Foundry…") status.textContent = "Foundry did not respond; your local sheet remains available.";
+      foundryRequestTimeout = null;
+    }, 10000);
+  } catch (error) {
+    if (foundryRequestTimeout) window.clearTimeout(foundryRequestTimeout);
+    foundryRequestTimeout = null;
+    if (status) status.textContent = error instanceof Error ? error.message : "Foundry could not save this Acolyte.";
+  }
+}
+
+function queueFoundryActorSync() {
+  if (!foundryActorSheetMode || !foundryActorSheetReady) return;
+  if (foundryActorSyncTimeout) window.clearTimeout(foundryActorSyncTimeout);
+  foundryActorSyncTimeout = window.setTimeout(() => {
+    foundryActorSyncTimeout = null;
+    sendFoundryActorUpdate();
+  }, 350);
+}
+
+function loadFoundryActor(actorData, actorId = "") {
+  const source = actorData?.flags?.["dh2CharacterBuilder"]?.source;
+  if (!source || typeof source !== "object") return false;
+  foundryActorId = actorId || actorData.id || actorData._id || foundryActorId;
+  activeCharacterId = `foundry-${foundryActorId}`;
+  character = prepareCharacter(source);
+  syncCreationConsequences();
+  const now = new Date().toISOString();
+  activeRecord = {
+    id: activeCharacterId,
+    character,
+    step: scenes.findIndex((scene) => scene.id === "review"),
+    createdAt: now,
+    updatedAt: now,
+    origin: "Foundry Actor",
+  };
+  appView = "builder";
+  step = activeRecord.step;
+  foundryActorSheetReady = false;
+  render();
+  foundryActorSheetReady = true;
+  return true;
+}
+
 if (foundryEmbeddedMode) {
   window.addEventListener("message", (event) => {
     if (event.source !== window.parent) return;
@@ -2913,11 +2988,22 @@ if (foundryEmbeddedMode) {
       try { return new URL(document.referrer || document.baseURI).origin; } catch { return location.origin; }
     })();
     if (![location.origin, parentOrigin, "null"].includes(event.origin)) return;
-    if (event.data?.source !== "dh2-portal-module" || event.data?.type !== "create-actor-result") return;
+    if (event.data?.source !== "dh2-portal-module") return;
+    if (event.data?.type === "load-actor" && foundryActorSheetMode) {
+      loadFoundryActor(event.data.actor, event.data.actorId);
+      return;
+    }
+    if (event.data?.type !== "create-actor-result" && event.data?.type !== "update-actor-result") return;
     if (foundryRequestTimeout) window.clearTimeout(foundryRequestTimeout);
     foundryRequestTimeout = null;
     const status = document.querySelector("#export-status");
     if (!status) return;
+    if (event.data.type === "update-actor-result") {
+      status.textContent = event.data.ok
+        ? "Saved to the Foundry Actor."
+        : event.data.error || "Foundry could not save this Acolyte.";
+      return;
+    }
     status.textContent = event.data.ok
       ? `${event.data.name || "Acolyte"} is ready in Foundry's Actors directory.`
       : event.data.error || "Foundry could not create this Acolyte.";
@@ -5295,6 +5381,9 @@ function createRosterCharacter(seed = {}, origin = "Created locally") {
 }
 
 function renderPortalSectionNav(active = "") {
+  if (foundryActorSheetMode) {
+    return `<nav class="section-nav section-nav-embedded" aria-label="Foundry Actor sheet"><span>Foundry Actor</span></nav>`;
+  }
   const button = (id, label, narrow) => `<button class="roster-button" id="open-${id}" type="button" ${active === id ? 'aria-current="page" disabled' : ""}><span class="nav-wide">${label}</span><span class="nav-narrow">${narrow}</span></button>`;
   return `<nav class="section-nav" aria-label="Portal sections">
     ${button("roster", "Your Acolytes", "Acolytes")}
@@ -6202,16 +6291,17 @@ function renderReview() {
         </div>
       </section>
       <aside class="validation-panel">
-        <h2>Save Your Acolyte</h2>
-        ${foundryEmbeddedMode ? `<button class="primary-button save-to-foundry" type="button">Create Foundry Actor <span>›</span></button>` : ""}
-        <button class="primary-button save-to-roster" type="button">Save &amp; Return to Acolytes <span>›</span></button>
+        <h2>${foundryActorSheetMode ? "Save Changes" : "Save Your Acolyte"}</h2>
+        ${foundryActorSheetMode ? `<button class="primary-button save-actor-sheet" type="button">Save Changes <span>›</span></button>` : ""}
+        ${!foundryActorSheetMode && foundryEmbeddedMode ? `<button class="primary-button save-to-foundry" type="button">Create Foundry Actor <span>›</span></button>` : ""}
+        ${!foundryActorSheetMode ? `<button class="primary-button save-to-roster" type="button">Save &amp; Return to Acolytes <span>›</span></button>` : ""}
         ${warnings.length ? warnings.map((warning) => `<p class="warning">${warning}</p>`).join("") : `<p class="valid">Character creation record is complete.</p>`}
         ${gmOverridesActive ? `<div class="gm-review-note" role="note"><strong>GM options recorded</strong><span>${[character.gmOverrides?.highCharacteristics ? "High characteristic values" : "", character.gmOverrides?.eliteAdvances ? "GM-granted Elite Advances" : ""].filter(Boolean).join(" · ")}. These exceptions bypass player creation limits and remain marked in exports.</span></div>` : ""}
         <section class="review-export-options" aria-labelledby="review-export-title">
           <h3 id="review-export-title">Optional exports</h3>
           <p>Download a copy for backup or import into Foundry VTT.</p>
           <button class="compact-button export-builder" type="button">Export Builder JSON</button>
-          <button class="compact-button export-foundry" type="button">Export Foundry Actor</button>
+          <button class="compact-button export-foundry" type="button">Export Foundry Actor JSON</button>
         </section>
         <p class="export-status" id="export-status" role="status" aria-live="polite"></p>
       </aside>
@@ -6247,6 +6337,7 @@ function render() {
   }
   const scene = scenes[step];
   const isIdentity = scene.id === "identity";
+  const actorSheetReview = foundryActorSheetMode && scene.id === "review";
   const unresolvedStageGrants = ["grants", "advances"].includes(scene.id) ? grantAlternatives().filter((choice) => !character.grantChoices[choice.id]) : [];
   const selected = selectedEntry(scene, character);
   const sceneArt = selected ? artByChoice[selected.id] : stageArtById[scene.id] || null;
@@ -6265,7 +6356,7 @@ function render() {
         ${portalEmblem}
         <div class="brand">
           <strong>Dark Heresy Character Creation</strong>
-          <span>Create Your Acolyte</span>
+          <span>${foundryActorSheetMode ? "Foundry Actor Sheet" : "Create Your Acolyte"}</span>
         </div>
         ${renderPortalSectionNav("")}
         <div class="audio-controls">
@@ -6312,13 +6403,13 @@ function render() {
       </aside>
 
       <footer class="controls ${scene.id === "review" ? "completed-sheet-controls" : ""}" aria-label="${scene.id === "review" ? "Completed character controls" : "Character creation navigation"}">
-        <button class="text-button" id="back" ${step === 0 ? "disabled" : ""}>Back</button>
+        <button class="text-button" id="back" ${step === 0 || actorSheetReview ? "disabled" : ""} ${actorSheetReview ? "aria-hidden=\"true\" tabindex=\"-1\"" : ""}>Back</button>
         ${scene.id === "review" ? "" : `<div class="progress" aria-label="Step ${step + 1} of ${scenes.length}">
           ${scenes.map((entry, index) => `<i class="${index === step ? "active" : index < step ? "done" : ""}" ${index === step ? 'aria-current="step"' : ""}><span class="sr-only">${entry.title}${index === step ? ", current step" : index < step ? ", completed" : ""}</span></i>`).join("")}
         </div>`}
         <div class="actions">
           ${isIdentity ? "" : `<button class="text-button" id="details">Rules</button>`}
-          <button class="primary-button" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : scene.id === "review" ? "Save Acolyte & Return" : scene.action}<span>›</span></button>
+          <button class="primary-button" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : actorSheetReview ? "Save Changes" : scene.id === "review" ? "Save Acolyte & Return" : scene.action}<span>›</span></button>
         </div>
       </footer>
     </main>
@@ -6929,6 +7020,7 @@ function wireEvents() {
   });
 
   document.querySelector("#back").addEventListener("click", () => {
+    if (foundryActorSheetMode) return;
     if (step > 0) step -= 1;
     pendingFocusSelector = "#scene-content";
     save();
@@ -6936,6 +7028,12 @@ function wireEvents() {
   });
 
   document.querySelector("#continue").addEventListener("click", () => {
+    if (foundryActorSheetMode && step === scenes.length - 1) {
+      playMechanicalLock();
+      save({ markComplete: true });
+      sendFoundryActorUpdate();
+      return;
+    }
     if (step < scenes.length - 1) {
       playMechanicalLock();
       step += 1;
@@ -7722,6 +7820,11 @@ function wireEvents() {
     playMechanicalLock();
     save({ markComplete: true });
     sendCharacterToFoundry();
+  });
+  document.querySelector(".save-actor-sheet")?.addEventListener("click", () => {
+    playMechanicalLock();
+    save({ markComplete: true });
+    sendFoundryActorUpdate();
   });
   document.querySelector(".export-foundry")?.addEventListener("click", () => {
     const filename = `${character.name || "acolyte"}.foundry-actor.json`;

@@ -24,6 +24,11 @@
   padding: 0;
 }
 
+.dh2-portal-actor-sheet .window-content {
+  overflow: hidden;
+  padding: 0;
+}
+
 .dh2-portal-frame-shell,
 .dh2-portal-frame {
   border: 0;
@@ -40,6 +45,10 @@
 
 .dh2-portal-frame {
   display: block;
+}
+
+.dh2-actor-sheet-frame-shell {
+  min-height: 560px;
 }
 
 @media (max-width: 720px) {

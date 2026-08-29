@@ -217,6 +217,14 @@ html[data-edition="hosted"] .sound:disabled {
   cursor: default;
   opacity: 1;
 }
+.section-nav-embedded span {
+  border: 1px solid rgba(225, 187, 118, .38);
+  color: var(--accent-hot);
+  font: 700 10px "Barlow Condensed", sans-serif;
+  letter-spacing: .14em;
+  padding: 8px 11px;
+  text-transform: uppercase;
+}
 .nav-narrow { display: none; }
 .audio-controls { display: flex; align-items: center; gap: 8px; }
 .sound { width: 42px; height: 36px; padding: 0 8px; display: flex; align-items: center; justify-content: center; gap: 4px; border-radius: 18px; border: 1px solid var(--line); background: rgba(8, 11, 10, .35); cursor: pointer; }
