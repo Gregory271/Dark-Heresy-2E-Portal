@@ -786,6 +786,13 @@ function applyTextScale(scope = root) {
     ".grant-choice-list label",
     ".granted-line",
     ".legacy-warning",
+    ".gm-review-note strong",
+    ".gm-review-note span",
+    ".validation-panel .warning",
+    ".validation-panel .valid",
+    ".validation-panel .save-to-roster",
+    ".review-export-options p",
+    ".review-export-options button",
     ".carrying-summary span",
     ".carrying-summary small",
     ".equipment-rule-alerts p",
@@ -5924,7 +5931,6 @@ function renderReview() {
           <div><h2>${character.name || "Unnamed Acolyte"}</h2><p class="review-profile-details">${homeWorldName} · ${backgroundName} · ${roleName}</p></div>
           <span class="review-record-state">${warnings.length ? `${warnings.length} item${warnings.length === 1 ? "" : "s"} to review` : "Ready to play"}</span>
         </header>
-        ${gmOverridesActive ? `<div class="gm-review-note" role="note"><strong>GM options recorded</strong><span>${[character.gmOverrides?.highCharacteristics ? "High characteristic values" : "", character.gmOverrides?.eliteAdvances ? "GM-granted Elite Advances" : ""].filter(Boolean).join(" · ")} are enabled for this character. They bypass normal player creation safeguards and remain visible in exported data.</span></div>` : ""}
         <div class="review-characteristics">${characteristics.map((entry) => {
           const breakdown = characteristicBreakdown(entry.id);
           const characteristicRuleId = `characteristic-${entry.id.replace(/([A-Z])/g, "-$1").toLowerCase()}`;
@@ -6026,6 +6032,7 @@ function renderReview() {
         <h2>Save Your Acolyte</h2>
         <button class="primary-button save-to-roster" type="button">Save &amp; Return to Acolytes <span>›</span></button>
         ${warnings.length ? warnings.map((warning) => `<p class="warning">${warning}</p>`).join("") : `<p class="valid">Character creation record is complete.</p>`}
+        ${gmOverridesActive ? `<div class="gm-review-note" role="note"><strong>GM options recorded</strong><span>${[character.gmOverrides?.highCharacteristics ? "High characteristic values" : "", character.gmOverrides?.eliteAdvances ? "GM-granted Elite Advances" : ""].filter(Boolean).join(" · ")}. These exceptions bypass player creation limits and remain marked in exports.</span></div>` : ""}
         <section class="review-export-options" aria-labelledby="review-export-title">
           <h3 id="review-export-title">Optional exports</h3>
           <p>Download a copy for backup or import into Foundry VTT.</p>

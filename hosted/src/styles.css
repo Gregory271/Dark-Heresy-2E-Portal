@@ -3480,7 +3480,7 @@ dialog h2,
    character sheets without importing another product's visual assets. */
 .scene-review .management-content { max-width: 1760px; }
 .scene-review .review-layout {
-  grid-template-columns: minmax(0,1fr) 220px;
+  grid-template-columns: minmax(0,1fr) 250px;
   min-height: 0;
   overflow: hidden;
 }
@@ -3490,11 +3490,8 @@ dialog h2,
   grid-template-rows: auto auto auto auto auto minmax(0,1fr);
   min-width: 0;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
   padding: 15px 16px 16px;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: #a77a3e #090d0c;
 }
 .review-profile-heading { grid-area: profile; }
 .review-characteristics { grid-area: characteristics; }
@@ -3873,11 +3870,12 @@ button.review-status-card:focus-visible {
   grid-template-columns: minmax(215px,245px) minmax(0,1fr);
   gap: 10px;
   min-width: 0;
-  min-height: clamp(420px,55vh,680px);
+  min-height: 0;
 }
 .review-summary-rail {
   display: grid;
-  grid-template-rows: auto minmax(0,1fr);
+  grid-template-rows: auto;
+  align-content: start;
   gap: 8px;
   min-width: 0;
   min-height: 0;
@@ -3894,10 +3892,9 @@ button.review-status-card:focus-visible {
   min-width: 0;
   min-height: 0;
   padding: 8px 10px;
-  overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #a77a3e #090d0c;
+  overflow: visible;
 }
+.review-summary-skills { display: none; }
 .review-summary-card > h3 {
   margin: 0;
   border-top: 1px solid rgba(225,187,118,.25);
@@ -4026,8 +4023,14 @@ button.review-status-card:focus-visible {
 .validation-panel {
   padding: 16px;
   background: rgba(4,7,7,.78);
+  overflow: visible;
 }
 .validation-panel h2 { margin: 0 0 8px; color: #f0c878; font-size: 24px; }
+.validation-panel .gm-review-note {
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin: 10px 0 0;
+}
 
 html[data-text-size="extra-large"] .review-sheet-body { grid-template-columns: 1fr; }
 html[data-text-size="extra-large"] .review-summary-rail { display: none; }
