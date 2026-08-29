@@ -249,6 +249,10 @@ let floatingTooltipListenersReady = false;
 let foundryRequestTimeout = null;
 let foundryActorSyncTimeout = null;
 let foundryActorSheetReady = false;
+let foundrySaveState = "saved";
+let foundrySaveMessage = "Synced";
+let foundryActorRevision = 0;
+const foundryActorSaveRequests = new Map();
 
 async function repositoryRequest(path = "", options = {}) {
   if (location.hostname.endsWith("github.io")) throw new Error("Local repository is not available on GitHub Pages.");
@@ -2921,11 +2925,34 @@ function foundryParentOrigin() {
   try { return new URL(document.referrer || document.baseURI).origin; } catch { return location.origin; }
 }
 
+function setFoundrySaveState(state, message = "") {
+  foundrySaveState = state;
+  foundrySaveMessage = message || (state === "dirty"
+    ? "Unsaved changes."
+    : state === "saving"
+      ? "Saving to Foundry…"
+      : state === "error"
+        ? "Foundry could not save these changes."
+        : "Saved to Foundry.");
+  const button = document.querySelector(".foundry-dirty-save");
+  if (button) {
+    button.hidden = state === "saved";
+    button.disabled = state === "saving";
+    const label = state === "saving" ? "Saving…" : state === "error" ? "Retry Save" : "Save Now";
+    button.firstChild.textContent = label;
+  }
+  const status = document.querySelector("#export-status");
+  if (status) status.textContent = foundrySaveMessage;
+}
+
 function sendFoundryActorUpdate() {
   if (!foundryActorSheetMode || !foundryActorSheetReady || !foundryActorId) return;
+  if (foundryActorSyncTimeout) window.clearTimeout(foundryActorSyncTimeout);
+  foundryActorSyncTimeout = null;
   const requestId = globalThis.crypto?.randomUUID?.() || `dh2-update-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const status = document.querySelector("#export-status");
-  if (status) status.textContent = "Saving changes to Foundry…";
+  const revision = foundryActorRevision;
+  foundryActorSaveRequests.set(requestId, revision);
+  setFoundrySaveState("saving", "Saving to Foundry…");
   try {
     const parentOrigin = foundryParentOrigin();
     const targetOrigin = parentOrigin && parentOrigin !== location.origin ? parentOrigin : location.origin;
@@ -2938,19 +2965,23 @@ function sendFoundryActorUpdate() {
     }, targetOrigin);
     if (foundryRequestTimeout) window.clearTimeout(foundryRequestTimeout);
     foundryRequestTimeout = window.setTimeout(() => {
-      if (status?.textContent === "Saving changes to Foundry…") status.textContent = "Foundry did not respond; your local sheet remains available.";
+      foundryActorSaveRequests.delete(requestId);
+      if (revision < foundryActorRevision) setFoundrySaveState("dirty", "Newer changes are waiting to save.");
+      else setFoundrySaveState("error", "Foundry did not respond. Use Retry Save when the connection is available.");
       foundryRequestTimeout = null;
     }, 10000);
   } catch (error) {
     if (foundryRequestTimeout) window.clearTimeout(foundryRequestTimeout);
     foundryRequestTimeout = null;
-    if (status) status.textContent = error instanceof Error ? error.message : "Foundry could not save this Acolyte.";
+    setFoundrySaveState("error", error instanceof Error ? error.message : "Foundry could not save this Acolyte.");
   }
 }
 
 function queueFoundryActorSync() {
   if (!foundryActorSheetMode || !foundryActorSheetReady) return;
   if (foundryActorSyncTimeout) window.clearTimeout(foundryActorSyncTimeout);
+  foundryActorRevision += 1;
+  setFoundrySaveState("dirty", "Unsaved changes; automatic save is queued.");
   foundryActorSyncTimeout = window.setTimeout(() => {
     foundryActorSyncTimeout = null;
     sendFoundryActorUpdate();
@@ -2976,8 +3007,11 @@ function loadFoundryActor(actorData, actorId = "") {
   appView = "builder";
   step = activeRecord.step;
   foundryActorSheetReady = false;
+  foundryActorRevision = 0;
+  foundryActorSaveRequests.clear();
   render();
   foundryActorSheetReady = true;
+  setFoundrySaveState("saved", "Synced");
   return true;
 }
 
@@ -2999,9 +3033,16 @@ if (foundryEmbeddedMode) {
     const status = document.querySelector("#export-status");
     if (!status) return;
     if (event.data.type === "update-actor-result") {
-      status.textContent = event.data.ok
-        ? "Saved to the Foundry Actor."
-        : event.data.error || "Foundry could not save this Acolyte.";
+      const revision = foundryActorSaveRequests.get(event.data.requestId) ?? foundryActorRevision;
+      foundryActorSaveRequests.delete(event.data.requestId);
+      if (revision < foundryActorRevision) {
+        setFoundrySaveState("dirty", "Newer changes are waiting to save.");
+        return;
+      }
+      setFoundrySaveState(
+        event.data.ok ? "saved" : "error",
+        event.data.ok ? "Saved to Foundry." : event.data.error || "Foundry could not save this Acolyte.",
+      );
       return;
     }
     status.textContent = event.data.ok
@@ -6358,22 +6399,22 @@ function render() {
       <header class="topbar">
         ${portalEmblem}
         <div class="brand">
-          <strong>Dark Heresy Character Creation</strong>
-          <span>${foundryActorSheetMode ? "Foundry Actor Sheet" : "Create Your Acolyte"}</span>
+          <strong>${foundryActorSheetMode ? "Dark Heresy Acolyte Sheet" : "Dark Heresy Character Creation"}</strong>
+          <span>${foundryActorSheetMode ? "Live Foundry Record" : "Create Your Acolyte"}</span>
         </div>
         ${renderPortalSectionNav("")}
         <div class="audio-controls">
-          <button class="sound ${soundtrackPlaying ? "playing" : ""}" id="sound-toggle" type="button" ${hostedEdition ? "disabled" : ""}
-            aria-label="${soundtrackPlaying ? "Pause" : "Play"} ambient soundtrack"
-            aria-pressed="${soundtrackPlaying}" title="${hostedEdition ? "Soundtrack is available in the local GM edition" : `${soundtrackPlaying ? "Pause" : "Play"} soundtrack`}">
-            <span class="sound-icon">${soundtrackPlaying ? "Ⅱ" : "▶"}</span>
-            <span class="sound-waves" aria-hidden="true"><i></i><i></i><i></i></span>
-          </button>
-          <label class="volume-control" title="Soundtrack volume">
-            <span aria-hidden="true">VOL</span>
-            <input id="sound-volume" type="range" min="0" max="100" step="1"
-              value="${Math.round(soundtrack.volume * 100)}" aria-label="Soundtrack volume" />
-          </label>
+          ${foundryActorSheetMode ? "" : `<button class="sound ${soundtrackPlaying ? "playing" : ""}" id="sound-toggle" type="button" ${hostedEdition ? "disabled" : ""}
+              aria-label="${soundtrackPlaying ? "Pause" : "Play"} ambient soundtrack"
+              aria-pressed="${soundtrackPlaying}" title="${hostedEdition ? "Soundtrack is available in the local GM edition" : `${soundtrackPlaying ? "Pause" : "Play"} soundtrack`}">
+              <span class="sound-icon">${soundtrackPlaying ? "Ⅱ" : "▶"}</span>
+              <span class="sound-waves" aria-hidden="true"><i></i><i></i><i></i></span>
+            </button>
+            <label class="volume-control" title="Soundtrack volume">
+              <span aria-hidden="true">VOL</span>
+              <input id="sound-volume" type="range" min="0" max="100" step="1"
+                value="${Math.round(soundtrack.volume * 100)}" aria-label="Soundtrack volume" />
+            </label>`}
           <label class="text-size-control" title="Interface text size">
             <span aria-hidden="true">TEXT</span>
             <input id="text-size" type="range" min="80" max="160" step="5"
@@ -6405,15 +6446,15 @@ function render() {
         <p>${step > 2 ? catalogs.roles.find(x => x.id === character.role)?.name : "Role not chosen"}</p>
       </aside>
 
-      <footer class="controls ${scene.id === "review" ? "completed-sheet-controls" : ""}" aria-label="${scene.id === "review" ? "Completed character controls" : "Character creation navigation"}">
+      <footer class="controls ${scene.id === "review" ? "completed-sheet-controls" : ""}" aria-label="${actorSheetReview ? "Foundry Actor sheet controls" : scene.id === "review" ? "Completed character controls" : "Character creation navigation"}">
         ${actorSheetReview ? "" : `<button class="text-button" id="back" ${step === 0 ? "disabled" : ""}>Back</button>`}
         ${scene.id === "review" ? "" : `<div class="progress" aria-label="Step ${step + 1} of ${scenes.length}">
           ${scenes.map((entry, index) => `<i class="${index === step ? "active" : index < step ? "done" : ""}" ${index === step ? 'aria-current="step"' : ""}><span class="sr-only">${entry.title}${index === step ? ", current step" : index < step ? ", completed" : ""}</span></i>`).join("")}
         </div>`}
         <div class="actions">
-          ${actorSheetReview ? `<span class="foundry-save-status" id="export-status" role="status" aria-live="polite">Changes save automatically.</span>` : ""}
+          ${actorSheetReview ? `<span class="foundry-save-status" id="export-status" role="status" aria-live="polite">${foundrySaveMessage}</span>` : ""}
           ${isIdentity ? "" : `<button class="text-button" id="details">Rules</button>`}
-          <button class="primary-button" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : actorSheetReview ? "Save Changes" : scene.id === "review" ? "Save Acolyte & Return" : scene.action}<span>›</span></button>
+          <button class="primary-button ${actorSheetReview ? "foundry-dirty-save" : ""}" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""} ${actorSheetReview && foundrySaveState === "saved" ? "hidden" : ""} ${actorSheetReview && foundrySaveState === "saving" ? "disabled" : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : actorSheetReview ? foundrySaveState === "saving" ? "Saving…" : foundrySaveState === "error" ? "Retry Save" : "Save Now" : scene.id === "review" ? "Save Acolyte & Return" : scene.action}<span>›</span></button>
         </div>
       </footer>
     </main>
@@ -6804,7 +6845,7 @@ function wireEvents() {
     save();
     render();
   });
-  document.querySelector("#sound-volume").addEventListener("input", (event) => {
+  document.querySelector("#sound-volume")?.addEventListener("input", (event) => {
     soundtrack.volume = Number(event.target.value) / 100;
     localStorage.setItem("dh2-soundtrack-volume", String(soundtrack.volume));
   });
@@ -6991,7 +7032,7 @@ function wireEvents() {
   });
   document.querySelector("#execute-action-roll")?.addEventListener("click", executeCurrentActionRoll);
 
-  document.querySelector("#sound-toggle").addEventListener("click", async () => {
+  document.querySelector("#sound-toggle")?.addEventListener("click", async () => {
     try {
       if (soundtrackPlaying) {
         soundtrack.pause();
