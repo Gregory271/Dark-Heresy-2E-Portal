@@ -9,10 +9,10 @@ const beyond = "Enemies Beyond";
 export const eliteAdvanceCatalogue = [
   {
     id: "psyker", name: "Psyker", source: core, page: 90, cost: 300,
-    summary: "Gain the Psyker trait, Psyker aptitude, Psy Rating 1, and access to psychic powers and Psy Rating advances.",
+    summary: "Gain the Psyker trait, Psyker aptitude, Psy Rating 1, and access to psychic powers and Psy Rating advances. A Mystic receives this same advance automatically through Stare into the Warp for 0 XP.",
     prerequisites: { characteristics: { willpower: 40 }, excludes: ["untouchable"] },
     instantChanges: ["Psyker trait", "Psyker aptitude", "Psy Rating 1", "Cannot later become an Untouchable"],
-    notes: "A character without the Sanctioned trait immediately gains 1d10+3 Corruption points.",
+    notes: "A character without the Sanctioned trait immediately gains 1d10+3 Corruption points. Adeptus Astra Telepathica's Tested on Terra grants Sanctioned and increases the advance's starting Psy Rating to 2.",
   },
   {
     id: "untouchable", name: "Untouchable", source: core, page: 91, cost: 300,

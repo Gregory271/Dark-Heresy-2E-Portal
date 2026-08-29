@@ -1,4 +1,4 @@
-import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.3";
+import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.4";
 import { armoury } from "./armoury-data.js?v=0.8.1";
 import { actionGroups, actionSource, combatActionCatalogue } from "./action-data.js?v=0.1.0";
 import { talentCatalogue as baseTalentCatalogue } from "./talent-data.js?v=0.9.1";
@@ -43,6 +43,16 @@ import {
   parseFate,
   parseWounds,
 } from "./creation-data.js?v=0.8.0";
+import {
+  hatredSpecialities,
+  malignancies,
+  mentalDisorders,
+  mutantStartingTraits,
+  mutations,
+  resistanceSpecialities,
+  tableEntryById,
+  tableEntryForRoll,
+} from "./exceptional-data.js?v=0.1.0";
 
 const talentCatalogue = [...baseTalentCatalogue, ...eliteTalentCatalogue];
 
@@ -83,6 +93,11 @@ function prepareCharacter(input = {}) {
   prepared.wounds ||= {};
   prepared.divination ||= {};
   prepared.divination.statChoices ||= {};
+  prepared.divination.resolutions ||= {};
+  const hadExceptionalState = Boolean(prepared.exceptional);
+  prepared.exceptional ||= {};
+  prepared.exceptional.creationCorruptionApplied = Math.max(0, Number(prepared.exceptional.creationCorruptionApplied || 0));
+  prepared.history ||= {};
   prepared.aptitudeReplacements ||= [];
   prepared.aptitudeSelections ||= {};
   prepared.grantChoices ||= {};
@@ -159,6 +174,12 @@ function prepareCharacter(input = {}) {
   prepared.xp.awards = Array.isArray(prepared.xp.awards)
     ? prepared.xp.awards.filter((entry) => Number(entry?.amount) > 0)
     : [];
+  if (!hadExceptionalState && prepared.eliteSetup.psykerCorruption !== null) {
+    prepared.exceptional.creationCorruptionApplied = Math.min(
+      prepared.conditions.corruption,
+      Math.max(0, Number(prepared.eliteSetup.psykerCorruption || 0)),
+    );
+  }
   return prepared;
 }
 
@@ -195,6 +216,7 @@ if (!characterLibrary.some((entry) => entry.id === activeCharacterId)) activeCha
 let activeRecord = characterLibrary.find((entry) => entry.id === activeCharacterId);
 let step = Math.min(scenes.length - 1, Math.max(0, Number(activeRecord?.step || 0)));
 let character = prepareCharacter(activeRecord?.character);
+syncCreationConsequences();
 let appView = "roster";
 let activeFloatingTooltipTarget = null;
 let floatingTooltipListenersReady = false;
@@ -1083,6 +1105,67 @@ function currentDivination() {
   return divinationFor(Number(character.divination?.roll || 0));
 }
 
+function selectedDivinationTalentLabel() {
+  const grant = currentDivination()?.talentGrant;
+  if (!grant) return "";
+  if (grant.choice === "hatred") return character.divination.resolutions?.talentSpeciality ? `Hatred (${character.divination.resolutions.talentSpeciality})` : "";
+  if (grant.choice === "resistance") return character.divination.resolutions?.talentSpeciality ? `Resistance (${character.divination.resolutions.talentSpeciality})` : "";
+  return grant.label;
+}
+
+function selectedMalignancyRecord(source) {
+  const id = source === "divination"
+    ? character.divination.resolutions?.malignancyId
+    : character.exceptional?.startingMalignancyId;
+  return tableEntryById(malignancies, id);
+}
+
+function selectedMutationRecord() {
+  return tableEntryById(mutations, character.exceptional?.mutationId);
+}
+
+function exceptionalCharacteristicModifiers() {
+  const modifiers = {};
+  const add = (target, amount) => {
+    if (!target || !Number.isFinite(Number(amount))) return;
+    modifiers[target] = (modifiers[target] || 0) + Number(amount);
+  };
+  for (const [source, magnitudeKey] of [["divination", "malignancyMagnitude"], ["starting", "startingMalignancyMagnitude"]]) {
+    const entry = selectedMalignancyRecord(source);
+    if (entry?.characteristicRoll) {
+      const magnitude = source === "divination"
+        ? Number(character.divination.resolutions?.[magnitudeKey] || 0)
+        : Number(character.exceptional?.[magnitudeKey] || 0);
+      if (magnitude) add(entry.characteristicRoll.target, magnitude * entry.characteristicRoll.sign);
+    }
+  }
+  const mutation = selectedMutationRecord();
+  Object.entries(mutation?.characteristicChanges || {}).forEach(([target, amount]) => add(target, amount));
+  if (mutation?.characteristicRoll) {
+    const magnitude = Number(character.exceptional?.mutationMagnitude || 0);
+    if (magnitude) add(mutation.characteristicRoll.target, magnitude * mutation.characteristicRoll.sign);
+  }
+  return modifiers;
+}
+
+function desiredCreationCorruption() {
+  const mutant = character.background === "mutant" ? 10 : 0;
+  const daemonWorld = character.homeWorld === "daemon-world" ? Number(character.exceptional?.daemonWorldCorruption || 0) : 0;
+  const roguePsyker = hasEliteAdvance("psyker") && character.background !== "astra-telepathica"
+    ? Number(character.eliteSetup?.psykerCorruption || 0)
+    : 0;
+  return mutant + daemonWorld + roguePsyker;
+}
+
+function syncCreationConsequences() {
+  character.exceptional ||= {};
+  character.conditions ||= { insanity: 0, corruption: 0 };
+  const previous = Math.max(0, Number(character.exceptional.creationCorruptionApplied || 0));
+  const desired = Math.max(0, desiredCreationCorruption());
+  character.conditions.corruption = Math.max(0, Number(character.conditions.corruption || 0) - previous + desired);
+  character.exceptional.creationCorruptionApplied = desired;
+}
+
 function divinationCharacteristicModifiers() {
   const modifiers = {};
   const choices = character.divination?.statChoices || {};
@@ -1095,6 +1178,11 @@ function divinationCharacteristicModifiers() {
   if (conditional && backgroundGrantedSkills()[currentDivination().skillGrant.id]) {
     modifiers[conditional.target] = (modifiers[conditional.target] || 0) + conditional.amount;
   }
+  const talentGrant = currentDivination()?.talentGrant;
+  if (talentGrant?.fallback && divinationTalentAlreadyOwned()) {
+    const { target, amount } = talentGrant.fallback;
+    modifiers[target] = (modifiers[target] || 0) + amount;
+  }
   return modifiers;
 }
 
@@ -1103,11 +1191,18 @@ function characteristicBreakdown(characteristicId) {
   const advanceRanks = Number(character.advances.characteristics[characteristicId] || 0);
   const advancement = advanceRanks * 5;
   const divination = divinationCharacteristicModifiers()[characteristicId] || 0;
+  const exceptional = exceptionalCharacteristicModifiers()[characteristicId] || 0;
+  const beforeElite = generated + advancement + divination + exceptional;
+  const elite = hasEliteAdvance("untouchable") && characteristicId === "fellowship"
+    ? Math.floor(beforeElite / 2) - beforeElite
+    : 0;
   return {
     generated,
     advancement,
     divination,
-    total: generated + advancement + divination,
+    exceptional,
+    elite,
+    total: beforeElite + elite,
   };
 }
 
@@ -1116,7 +1211,8 @@ function characteristicValue(characteristicId) {
 }
 
 function finalFateThreshold() {
-  return Number(character.fate?.threshold || 0) + Number(currentDivination()?.fateChange || 0);
+  const fated = character.advances?.talents?.some((entry) => entry.id === "elite-inquisitor-fated") ? 1 : 0;
+  return Number(character.fate?.threshold || 0) + Number(currentDivination()?.fateChange || 0) + fated;
 }
 
 function fateStatus() {
@@ -1240,12 +1336,21 @@ function resolvedGrantedSkills() {
     const key = specialistSkillKey(skillId, speciality);
     grants[key] = { key, id: skillId, name: skill.name, speciality, displayName: `${skill.name} (${speciality})`, rank: 1, source };
   };
+  const addBasicSkill = (skillId, source) => {
+    const skill = skills.find((entry) => entry.id === skillId);
+    if (skill) grants[skill.id] = { key: skill.id, id: skill.id, name: skill.name, speciality: "", displayName: skill.name, rank: 1, source };
+  };
+  if (character.homeWorld === "daemon-world") addBasicSkill("psyniscience", "Daemon World — Touched by the Warp");
+  if (character.homeWorld === "penal-colony") {
+    addEliteSpeciality("common-lore", "Underworld", "Penal Colony — Finger on the Pulse");
+    addBasicSkill("scrutiny", "Penal Colony — Finger on the Pulse");
+  }
   if (hasEliteAdvance("sister-of-battle")) addEliteSpeciality("scholastic-lore", "Tactica Imperialis", "Sister of Battle Elite Advance");
   if (hasEliteAdvance("inquisitor")) addEliteSpeciality("forbidden-lore", character.eliteSetup.inquisitorLore, "Inquisitor Elite Advance");
   return grants;
 }
 
-function resolvedGrantedTalents() {
+function baseGrantedTalents() {
   const grants = {};
   const addGrant = (label, source) => {
     if (!label) return;
@@ -1262,6 +1367,25 @@ function resolvedGrantedTalents() {
   if (hasEliteAdvance("sister-of-battle")) {
     addGrant("Peer (Adepta Sororitas)", "Sister of Battle Elite Advance");
     addGrant("Weapon Training (Bolt)", "Sister of Battle Elite Advance");
+  }
+  if (character.homeWorld === "penal-colony") addGrant("Peer (Criminal Cartels)", "Penal Colony — Finger on the Pulse");
+  return grants;
+}
+
+function divinationTalentAlreadyOwned() {
+  const label = selectedDivinationTalentLabel() || currentDivination()?.talentGrant?.label;
+  const talent = talentByName(label || "");
+  if (!talent) return false;
+  return Boolean(baseGrantedTalents()[talent.id])
+    || character.advances.talents.some((entry) => entry?.id === talent.id);
+}
+
+function resolvedGrantedTalents() {
+  const grants = baseGrantedTalents();
+  const label = selectedDivinationTalentLabel();
+  const talent = talentByName(label);
+  if (talent && !divinationTalentAlreadyOwned()) {
+    grants[talent.id] = { ...talent, displayName: label, ruleSource: talent.source, source: "Divination", initial: true, cost: 0 };
   }
   return grants;
 }
@@ -1394,12 +1518,40 @@ function hasEliteAdvance(id) {
   return activeEliteAdvances().some((entry) => entry.id === id);
 }
 
+function exceptionalFeatureRecords() {
+  const records = [];
+  if (character.background === "mutant") {
+    const startingTrait = mutantStartingTraits.find((entry) => entry.id === character.exceptional?.mutantTraitId);
+    if (startingTrait) records.push({ name: startingTrait.name, summary: "Selected Mutant starting trait.", source: "Mutant Background" });
+    const mutation = selectedMutationRecord();
+    if (mutation) records.push({ name: mutation.name, summary: mutation.summary, source: "Mutant Background — Mutation, Core Rulebook p. 292" });
+  }
+  if (character.background === "exorcised") {
+    const malignancy = selectedMalignancyRecord("starting");
+    if (malignancy) records.push({ name: malignancy.name, summary: malignancy.summary, source: "Exorcised Background — Malignancy, Core Rulebook p. 290" });
+  }
+  if (currentDivination()?.malignancyRoll) {
+    const malignancy = selectedMalignancyRecord("divination");
+    if (malignancy) records.push({ name: malignancy.name, summary: malignancy.summary, source: "Divination — Malignancy, Core Rulebook p. 290" });
+  }
+  if (currentDivination()?.disorderGrant === "phobia") {
+    const disorder = mentalDisorders.find((entry) => entry.id === character.divination.resolutions?.disorderId);
+    if (disorder) records.push({ name: disorder.name, summary: disorder.summary, source: "Divination — Mental Disorder, Core Rulebook pp. 287–289" });
+  }
+  return records;
+}
+
 function automaticTraits() {
-  const traits = [];
+  const traits = [...exceptionalFeatureRecords()];
   if (["mechanicus", "heretek"].includes(character.background)) traits.push({
     name: "Mechanicus Implants",
     summary: "The character possesses the foundational cranial circuitry, cyber-mantle, electro-graft, electoo inductors, and Potentia Coil of a servant of the Machine-God.",
     source: character.background === "mechanicus" ? "Adeptus Mechanicus Background" : "Heretek Background",
+  });
+  if (character.homeWorld === "agri-world") traits.push({
+    name: "Brutal Charge (2)",
+    summary: "The character gains +2 damage on attacks made during a Charge.",
+    source: "Agri-World — Strength from the Land",
   });
   if (hasEliteAdvance("psyker")) traits.push({
     name: "Psyker",
@@ -1413,6 +1565,7 @@ function automaticTraits() {
   });
   if (hasEliteAdvance("astropath")) traits.push(
     { name: "Soul Bound", summary: "The Astropath is soul-bound to the Emperor and permanently loses normal sight.", source: "Astropath Elite Advance" },
+    { name: "Blind", summary: "The Astropath permanently loses normal sight as part of Soul Binding.", source: "Astropath Elite Advance" },
     { name: `Unnatural Senses (${characteristicValue("willpower") || "WP"})`, summary: "The Astropath perceives surroundings psychically to a range equal to Willpower in metres.", source: "Astropath Elite Advance" },
   );
   return traits;
@@ -1481,6 +1634,7 @@ function xpSpent() {
 }
 
 function save({ markComplete = false } = {}) {
+  syncCreationConsequences();
   syncGrantedEquipment();
   const now = new Date().toISOString();
   if (markComplete) character.completedAt = now;
@@ -1589,6 +1743,7 @@ function resetCreationDataFrom(sceneId) {
     character.wounds = {};
     character.divination = { statChoices: {} };
   }
+  character.exceptional = { creationCorruptionApplied: 0 };
   character.aptitudeReplacements = [];
   character.aptitudeSelections = {};
   character.grantChoices = {};
@@ -1621,7 +1776,7 @@ function resetCreationDataFrom(sceneId) {
   character.eliteSetup = { gmApproved: {}, inquisitorLore: "", sisterWeapon: "", psykerCorruption: null, maleficApproved: false };
   character.talentShopSelected = null;
   character.talentFilters = { query: "", tier: "All" };
-  character.xp = { starting: 1000 };
+  character.xp = { starting: 1000, awards: [] };
 }
 
 function selectCatalogChoice(scene, choiceId) {
@@ -1727,6 +1882,20 @@ function renderCatalog(scene, selected) {
     </div>`;
 }
 
+function psykerPathClarification() {
+  const sanctioned = character.background === "astra-telepathica";
+  return `<section class="psyker-path-clarification" aria-label="Mystic and Psyker rules clarification">
+    <span class="psyker-path-mark" aria-hidden="true">Ψ</span>
+    <div>
+      <strong>Mystic is the Role; Psyker is the Elite Advance it grants.</strong>
+      <p>Stare into the Warp gives this character the normal Psyker Elite Advance automatically for 0 XP. It grants the Psyker trait, Psyker aptitude, Psy Rating, and access to psychic powers; it cannot be purchased a second time.</p>
+      <small>${sanctioned
+        ? "Adeptus Astra Telepathica: Tested on Terra also grants Sanctioned and raises starting Psy Rating from 1 to 2."
+        : "Without the Adeptus Astra Telepathica background, the character is an unsanctioned rogue psyker and must record 1d10+3 Corruption."}</small>
+    </div>
+  </section>`;
+}
+
 function renderMechanics(selected) {
   const rows = mechanicsByChoice[selected.id] || [];
   const rulesHeading = scenes[step].id === "homeWorld"
@@ -1748,10 +1917,21 @@ function renderMechanics(selected) {
               : value}</dd>
           </div>`).join("")}
       </dl>
+      ${scenes[step].id === "role" && selected.id === "mystic" ? psykerPathClarification() : ""}
     </aside>`;
 }
 
 function renderIdentity() {
+  const history = character.history || {};
+  const historyPrompts = [
+    ["desire", "What does your Acolyte desire?", "A goal, need, or ambition."],
+    ["hatred", "What does your Acolyte hate?", "A foe, institution, failing, or idea."],
+    ["sacrifice", "What would your Acolyte sacrifice?", "What duty might cost them."],
+    ["meeting", "How did the Inquisitor find them?", "The event that brought them into service."],
+    ["inquisitorMeaning", "What does the Inquisitor mean to them?", "Patron, judge, saviour, threat, or something more complicated."],
+    ["warbandBond", "What binds them to the warband?", "A shared cause, debt, friendship, or necessity."],
+    ["base", "Where does the warband operate from?", "A vessel, safe house, fortress, or other base."],
+  ];
   return `
     <form class="identity-form" id="identity-form">
       <label>
@@ -1770,8 +1950,15 @@ function renderIdentity() {
       </div>
       <label>
         <span>Appearance</span>
-        <textarea name="appearance" maxlength="240" placeholder="A brief description of your Acolyte's appearance…">${character.appearance}</textarea>
+        <textarea name="appearance" maxlength="240" placeholder="A brief description of your Acolyte's appearance…">${escapeHtmlAttribute(character.appearance)}</textarea>
       </label>
+      <details class="personal-history-card">
+        <summary><strong>Optional personal history</strong><span>Skippable · can be completed later</span></summary>
+        <p>Use any prompts that help define the character. None are required to continue.</p>
+        <div class="personal-history-grid">
+          ${historyPrompts.map(([id, label, placeholder]) => `<label><span>${label}</span><textarea data-history-field="${id}" maxlength="320" placeholder="${placeholder}">${escapeHtmlAttribute(history[id] || "")}</textarea></label>`).join("")}
+        </div>
+      </details>
     </form>`;
 }
 
@@ -1849,6 +2036,30 @@ function renderFateWounds() {
     </div>`;
 }
 
+function renderMagnitudeControl(entry, source) {
+  if (!entry?.characteristicRoll) return "";
+  const key = source === "divination" ? "malignancyMagnitude" : source === "mutation" ? "mutationMagnitude" : "startingMalignancyMagnitude";
+  const value = source === "divination" ? character.divination.resolutions?.[key] : character.exceptional?.[key];
+  const characteristic = characteristics.find((candidate) => candidate.id === entry.characteristicRoll.target)?.name || entry.characteristicRoll.target;
+  return `<div class="exceptional-magnitude">
+    <p><strong>Characteristic adjustment pending</strong><span>Roll 1d${entry.characteristicRoll.sides}; ${characteristic} is reduced by the result.</span></p>
+    <button class="compact-button" type="button" data-roll-exceptional-magnitude="${source}">Roll 1d${entry.characteristicRoll.sides}</button>
+    <label class="manual-result"><span>Enter result</span><input type="number" min="1" max="${entry.characteristicRoll.sides}" value="${value || ""}" data-exceptional-magnitude="${source}" /></label>
+  </div>`;
+}
+
+function renderExceptionalResult(entry, source) {
+  if (!entry) return "";
+  const detailKey = source === "divination" ? "malignancyDetail" : source === "mutation" ? "mutationDetail" : "startingMalignancyDetail";
+  const detail = source === "divination" ? character.divination.resolutions?.[detailKey] : character.exceptional?.[detailKey];
+  return `<article class="exceptional-result">
+    <span>${entry.min === entry.max ? entry.min : `${entry.min}–${entry.max}`}</span>
+    <div><strong>${entry.name}</strong><p>${entry.summary}</p></div>
+    ${entry.needsDetail ? `<label><span>${entry.needsDetail}</span><input type="text" maxlength="120" value="${escapeHtmlAttribute(detail || "")}" data-exceptional-detail="${source}" placeholder="Record the chosen ${entry.needsDetail.toLowerCase()}" /></label>` : ""}
+    ${renderMagnitudeControl(entry, source)}
+  </article>`;
+}
+
 function renderDivination() {
   const roll = Number(character.divination.roll || 0);
   const result = roll ? divinationFor(roll) : null;
@@ -1873,6 +2084,26 @@ function renderDivination() {
   const fateControl = result?.fateChange
     ? `<div class="applied-change"><span>Applied automatically</span><strong>Fate Threshold +${result.fateChange}</strong></div>`
     : "";
+  const talentGrant = result?.talentGrant;
+  const talentOptions = talentGrant?.choice === "hatred" ? hatredSpecialities : talentGrant?.choice === "resistance" ? resistanceSpecialities : [];
+  const talentLabel = selectedDivinationTalentLabel();
+  const talentAlreadyOwned = talentGrant ? divinationTalentAlreadyOwned() : false;
+  const talentControl = talentGrant ? `<div class="divination-resolution-card">
+    <strong>${talentAlreadyOwned ? "Existing talent detected" : "Talent granted automatically"}</strong>
+    ${talentOptions.length ? `<label><span>Choose ${talentGrant.label} speciality</span><select data-divination-talent-speciality><option value="">Choose...</option>${talentOptions.map((option) => `<option value="${option}" ${character.divination.resolutions?.talentSpeciality === option ? "selected" : ""}>${option}</option>`).join("")}</select></label>` : `<span>${talentGrant.label}</span>`}
+    <p>${talentAlreadyOwned ? `${talentLabel || talentGrant.label} is already possessed, so the listed characteristic increase is applied instead.` : talentLabel ? `${talentLabel} will be included in the final sheet and export.` : "Choose the required speciality to finish this result."}</p>
+  </div>` : "";
+  const disorderControl = result?.disorderGrant === "phobia" ? `<div class="divination-resolution-card">
+    <strong>Choose the Phobia</strong>
+    <label><span>Mental Disorder</span><select data-divination-disorder><option value="">Choose...</option>${mentalDisorders.filter((entry) => entry.id.startsWith("phobia-")).map((entry) => `<option value="${entry.id}" ${character.divination.resolutions?.disorderId === entry.id ? "selected" : ""}>${entry.name}</option>`).join("")}</select></label>
+  </div>` : "";
+  const divinationMalignancy = selectedMalignancyRecord("divination");
+  const malignancyControl = result?.malignancyRoll ? `<div class="divination-resolution-card">
+    <strong>Resolve the Malignancy</strong>
+    <p>Roll d100 on Table 8-15, or enter a result rolled elsewhere.</p>
+    <div class="dual-actions"><button class="compact-button" type="button" data-roll-divination-malignancy>Roll d100</button><label class="manual-result"><span>Enter d100</span><input type="number" min="1" max="100" value="${character.divination.resolutions?.malignancyRoll || ""}" data-divination-malignancy-roll /></label></div>
+    ${renderExceptionalResult(divinationMalignancy, "divination")}
+  </div>` : "";
   return `
     <div class="management-shell divination-layout">
       <article class="divination-card">
@@ -1892,7 +2123,7 @@ function renderDivination() {
         <p class="choice-source">Twist of Destiny</p>
         <p>The selected effect is recorded in the export. Effects that offer alternatives remain a player choice and should be resolved before the final review.</p>
         ${result ? `<dl><dt>Roll</dt><dd>${result.min === result.max ? result.min : `${result.min}-${result.max}`}</dd><dt>Divination</dt><dd>${result.title}</dd><dt>Effect</dt><dd>${result.effect}</dd></dl>` : ""}
-        ${result && (changeControls || fateControl) ? `<div class="divination-adjustments">${changeControls}${fateControl}</div>` : ""}
+        ${result && (changeControls || fateControl || talentControl || disorderControl || malignancyControl) ? `<div class="divination-adjustments">${changeControls}${fateControl}${talentControl}${disorderControl}${malignancyControl}</div>` : ""}
       </aside>
     </div>`;
 }
@@ -2309,7 +2540,7 @@ function foundryCharacteristicData(characteristicId) {
   return {
     base: breakdown.generated,
     advance: Number(character.advances.characteristics[characteristicId] || 0),
-    modifier: breakdown.divination,
+    modifier: breakdown.divination + breakdown.exceptional + breakdown.elite,
     unnatural: 0,
     cost: characteristicXpCost(characteristicId),
   };
@@ -2481,6 +2712,8 @@ function hasPsykerAccess() {
 }
 
 function eliteAdvanceStatus(advance) {
+  const automaticGrant = automaticEliteAdvances().find((entry) => entry.id === advance.id);
+  if (automaticGrant) return { missing: [], owned: true, automatic: true };
   const missing = [];
   const activeIds = new Set(activeEliteAdvances().map((entry) => entry.id));
   for (const [id, minimum] of Object.entries(advance.prerequisites?.characteristics || {})) {
@@ -3076,6 +3309,41 @@ function grantAlternatives() {
   return alternatives;
 }
 
+function renderStartingConsequences() {
+  const panels = [];
+  if (character.homeWorld === "daemon-world") {
+    panels.push(`<section class="grant-panel exceptional-panel">
+      <h2>Daemon World Corruption</h2>
+      <p>Touched by the Warp grants Psyniscience and 1d10+5 starting Corruption.</p>
+      <div class="dual-actions"><button class="compact-button" type="button" data-roll-daemon-corruption>Roll 1d10+5</button><label class="manual-result"><span>Enter total</span><input type="number" min="6" max="15" value="${character.exceptional?.daemonWorldCorruption || ""}" data-daemon-corruption /></label></div>
+      ${character.exceptional?.daemonWorldCorruption ? `<div class="applied-change"><span>Applied automatically</span><strong>Corruption +${character.exceptional.daemonWorldCorruption}</strong></div>` : ""}
+    </section>`);
+  }
+  if (character.background === "mutant") {
+    const mutation = selectedMutationRecord();
+    panels.push(`<section class="grant-panel exceptional-panel">
+      <h2>Mutant Traits and Mutation</h2>
+      <p>Choose one starting trait, record 10 Corruption, then roll 5d10 on the Mutation table.</p>
+      <label><span>Starting trait</span><select data-mutant-trait><option value="">Choose...</option>${mutantStartingTraits.map((entry) => `<option value="${entry.id}" ${character.exceptional?.mutantTraitId === entry.id ? "selected" : ""}>${entry.name}</option>`).join("")}</select></label>
+      <div class="dual-actions"><button class="compact-button" type="button" data-roll-mutation>Roll 5d10</button><label class="manual-result"><span>Enter total</span><input type="number" min="5" max="50" value="${character.exceptional?.mutationRoll || ""}" data-mutation-roll /></label></div>
+      ${character.exceptional?.mutationDice?.length ? `<small>Dice: ${character.exceptional.mutationDice.join(", ")}</small>` : ""}
+      ${renderExceptionalResult(mutation, "mutation")}
+      <div class="applied-change"><span>Applied automatically</span><strong>Corruption +10</strong></div>
+    </section>`);
+  }
+  if (character.background === "exorcised") {
+    const malignancy = selectedMalignancyRecord("starting");
+    panels.push(`<section class="grant-panel exceptional-panel">
+      <h2>Starting Malignancy</h2>
+      <p>The Exorcised background begins with one Malignancy chosen from Table 8-15.</p>
+      <label><span>Malignancy</span><select data-starting-malignancy><option value="">Choose...</option>${malignancies.map((entry) => `<option value="${entry.id}" ${character.exceptional?.startingMalignancyId === entry.id ? "selected" : ""}>${entry.name}</option>`).join("")}</select></label>
+      ${renderExceptionalResult(malignancy, "starting")}
+    </section>`);
+  }
+  if (!panels.length) return "";
+  return `<div class="starting-consequences" aria-label="Starting consequences">${panels.join("")}</div>`;
+}
+
 function renderGrants() {
   const backgroundRows = mechanicsByChoice[character.background] || [];
   const roleRows = mechanicsByChoice[character.role] || [];
@@ -3113,6 +3381,7 @@ function renderGrants() {
             </label>`).join("") || "<p>No unresolved alternatives were detected.</p>"}
         </div>
       </section>
+      ${renderStartingConsequences()}
     </div>`;
 }
 
@@ -3435,22 +3704,23 @@ function renderEliteAdvanceShop() {
   const selected = eliteAdvanceById(character.eliteShopSelected) || eliteAdvanceCatalogue.find((entry) => !entry.automatic) || eliteAdvanceCatalogue[0];
   const status = eliteAdvanceStatus(selected);
   const active = activeEliteAdvances();
+  const includedByMystic = selected.id === "psyker" && character.role === "mystic";
   return `<section class="elite-advance-shop" id="advance-elite">
     <div class="elite-compact-heading"><div><p class="choice-source">Optional, campaign-changing advances</p><h2>Elite Advances</h2></div><p>Choose an advance to inspect it. The builder checks mechanical prerequisites; the GM must still approve how it enters the story.</p></div>
     <div class="active-elite-advances">${active.map((advance) => `<div class="active-elite-chip"><span>${advance.automatic ? "Granted" : "Purchased"}</span><strong>${advance.name}</strong><small>${advance.automatic ? advance.source : `${advance.cost} XP`}</small>${advance.automatic ? "" : `<button type="button" data-remove-elite-advance="${advance.id}" aria-label="Remove ${advance.name}">×</button>`}</div>`).join("") || "<span>No Elite Advance selected.</span>"}</div>
     <div class="elite-selector-grid">
-      <label class="elite-select-control"><span>Inspect an Elite Advance</span><select data-elite-advance-inspect aria-label="Inspect an Elite Advance"><option value="">Choose an advance...</option>${eliteAdvanceCatalogue.map((entry) => `<option value="${entry.id}" ${entry.id === selected.id ? "selected" : ""}>${entry.name}</option>`).join("")}</select></label>
+      <label class="elite-select-control"><span>Inspect an Elite Advance</span><select data-elite-advance-inspect aria-label="Inspect an Elite Advance"><option value="">Choose an advance...</option>${eliteAdvanceCatalogue.map((entry) => `<option value="${entry.id}" ${entry.id === selected.id ? "selected" : ""}>${entry.name}${entry.id === "psyker" && character.role === "mystic" ? " — Included by Mystic" : ""}</option>`).join("")}</select></label>
       <article class="elite-inspector">
         <div><p class="choice-source">${selected.source}, p. ${selected.page}</p><h3>${selected.name}</h3><p>${selected.summary}</p></div>
         <dl>
-          <div><dt>Cost</dt><dd>${selected.cost} XP</dd></div>
+          <div><dt>Cost</dt><dd>${includedByMystic ? "0 XP — included by Mystic" : `${selected.cost} XP`}</dd></div>
           <div><dt>Instant changes</dt><dd>${selected.instantChanges.join(" · ")}</dd></div>
           <div><dt>Guidance</dt><dd>${selected.notes}</dd></div>
           ${selected.prerequisites?.narrative ? `<div><dt>Narrative prerequisite</dt><dd>${selected.prerequisites.narrative}</dd></div>` : ""}
           ${status.missing.filter((entry) => entry !== "GM approval").length ? `<div><dt>Missing</dt><dd class="missing-prerequisite">${status.missing.filter((entry) => entry !== "GM approval").join(" · ")}</dd></div>` : ""}
         </dl>
-        <label class="elite-gm-approval"><input type="checkbox" data-elite-gm-approval="${selected.id}" ${character.eliteSetup.gmApproved?.[selected.id] ? "checked" : ""} ${status.owned ? "disabled" : ""} /><span>GM approval confirmed for this character</span></label>
-        <button class="primary-button" type="button" data-purchase-elite-advance="${selected.id}" ${status.owned || status.missing.length || xpSpent() + selected.cost > character.xp.starting ? "disabled" : ""}>${status.owned ? "Advance Already Active" : status.missing.length ? "Prerequisites Missing" : xpSpent() + selected.cost > character.xp.starting ? "Insufficient XP" : "Purchase Elite Advance"}<span>›</span></button>
+        ${includedByMystic ? psykerPathClarification() : `<label class="elite-gm-approval"><input type="checkbox" data-elite-gm-approval="${selected.id}" ${character.eliteSetup.gmApproved?.[selected.id] ? "checked" : ""} ${status.owned ? "disabled" : ""} /><span>GM approval confirmed for this character</span></label>`}
+        <button class="primary-button" type="button" data-purchase-elite-advance="${selected.id}" ${status.owned || status.missing.length || xpSpent() + selected.cost > character.xp.starting ? "disabled" : ""}>${includedByMystic ? "Included by Mystic Role" : status.owned ? "Advance Already Active" : status.missing.length ? "Prerequisites Missing" : xpSpent() + selected.cost > character.xp.starting ? "Insufficient XP" : "Purchase Elite Advance"}<span>${includedByMystic ? "✓" : "›"}</span></button>
       </article>
     </div>
     ${active.map(eliteSetupControls).filter(Boolean).join("")}
@@ -5046,6 +5316,31 @@ function renderActionIndex(actions) {
   </section>`;
 }
 
+function creationConsequenceWarnings() {
+  const warnings = [];
+  const divination = currentDivination();
+  if (divination?.talentGrant?.choice && !character.divination.resolutions?.talentSpeciality) warnings.push(`The Divination's ${divination.talentGrant.label} speciality has not been chosen.`);
+  if (divination?.disorderGrant === "phobia" && !character.divination.resolutions?.disorderId) warnings.push("The Divination's Phobia has not been chosen.");
+  if (divination?.malignancyRoll) {
+    const malignancy = selectedMalignancyRecord("divination");
+    if (!malignancy) warnings.push("The Divination's Malignancy roll has not been resolved.");
+    else if (malignancy.characteristicRoll && !character.divination.resolutions?.malignancyMagnitude) warnings.push(`${malignancy.name}'s characteristic reduction has not been rolled.`);
+  }
+  if (character.homeWorld === "daemon-world" && !character.exceptional?.daemonWorldCorruption) warnings.push("Daemon World starting Corruption has not been rolled or entered.");
+  if (character.background === "mutant") {
+    const mutation = selectedMutationRecord();
+    if (!character.exceptional?.mutantTraitId) warnings.push("The Mutant starting trait has not been chosen.");
+    if (!mutation) warnings.push("The Mutant's 5d10 Mutation roll has not been resolved.");
+    else if (mutation.characteristicRoll && !character.exceptional?.mutationMagnitude) warnings.push(`${mutation.name}'s characteristic reduction has not been rolled.`);
+  }
+  if (character.background === "exorcised") {
+    const malignancy = selectedMalignancyRecord("starting");
+    if (!malignancy) warnings.push("The Exorcised starting Malignancy has not been chosen.");
+    else if (malignancy.characteristicRoll && !character.exceptional?.startingMalignancyMagnitude) warnings.push(`${malignancy.name}'s characteristic reduction has not been rolled.`);
+  }
+  return warnings;
+}
+
 function renderReview() {
   sheetDetailRecords.clear();
   sheetDetailCounter = 0;
@@ -5076,8 +5371,8 @@ function renderReview() {
     ...character.advances.eliteAdvances.filter((entry) => entry?.name).map((entry) => [entry.name, Number(entry.cost || 0)]),
   ];
   const xpAvailable = character.xp.starting - spent;
-  const xpAwards = [...character.xp.awards].reverse();
-  const xpAwardedTotal = character.xp.awards.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const xpAwards = [...(character.xp.awards || [])].reverse();
+  const xpAwardedTotal = (character.xp.awards || []).reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
   const initialXp = Math.max(0, character.xp.starting - xpAwardedTotal);
   const agilityBonus = characteristicBonus("agility");
   const toughnessBonus = characteristicBonus("toughness");
@@ -5100,6 +5395,7 @@ function renderReview() {
     hasEliteAdvance("psyker") && character.background !== "astra-telepathica" && character.eliteSetup.psykerCorruption === null ? "The rogue psyker's 1d10+3 starting Corruption has not been recorded." : "",
     hasEliteAdvance("inquisitor") && !character.eliteSetup.inquisitorLore ? "The Inquisitor's granted Forbidden Lore speciality has not been chosen." : "",
     hasEliteAdvance("sister-of-battle") && !character.eliteSetup.sisterWeapon ? "The Sister of Battle's granted weapon has not been chosen." : "",
+    ...creationConsequenceWarnings(),
     ...psychicPowers.filter((power) => psychicPowerStatus(power).missing.length).map((power) => `${power.name} no longer meets: ${psychicPowerStatus(power).missing.join(", ")}.`),
     ...equipmentState.warnings.filter((entry) => entry.level === "warning").map((entry) => entry.message),
   ].filter(Boolean);
@@ -5119,6 +5415,13 @@ function renderReview() {
     <div><strong>Background</strong><span>${backgroundName}</span></div>
     <div><strong>Role</strong><span>${roleName}</span></div>
   </div>`;
+  const historyLabels = {
+    desire: "Desire", hatred: "Hatred", sacrifice: "Sacrifice", meeting: "Meeting the Inquisitor",
+    inquisitorMeaning: "Meaning of the Inquisitor", warbandBond: "Warband bond", base: "Base of operations",
+  };
+  const personalHistoryRows = `<div class="dossier-list">${Object.entries(historyLabels).map(([id, label]) => character.history?.[id]
+    ? `<div><strong>${label}</strong><span>${escapeHtmlAttribute(character.history[id])}</span></div>`
+    : "").join("") || "<p>No personal-history prompts recorded.</p>"}</div>`;
   const aptitudeTags = `<div class="tag-list final">${resolvedAptitudes().aptitudes.map((aptitude) => `<span>${aptitude}</span>`).join("")}</div>`;
   const skillRows = `<div class="dossier-list review-skills-list">${ownedSkills.map((record) => {
     const { skill, grant, displayName, speciality, rank } = record;
@@ -5216,15 +5519,19 @@ function renderReview() {
             breakdown.generated ? `Generated ${breakdown.generated}` : "",
             breakdown.advancement ? `Advances +${breakdown.advancement}` : "",
             breakdown.divination ? `Divination ${breakdown.divination > 0 ? "+" : ""}${breakdown.divination}` : "",
+            breakdown.exceptional ? `Mutation/Malignancy ${breakdown.exceptional > 0 ? "+" : ""}${breakdown.exceptional}` : "",
+            breakdown.elite ? `Elite Advance ${breakdown.elite > 0 ? "+" : ""}${breakdown.elite}` : "",
           ].filter(Boolean);
-          return `<div class="${breakdown.divination ? "modified" : ""}" title="${escapeHtmlAttribute(parts.join(" · "))}">
+          return `<div class="${breakdown.divination || breakdown.exceptional || breakdown.elite ? "modified" : ""}" title="${escapeHtmlAttribute(parts.join(" · "))}">
             <button type="button" class="review-characteristic-label rule-term lore-term lore-term-stat" data-rule-term="${characteristicRuleId}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${entry.name}. ${tooltip}`)}">${entry.abbreviation}</button>
             <strong>${breakdown.total || "—"}</strong>${parts.length > 1 ? `<small>${escapeHtmlAttribute(parts.slice(1).join(" · "))}</small>` : ""}
           </div>`;
         }).join("")}</div>
-        ${Object.keys(divinationModifiers).length || currentDivination()?.fateChange ? `<div class="calculation-note"><strong>Divination applied:</strong> ${[
+        ${Object.keys(divinationModifiers).length || Object.keys(exceptionalCharacteristicModifiers()).length || currentDivination()?.fateChange || character.exceptional?.creationCorruptionApplied ? `<div class="calculation-note"><strong>Creation effects applied:</strong> ${[
           ...Object.entries(divinationModifiers).map(([id, amount]) => `${characteristics.find((entry) => entry.id === id)?.name || id} ${amount > 0 ? "+" : ""}${amount}`),
+          ...Object.entries(exceptionalCharacteristicModifiers()).map(([id, amount]) => `${characteristics.find((entry) => entry.id === id)?.name || id} ${amount > 0 ? "+" : ""}${amount}`),
           currentDivination()?.fateChange ? `Fate Threshold +${currentDivination().fateChange}` : "",
+          character.exceptional?.creationCorruptionApplied ? `Starting Corruption +${character.exceptional.creationCorruptionApplied}` : "",
         ].filter(Boolean).join(" · ")}</div>` : ""}
         <div class="review-vitals-strip">
           ${renderReviewWounds()}
@@ -5271,7 +5578,7 @@ function renderReview() {
               <div class="review-tab-panel" id="review-panel-features" role="tabpanel" aria-labelledby="review-tab-features" data-review-panel="features" ${reviewTabState === "features" ? "" : "hidden"}>
                 <div class="review-feature-grid"><section class="review-aptitudes-section"><h3>Aptitudes</h3>${aptitudeTags}</section><section class="review-talents-section"><h3>Talents</h3><div class="dossier-list">${talentRows}</div></section><section class="review-abilities-section"><h3>Traits and Special Abilities</h3><div class="dossier-list">${abilityRows}</div></section>${eliteAdvances.length ? `<section class="review-elites-section"><h3>Elite Advances</h3><div class="dossier-list">${eliteRows}</div></section>` : ""}</div>
               </div>
-              <div class="review-tab-panel" id="review-panel-background" role="tabpanel" aria-labelledby="review-tab-background" data-review-panel="background" ${reviewTabState === "background" ? "" : "hidden"}><div class="review-background-grid"><section><h3>Identity and Origin</h3>${identityRows}</section><section><h3>Divination</h3><div class="dossier-list">${renderSheetEntry({ kind: "Divination", name: currentDivination()?.title || "Not recorded", summary: currentDivination()?.effect || "No effect recorded.", meta: character.divination.roll ? `Roll ${character.divination.roll}` : "", source: currentDivination()?.source || "Core Rulebook — Divinations" })}</div></section></div></div>
+              <div class="review-tab-panel" id="review-panel-background" role="tabpanel" aria-labelledby="review-tab-background" data-review-panel="background" ${reviewTabState === "background" ? "" : "hidden"}><div class="review-background-grid"><section><h3>Identity and Origin</h3>${identityRows}</section><section><h3>Personal History</h3>${personalHistoryRows}</section><section><h3>Divination</h3><div class="dossier-list">${renderSheetEntry({ kind: "Divination", name: currentDivination()?.title || "Not recorded", summary: currentDivination()?.effect || "No effect recorded.", meta: character.divination.roll ? `Roll ${character.divination.roll}` : "", source: currentDivination()?.source || "Core Rulebook — Divinations" })}</div></section></div></div>
               <div class="review-tab-panel" id="review-panel-advancement" role="tabpanel" aria-labelledby="review-tab-advancement" data-review-panel="advancement" ${reviewTabState === "advancement" ? "" : "hidden"}><section class="review-advancement-section">
                 <div class="review-section-heading"><div><h3>Advancement</h3><p>Award experience, review purchases, or return to the rules-aware advancement and equipment tools.</p></div></div>
                 <div class="advancement-balance" aria-label="Experience totals">
@@ -6000,9 +6307,16 @@ function wireEvents() {
 
   const form = document.querySelector("#identity-form");
   form?.addEventListener("input", (event) => {
-    character[event.target.name] = event.target.value;
+    const historyField = event.target.dataset?.historyField;
+    if (historyField) {
+      character.history ||= {};
+      character.history[historyField] = event.target.value;
+    } else if (event.target.name) {
+      character[event.target.name] = event.target.value;
+    }
     save();
-    document.querySelector(".record strong").textContent = character.name || "Designation pending";
+    const recordName = document.querySelector(".record strong");
+    if (recordName) recordName.textContent = character.name || "Designation pending";
   });
 
   document.querySelector("#back").addEventListener("click", () => {
@@ -6180,6 +6494,137 @@ function wireEvents() {
       character.divination.statChoices[select.dataset.divinationChoice] = select.value;
       save();
       render();
+    });
+  });
+  document.querySelector("[data-divination-talent-speciality]")?.addEventListener("change", (event) => {
+    character.divination.resolutions ||= {};
+    character.divination.resolutions.talentSpeciality = event.target.value;
+    playMechanicalLock();
+    save();
+    render();
+  });
+  document.querySelector("[data-divination-disorder]")?.addEventListener("change", (event) => {
+    character.divination.resolutions ||= {};
+    character.divination.resolutions.disorderId = event.target.value;
+    playMechanicalLock();
+    save();
+    render();
+  });
+  const recordDivinationMalignancy = (value, dice = [], source = "manual") => {
+    character.divination.resolutions ||= {};
+    const entry = tableEntryForRoll(malignancies, value);
+    character.divination.resolutions.malignancyRoll = value;
+    character.divination.resolutions.malignancyId = entry?.id || "";
+    character.divination.resolutions.malignancyDice = dice;
+    character.divination.resolutions.malignancySource = source;
+    delete character.divination.resolutions.malignancyMagnitude;
+    delete character.divination.resolutions.malignancyDetail;
+  };
+  document.querySelector("[data-roll-divination-malignancy]")?.addEventListener("click", async () => {
+    const dice = await rollVisualDice(1, 100);
+    recordDivinationMalignancy(dice[0], dice, "local-3d");
+    save();
+    render();
+  });
+  const manualDivinationMalignancy = document.querySelector("[data-divination-malignancy-roll]");
+  manualDivinationMalignancy?.addEventListener("input", (event) => {
+    const value = Number(event.target.value);
+    if (!Number.isFinite(value) || value < 1 || value > 100) return;
+    recordDivinationMalignancy(value);
+    save();
+  });
+  manualDivinationMalignancy?.addEventListener("change", render);
+
+  document.querySelector("[data-mutant-trait]")?.addEventListener("change", (event) => {
+    character.exceptional.mutantTraitId = event.target.value;
+    playMechanicalLock();
+    save();
+    render();
+  });
+  const recordMutation = (value, dice = [], source = "manual") => {
+    const entry = tableEntryForRoll(mutations, value);
+    character.exceptional.mutationRoll = value;
+    character.exceptional.mutationId = entry?.id || "";
+    character.exceptional.mutationDice = dice;
+    character.exceptional.mutationSource = source;
+    delete character.exceptional.mutationMagnitude;
+    delete character.exceptional.mutationDetail;
+  };
+  document.querySelector("[data-roll-mutation]")?.addEventListener("click", async () => {
+    const dice = await rollVisualDice(5, 10);
+    recordMutation(dice.reduce((sum, die) => sum + die, 0), dice, "local-3d");
+    save();
+    render();
+  });
+  const manualMutation = document.querySelector("[data-mutation-roll]");
+  manualMutation?.addEventListener("input", (event) => {
+    const value = Number(event.target.value);
+    if (!Number.isFinite(value) || value < 5 || value > 50) return;
+    recordMutation(value);
+    save();
+  });
+  manualMutation?.addEventListener("change", render);
+
+  document.querySelector("[data-starting-malignancy]")?.addEventListener("change", (event) => {
+    character.exceptional.startingMalignancyId = event.target.value;
+    delete character.exceptional.startingMalignancyMagnitude;
+    delete character.exceptional.startingMalignancyDetail;
+    playMechanicalLock();
+    save();
+    render();
+  });
+  const manualDaemonCorruption = document.querySelector("[data-daemon-corruption]");
+  manualDaemonCorruption?.addEventListener("input", (event) => {
+    const value = Number(event.target.value);
+    if (!Number.isFinite(value) || value < 6 || value > 15) return;
+    character.exceptional.daemonWorldCorruption = value;
+    save();
+  });
+  manualDaemonCorruption?.addEventListener("change", render);
+  document.querySelector("[data-roll-daemon-corruption]")?.addEventListener("click", async () => {
+    const [die] = await rollVisualDice(1, 10);
+    character.exceptional.daemonWorldCorruption = die + 5;
+    character.exceptional.daemonWorldCorruptionDie = die;
+    save();
+    render();
+  });
+  const setExceptionalMagnitude = (source, value) => {
+    if (source === "divination") {
+      character.divination.resolutions.malignancyMagnitude = value;
+    } else if (source === "mutation") {
+      character.exceptional.mutationMagnitude = value;
+    } else {
+      character.exceptional.startingMalignancyMagnitude = value;
+    }
+  };
+  document.querySelectorAll("[data-exceptional-magnitude]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || value < Number(input.min) || value > Number(input.max)) return;
+      setExceptionalMagnitude(input.dataset.exceptionalMagnitude, value);
+      save();
+    });
+    input.addEventListener("change", render);
+  });
+  document.querySelectorAll("[data-roll-exceptional-magnitude]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const source = button.dataset.rollExceptionalMagnitude;
+      const entry = source === "divination" ? selectedMalignancyRecord("divination") : source === "mutation" ? selectedMutationRecord() : selectedMalignancyRecord("starting");
+      if (!entry?.characteristicRoll) return;
+      const [die] = await rollVisualDice(1, entry.characteristicRoll.sides === 5 ? 10 : entry.characteristicRoll.sides);
+      const value = entry.characteristicRoll.sides === 5 ? Math.ceil(die / 2) : die;
+      setExceptionalMagnitude(source, value);
+      save();
+      render();
+    });
+  });
+  document.querySelectorAll("[data-exceptional-detail]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const source = input.dataset.exceptionalDetail;
+      if (source === "divination") character.divination.resolutions.malignancyDetail = input.value;
+      else if (source === "mutation") character.exceptional.mutationDetail = input.value;
+      else character.exceptional.startingMalignancyDetail = input.value;
+      save();
     });
   });
 
@@ -6383,14 +6828,12 @@ function wireEvents() {
   document.querySelector("[data-psyker-corruption]")?.addEventListener("input", (event) => {
     const value = event.target.value === "" ? null : Math.max(4, Math.min(13, Number(event.target.value)));
     character.eliteSetup.psykerCorruption = value;
-    if (value !== null) character.conditions.corruption = value;
     save();
     refreshXpMeter();
   });
   document.querySelector("[data-roll-psyker-corruption]")?.addEventListener("click", async () => {
     const [die] = await rollVisualDice(1, 10);
     character.eliteSetup.psykerCorruption = die + 3;
-    character.conditions.corruption = die + 3;
     save();
     rerenderAdvancesPreservingScroll("[data-psyker-corruption]", "#advance-elite");
   });
@@ -6565,6 +7008,7 @@ function wireEvents() {
         characteristicValues: Object.fromEntries(characteristics.map((entry) => [entry.id, characteristicValue(entry.id)])),
         characteristicBreakdowns: Object.fromEntries(characteristics.map((entry) => [entry.id, characteristicBreakdown(entry.id)])),
         divinationModifiers: divinationCharacteristicModifiers(),
+        exceptionalModifiers: exceptionalCharacteristicModifiers(),
         fateThreshold: finalFateThreshold(),
         currentFate: currentFatePoints(),
         aptitudes: resolvedAptitudes().aptitudes,
@@ -6620,7 +7064,11 @@ function wireEvents() {
           elite: eliteAdvances.map((entry) => entry.name).join(", "),
           divination: foundryDivinationName(),
           gender: character.presentation || "",
-          notes: character.appearance || "",
+          notes: [
+            character.appearance ? `Appearance: ${character.appearance}` : "",
+            ...Object.entries({ desire: "Desire", hatred: "Hatred", sacrifice: "Sacrifice", meeting: "Meeting the Inquisitor", inquisitorMeaning: "Meaning of the Inquisitor", warbandBond: "Warband bond", base: "Base of operations" })
+              .map(([id, label]) => character.history?.[id] ? `${label}: ${character.history[id]}` : ""),
+          ].filter(Boolean).join("\n\n"),
         },
         characteristics: Object.fromEntries(characteristics.map((entry) => [entry.id, foundryCharacteristicData(entry.id)])),
         fate: {

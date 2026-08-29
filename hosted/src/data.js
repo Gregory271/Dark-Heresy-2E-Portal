@@ -97,13 +97,13 @@ export const stageArtById = {
 };
 
 export const divinations = [
-  { min: 1, max: 1, title: "Mutation without, corruption within.", effect: "Roll once on Table 8-15: Malignancies (Core Rulebook, page 290) and apply the result." },
-  { min: 2, max: 5, title: "Trust in your fear.", effect: "Increase Perception by 5. Gain the Phobia Mental Disorder.", statChanges: [{ target: "perception", amount: 5 }] },
-  { min: 6, max: 9, title: "Humans must die so that humanity can endure.", effect: "Gain the Jaded talent. If already possessed, increase Willpower by 2 instead." },
+  { min: 1, max: 1, title: "Mutation without, corruption within.", effect: "Roll once on Table 8-15: Malignancies (Core Rulebook, page 290) and apply the result.", malignancyRoll: true },
+  { min: 2, max: 5, title: "Trust in your fear.", effect: "Increase Perception by 5. Gain the Phobia Mental Disorder.", statChanges: [{ target: "perception", amount: 5 }], disorderGrant: "phobia" },
+  { min: 6, max: 9, title: "Humans must die so that humanity can endure.", effect: "Gain the Jaded talent. If already possessed, increase Willpower by 2 instead.", talentGrant: { label: "Jaded", fallback: { target: "willpower", amount: 2 } } },
   { min: 10, max: 13, title: "The pain of the bullet is ecstasy compared to damnation.", effect: "Reduce Agility by 3. The first time Critical damage is suffered each session, roll 1d10; on a 10, suffer no Critical Effects, though the damage still counts as Critical damage.", statChanges: [{ target: "agility", amount: -3 }] },
-  { min: 14, max: 17, title: "Be a boon to your allies and the bane of your enemies.", effect: "Gain Hatred (choose any one). If already possessed, increase Strength by 2 instead." },
+  { min: 14, max: 17, title: "Be a boon to your allies and the bane of your enemies.", effect: "Gain Hatred (choose any one). If already possessed, increase Strength by 2 instead.", talentGrant: { label: "Hatred", choice: "hatred", fallback: { target: "strength", amount: 2 } } },
   { min: 18, max: 21, title: "The wise learn from the deaths of others.", effect: "Increase Agility or Intelligence by 3. Reduce Weapon Skill or Ballistic Skill by 3.", statChanges: [{ id: "increase", options: ["agility", "intelligence"], amount: 3 }, { id: "reduce", options: ["weaponSkill", "ballisticSkill"], amount: -3 }] },
-  { min: 22, max: 25, title: "Kill the alien before it can speak its lies.", effect: "Gain Quick Draw. If already possessed, increase Agility by 2 instead." },
+  { min: 22, max: 25, title: "Kill the alien before it can speak its lies.", effect: "Gain Quick Draw. If already possessed, increase Agility by 2 instead.", talentGrant: { label: "Quick Draw", fallback: { target: "agility", amount: 2 } } },
   { min: 26, max: 29, title: "Truth is subjective.", effect: "Increase Perception by 3. The first time Corruption is gained each session, gain that amount plus 1.", statChanges: [{ target: "perception", amount: 3 }] },
   { min: 30, max: 33, title: "Thought begets Heresy.", effect: "Reduce Intelligence by 3. The first time Corruption is gained each session, reduce that amount by 1, to a minimum of 0.", statChanges: [{ target: "intelligence", amount: -3 }] },
   { min: 34, max: 38, title: "Heresy begets Retribution.", effect: "Increase Fellowship or Strength by 3. Reduce Toughness or Willpower by 3.", statChanges: [{ id: "increase", options: ["fellowship", "strength"], amount: 3 }, { id: "reduce", options: ["toughness", "willpower"], amount: -3 }] },
@@ -115,11 +115,11 @@ export const divinations = [
   { min: 64, max: 67, title: "Only the insane have strength enough to prosper.", effect: "Increase Willpower by 3. The first time Insanity is gained each session, gain that amount plus 1.", statChanges: [{ target: "willpower", amount: 3 }] },
   { min: 68, max: 71, title: "A suspicious mind is a healthy mind.", effect: "Increase Perception by 2. The character may re-roll Awareness tests to avoid being Surprised.", statChanges: [{ target: "perception", amount: 2 }] },
   { min: 72, max: 75, title: "Suffering is an unrelenting instructor.", effect: "Reduce Toughness by 3. The first time damage is suffered each session, gain +20 to the next test made before the end of the next turn.", statChanges: [{ target: "toughness", amount: -3 }] },
-  { min: 76, max: 79, title: "The only true fear is dying without your duty done.", effect: "Gain Resistance (Cold, Heat, or Fear). If already possessed, increase Toughness by 2 instead." },
+  { min: 76, max: 79, title: "The only true fear is dying without your duty done.", effect: "Gain Resistance (Cold, Heat, or Fear). If already possessed, increase Toughness by 2 instead.", talentGrant: { label: "Resistance", choice: "resistance", fallback: { target: "toughness", amount: 2 } } },
   { min: 80, max: 83, title: "Only in death does duty end.", effect: "The first time Fatigue would be suffered each session, reduce it by 1, to a minimum of 0." },
-  { min: 84, max: 87, title: "Innocence is an illusion.", effect: "Gain Keen Intuition. If already possessed, increase Intelligence by 2 instead." },
+  { min: 84, max: 87, title: "Innocence is an illusion.", effect: "Gain Keen Intuition. If already possessed, increase Intelligence by 2 instead.", talentGrant: { label: "Keen Intuition", fallback: { target: "intelligence", amount: 2 } } },
   { min: 88, max: 91, title: "To war is human.", effect: "Gain Dodge as a Known skill. If already possessed, increase Agility by 2 instead.", skillGrant: { id: "dodge", ifKnownStat: { target: "agility", amount: 2 } } },
-  { min: 92, max: 95, title: "There is no substitute for zeal.", effect: "Gain Clues from the Crowds. If already possessed, increase Fellowship by 2 instead." },
+  { min: 92, max: 95, title: "There is no substitute for zeal.", effect: "Gain Clues from the Crowds. If already possessed, increase Fellowship by 2 instead.", talentGrant: { label: "Clues from the Crowds", fallback: { target: "fellowship", amount: 2 } } },
   { min: 96, max: 99, title: "Even one who has nothing can still offer his life.", effect: "When burning Fate threshold to survive a lethal injury, roll 1d10. On a 10, survive without reducing Fate threshold." },
   { min: 100, max: 100, title: "Do not ask why you serve. Only ask how.", effect: "Increase Fate threshold by 1.", fateChange: 1 },
 ];
