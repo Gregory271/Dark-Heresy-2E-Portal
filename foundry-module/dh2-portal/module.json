@@ -2,7 +2,7 @@
   "id": "dh2-portal",
   "title": "Dark Heresy 2E Portal Bridge",
   "description": "Uses the complete Dark Heresy 2E Portal as the character creator and native Acolyte character sheet inside Foundry VTT.",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "authors": [
     {
       "name": "Pax Historia"

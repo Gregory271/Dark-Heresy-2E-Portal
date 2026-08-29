@@ -229,7 +229,8 @@ async function openActorImport() {
   try {
     const file = await chooseJsonFile();
     if (!file) return null;
-    const payload = JSON.parse(await file.text());
+    const payload = await readJsonFile(file);
+    if (looksLikeActorLibrary(payload)) return await importActorLibrary(payload);
     return await importActorData(payload);
   } catch (error) {
     console.error(`${MODULE_ID} | Character import failed`, error);
@@ -247,7 +248,7 @@ async function openActorLibraryImport() {
   try {
     const file = await chooseJsonFile();
     if (!file) return null;
-    const payload = JSON.parse(await file.text());
+    const payload = await readJsonFile(file);
     return await importActorLibrary(payload);
   } catch (error) {
     console.error(`${MODULE_ID} | Web roster import failed`, error);
@@ -513,13 +514,19 @@ function validateActorLibrary(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("Choose a valid Portal Foundry roster file.");
   }
-  if (payload.format !== "dh2-foundry-actor-library" || !Array.isArray(payload.actors)) {
-    throw new Error('This is not a Portal roster transfer. In the web app, open Your Acolytes and use “Export Roster for Foundry”.');
+  const format = String(payload.format || "").trim();
+  const actors = Array.isArray(payload.actors)
+    ? payload.actors
+    : payload.actors && typeof payload.actors === "object"
+      ? Object.values(payload.actors)
+      : [];
+  if (!actors.length || (format && format !== "dh2-foundry-actor-library" && !actors.every((entry) => entry?.actor?.type === "acolyte"))) {
+    const detected = format || "no format identifier";
+    throw new Error(`This is not a Portal roster transfer (detected: ${detected}; Actors: ${actors.length}). In the web app, open Your Acolytes and use “Export Roster for Foundry”.`);
   }
-  if (!payload.actors.length) throw new Error("This Portal roster does not contain any Acolytes.");
-  if (payload.actors.length > 250) throw new Error("This roster contains more than the 250-character safety limit.");
+  if (actors.length > 250) throw new Error("This roster contains more than the 250-character safety limit.");
 
-  return payload.actors.map((entry, index) => {
+  return actors.map((entry, index) => {
     const recordId = String(entry?.recordId || entry?.actor?.flags?.[PORTAL_FLAG]?.libraryRecordId || "").trim();
     if (!recordId) throw new Error(`Roster entry ${index + 1} is missing its character identifier.`);
     const actor = validateActorData(entry?.actor || entry);
@@ -530,6 +537,11 @@ function validateActorLibrary(payload) {
     actor.flags[PORTAL_FLAG].libraryOrigin = String(entry?.origin || actor.flags[PORTAL_FLAG].libraryOrigin || "Web roster");
     return { recordId, actor };
   });
+}
+
+function looksLikeActorLibrary(payload) {
+  return Boolean(payload && typeof payload === "object" && !Array.isArray(payload)
+    && (String(payload.format || "").trim() === "dh2-foundry-actor-library" || Array.isArray(payload.actors)));
 }
 
 function findMatchingPortalActor(entry) {
@@ -587,4 +599,19 @@ function chooseJsonFile() {
     document.body.append(input);
     input.click();
   });
+}
+
+async function readJsonFile(file) {
+  const raw = typeof file?.text === "function"
+    ? await file.text()
+    : await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.addEventListener("load", () => resolve(reader.result), { once: true });
+      reader.addEventListener("error", () => reject(reader.error || new Error("Foundry could not read the selected file.")), { once: true });
+      reader.readAsText(file);
+    });
+  const text = String(raw || "").replace(/^\uFEFF/, "").trim();
+  if (!text) throw new Error("The selected JSON file is empty.");
+  const parsed = JSON.parse(text);
+  return typeof parsed === "string" ? JSON.parse(parsed) : parsed;
 }
