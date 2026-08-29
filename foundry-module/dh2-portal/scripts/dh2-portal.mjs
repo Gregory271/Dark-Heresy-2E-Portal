@@ -147,8 +147,13 @@ async function openActorImport() {
 }
 
 async function handlePortalMessage(event) {
-  const allowedOrigin = event.origin === window.location.origin || event.origin === "https://gregory271.github.io";
-  if (!allowedOrigin || event.data?.source !== "dh2-portal-frame") return;
+  const portalRoot = portalApplication?.element?.[0] ?? portalApplication?.element;
+  const portalWindow = portalRoot?.querySelector?.(".dh2-portal-frame")?.contentWindow;
+  const fromPortal = Boolean(portalWindow && event.source === portalWindow);
+  const allowedOrigin = event.origin === window.location.origin
+    || event.origin === "https://gregory271.github.io"
+    || (event.origin === "null" && fromPortal);
+  if (!allowedOrigin || !fromPortal || event.data?.source !== "dh2-portal-frame") return;
   if (event.data.type !== "create-actor" || !event.data.requestId) return;
 
   const reply = (result) => event.source?.postMessage({
@@ -156,7 +161,7 @@ async function handlePortalMessage(event) {
     type: "create-actor-result",
     requestId: event.data.requestId,
     ...result,
-  }, event.origin);
+  }, event.origin === "null" ? "*" : event.origin);
 
   if (game.user.isGM) {
     try {
