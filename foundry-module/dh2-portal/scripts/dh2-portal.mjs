@@ -40,8 +40,8 @@ class DarkHeresyPortalApplication extends Application {
     return { portalUrl: REMOTE_PORTAL_URL };
   }
 
-  async render(force, options) {
-    await super.render(force, options);
+  async _render(force, options) {
+    await super._render(force, options);
     const root = this.element?.[0] ?? this.element;
     const frame = root?.querySelector?.(".dh2-portal-frame");
     if (!frame) return this;
