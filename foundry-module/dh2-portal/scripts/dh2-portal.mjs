@@ -53,7 +53,8 @@ class DarkHeresyPortalApplication extends Application {
       return this;
     }
 
-    const baseUrl = new URL("./", portalUrl).href;
+    const absolutePortalUrl = new URL(portalUrl, window.location.href).href;
+    const baseUrl = new URL("./", absolutePortalUrl).href;
     const escapedBase = baseUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
     const documentHtml = /<head(?:\s[^>]*)?>/i.test(html)
       ? html.replace(/<head(\s[^>]*)?>/i, (tag) => `${tag}<base href="${escapedBase}">`)
