@@ -5073,6 +5073,8 @@ function reinforcementSearchText(entry) {
     entry.talents?.join(" "),
     entry.traits?.join(" "),
     entry.gear?.join(" "),
+    entry.type === "equipment" ? itemRulesSummary(entry.item) : "",
+    entry.type === "equipment" ? JSON.stringify(entry.item?.profile || {}) : "",
   ].filter(Boolean).join(" ").toLowerCase();
 }
 
@@ -5113,11 +5115,16 @@ function reinforcementDetail(entry) {
   if (entry.type === "equipment") {
     const item = entry.item || {};
     const profile = item.profile || {};
+    const profileRows = itemProfileRows(item)
+      .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "" && value !== "—")
+      .map(([label, value]) => `<div><dt>${escapeHtmlAttribute(label)}</dt><dd>${escapeHtmlAttribute(value)}</dd></div>`)
+      .join("");
     return `<article class="reinforcement-record equipment-record">
       <header class="reinforcement-record-header"><div class="reinforcement-record-art" style="--record-image:url('${reinforcementArtwork(entry)}')" aria-hidden="true"></div><div><p class="eyebrow">Equipment profile</p><h2>${escapeHtmlAttribute(entry.name)}</h2><p>${escapeHtmlAttribute(entry.summary)}</p></div><span class="reinforcement-record-mark">◆</span></header>
       <div class="reinforcement-tags">${tags}</div>
       <dl class="reinforcement-facts"><div><dt>Category</dt><dd>${escapeHtmlAttribute(item.category || "Equipment")}</dd></div><div><dt>Availability</dt><dd>${escapeHtmlAttribute(item.availability || profile.availability || "—")}</dd></div><div><dt>Weight</dt><dd>${profile.weight ?? item.weight ?? "—"}${profile.weight || item.weight ? " kg" : ""}</dd></div><div><dt>Craftsmanship</dt><dd>${escapeHtmlAttribute(item.craftsmanship || profile.craftsmanship || "Common")}</dd></div></dl>
-      <section class="reinforcement-text-block"><h3>Rules summary</h3><p>${escapeHtmlAttribute(item.description || entry.summary || "No summary recorded.")}</p></section>
+      ${profileRows ? `<dl class="reinforcement-facts reinforcement-profile-facts">${profileRows}</dl>` : ""}
+      <section class="reinforcement-text-block"><h3>Rules summary</h3><p>${escapeHtmlAttribute(itemRulesSummary(item) || entry.summary || "No summary recorded.")}</p></section>
       <p class="reinforcement-source">${escapeHtmlAttribute(entry.source || "Armoury")}</p>
     </article>`;
   }
