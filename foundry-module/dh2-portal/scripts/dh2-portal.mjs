@@ -24,11 +24,42 @@ class DarkHeresyPortalApplication extends Application {
     const path = `modules/${MODULE_ID}/portal/index.html?foundry=1`;
     const localUrl = foundry.utils.getRoute?.(path) || `/${path}`;
     try {
-      const response = await fetch(localUrl, { method: "HEAD" });
-      return { portalUrl: response.ok ? localUrl : REMOTE_PORTAL_URL };
+      // Foundry intentionally serves HTML from its data directory as
+      // text/plain. Fetch the document here and render it as srcdoc instead
+      // of navigating an iframe directly to the raw response.
+      const response = await fetch(localUrl);
+      if (response.ok) {
+        const portalHtml = await response.text();
+        this._portalDocument = { portalUrl: localUrl, portalHtml };
+        return { portalUrl: localUrl };
+      }
     } catch (_error) {
-      return { portalUrl: REMOTE_PORTAL_URL };
+      // Fall through to the hosted edition when the local package is absent.
     }
+    this._portalDocument = { portalUrl: REMOTE_PORTAL_URL, portalHtml: "" };
+    return { portalUrl: REMOTE_PORTAL_URL };
+  }
+
+  async render(force, options) {
+    await super.render(force, options);
+    const root = this.element?.[0] ?? this.element;
+    const frame = root?.querySelector?.(".dh2-portal-frame");
+    if (!frame) return this;
+
+    const portalUrl = frame.dataset.portalUrl || REMOTE_PORTAL_URL;
+    const html = this._portalDocument?.portalHtml || "";
+    if (!html || portalUrl === REMOTE_PORTAL_URL) {
+      frame.src = portalUrl;
+      return this;
+    }
+
+    const baseUrl = new URL("./", portalUrl).href;
+    const escapedBase = baseUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    const documentHtml = /<head(?:\s[^>]*)?>/i.test(html)
+      ? html.replace(/<head(\s[^>]*)?>/i, (tag) => `${tag}<base href="${escapedBase}">`)
+      : `<base href="${escapedBase}">${html}`;
+    frame.srcdoc = documentHtml;
+    return this;
   }
 
   async close(options) {
