@@ -2,7 +2,7 @@
   "id": "dh2-portal",
   "title": "Dark Heresy 2E Portal Bridge",
   "description": "Opens the complete Dark Heresy 2E Portal inside Foundry VTT and creates native Acolyte Actors from its final review screen.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "authors": [
     {
       "name": "Pax Historia"
