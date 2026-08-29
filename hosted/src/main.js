@@ -61,8 +61,9 @@ const root = document.querySelector("#app");
 const portalEmblem = `<img class="sigil" src="./public/assets/brand/pax-historia-emblem.png?v=0.1.0" alt="" aria-hidden="true" />`;
 const hostedEdition = location.hostname.endsWith("github.io")
   || document.querySelector('meta[name="dh2-edition"]')?.content === "hosted";
-const foundryEmbeddedMode = new URLSearchParams(location.search).get("foundry") === "1"
-  && window.parent !== window;
+const foundryEmbeddedMode = window.parent !== window
+  && (new URLSearchParams(location.search).get("foundry") === "1"
+    || document.querySelector('meta[name="dh2-embedded"]')?.content === "foundry");
 document.documentElement.dataset.edition = hostedEdition ? "hosted" : "local";
 document.documentElement.dataset.foundryEmbedded = String(foundryEmbeddedMode);
 const libraryStorageKey = "dh2-character-library";

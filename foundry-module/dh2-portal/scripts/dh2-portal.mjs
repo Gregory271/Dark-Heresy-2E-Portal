@@ -56,9 +56,10 @@ class DarkHeresyPortalApplication extends Application {
     const absolutePortalUrl = new URL(portalUrl, window.location.href).href;
     const baseUrl = new URL("./", absolutePortalUrl).href;
     const escapedBase = baseUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    const embeddedMeta = '<meta name="dh2-embedded" content="foundry">';
     const documentHtml = /<head(?:\s[^>]*)?>/i.test(html)
-      ? html.replace(/<head(\s[^>]*)?>/i, (tag) => `${tag}<base href="${escapedBase}">`)
-      : `<base href="${escapedBase}">${html}`;
+      ? html.replace(/<head(\s[^>]*)?>/i, (tag) => `${tag}${embeddedMeta}<base href="${escapedBase}">`)
+      : `${embeddedMeta}<base href="${escapedBase}">${html}`;
     frame.srcdoc = documentHtml;
     return this;
   }
@@ -159,7 +160,7 @@ async function handlePortalMessage(event) {
 
   if (game.user.isGM) {
     try {
-      const actor = await importActorData(event.data.payload, { ownerUserId: game.user.id, openSheet: false });
+      const actor = await importActorData(event.data.payload, { ownerUserId: game.user.id, openSheet: true });
       reply({ ok: true, actorId: actor.id, name: actor.name });
     } catch (error) {
       reply({ ok: false, error: error instanceof Error ? error.message : "Foundry could not create this Acolyte." });
