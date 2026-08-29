@@ -74,12 +74,17 @@ const currentActionRecords = new Map();
 let actionRollSession = null;
 let actionIndexState = {
   query: localStorage.getItem("dh2-action-query") || "",
-  group: localStorage.getItem("dh2-action-group") || "Attacks",
+  group: localStorage.getItem("dh2-action-group") || "All",
   fateOnly: localStorage.getItem("dh2-action-fate-only") === "true",
   showUnavailable: localStorage.getItem("dh2-action-show-unavailable") === "true",
 };
 const reviewTabStorageKey = "dh2-review-tab";
 let reviewTabState = localStorage.getItem(reviewTabStorageKey) || "actions";
+let armouryBrowserState = {
+  query: "",
+  category: "All",
+  availability: "available",
+};
 
 function characterId() {
   return globalThis.crypto?.randomUUID?.() || `acolyte-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -3222,22 +3227,27 @@ function derivedCharacterActions(inventoryItems = character.equipment.inventory.
 }
 
 function serialisableCharacterActions(actions = derivedCharacterActions()) {
-  return actions.map((record) => ({
-    id: record.id,
-    name: record.name,
-    group: record.group,
-    actionType: record.type,
-    subtypes: record.subtypes || [],
-    summary: record.summary,
-    source: record.source,
-    context: record.context,
-    available: Boolean(record.available),
-    usesFate: Boolean(record.usesFate),
-    spendsFate: Boolean(record.spendsFate),
-    burnsFate: Boolean(record.burnsFate),
-    unavailableReason: record.unavailableReason || record.reason || "",
-    test: record.test ? { ...record.test } : null,
-  }));
+  return actions.map((record) => {
+    const section = actionSectionPresentation(record);
+    return {
+      id: record.id,
+      name: record.name,
+      group: record.group,
+      section: section.key,
+      sectionLabel: section.title,
+      actionType: record.type,
+      subtypes: record.subtypes || [],
+      summary: record.summary,
+      source: record.source,
+      context: record.context,
+      available: Boolean(record.available),
+      usesFate: Boolean(record.usesFate),
+      spendsFate: Boolean(record.spendsFate),
+      burnsFate: Boolean(record.burnsFate),
+      unavailableReason: record.unavailableReason || record.reason || "",
+      test: record.test ? { ...record.test } : null,
+    };
+  });
 }
 
 function resolvedActionTest(test, situationalModifier = 0, fateModifier = 0) {
@@ -3434,9 +3444,27 @@ function renderEquipment() {
   const slots = Math.max(0, characteristicBonus("influence"));
   const grantedEquipment = resolvedGrantedEquipment();
   const grantedByItemId = new Map(grantedEquipment.entries.filter((entry) => entry.itemId).map((entry) => [entry.itemId, entry]));
-  const selected = armoury.find((item) => item.id === character.equipment.selected) || armoury[0];
-  const selectedGrant = grantedByItemId.get(selected.id);
   const categories = ["All", ...new Set(armoury.map((item) => item.category))];
+  if (!categories.includes(armouryBrowserState.category)) armouryBrowserState.category = "All";
+  const availableNowIds = new Set([
+    ...character.equipment.inventory,
+    ...grantedByItemId.keys(),
+    ...armoury.filter(isStartingAcquisitionLegal).map((item) => item.id),
+  ]);
+  const storedSelection = armoury.find((item) => item.id === character.equipment.selected);
+  const selectionMatchesAvailability = storedSelection && (
+    armouryBrowserState.availability === "all"
+    || (armouryBrowserState.availability === "available" && availableNowIds.has(storedSelection.id))
+    || (armouryBrowserState.availability === "unavailable" && !availableNowIds.has(storedSelection.id))
+  );
+  const selected = selectionMatchesAvailability
+    ? storedSelection
+    : armoury.find((item) => armouryBrowserState.availability === "all"
+      || (armouryBrowserState.availability === "available" && availableNowIds.has(item.id))
+      || (armouryBrowserState.availability === "unavailable" && !availableNowIds.has(item.id)))
+      || storedSelection
+      || armoury[0];
+  const selectedGrant = grantedByItemId.get(selected.id);
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
   const unlinkedGrantedItems = grantedEquipment.entries.filter((entry) => !entry.item);
   const ownedWeapons = inventoryItems.filter((item) => item.category === "Weapons");
@@ -3457,16 +3485,43 @@ function renderEquipment() {
         ? "No starting acquisition slots remain."
         : "Spend one starting acquisition slot and add this item to inventory.";
   const rows = itemProfileRows(selected);
+  const availabilityFilters = [
+    ["available", "Available Now", availableNowIds.size, "Show choice grants, owned gear, and items obtainable during character creation."],
+    ["unavailable", "Unavailable", armoury.length - availableNowIds.size, "Show items that require an acquisition test or later access."],
+    ["all", "All Items", armoury.length, "Show every equipment entry in the Armoury."],
+  ];
+  const itemMatchesArmouryFilters = (item) => {
+    const searchText = normaliseItemName(`${item.name} ${item.category} ${item.description}`);
+    const matchesQuery = searchText.includes(normaliseItemName(armouryBrowserState.query));
+    const matchesCategory = armouryBrowserState.category === "All" || item.category === armouryBrowserState.category;
+    const availableNow = availableNowIds.has(item.id);
+    const matchesAvailability = armouryBrowserState.availability === "all"
+      || (armouryBrowserState.availability === "available" && availableNow)
+      || (armouryBrowserState.availability === "unavailable" && !availableNow);
+    return matchesQuery && matchesCategory && matchesAvailability;
+  };
   return `
     <div class="management-shell armoury-layout">
       <section class="armoury-browser">
         <div class="armoury-toolbar">
-          <label><span>Search Armoury</span><input id="armoury-search" type="search" placeholder="Weapon, armour, tool..." autocomplete="off" /></label>
-          <div class="armoury-categories" aria-label="Filter equipment by category">${categories.map((category) => `<button type="button" data-equipment-category="${category}" class="${category === "All" ? "active" : ""}" aria-pressed="${category === "All"}">${category}</button>`).join("")}</div>
+          <label><span>Search Armoury</span><input id="armoury-search" type="search" value="${escapeHtmlAttribute(armouryBrowserState.query)}" placeholder="Weapon, armour, tool..." autocomplete="off" /></label>
+          <div class="armoury-availability-filter">
+            <span>Show equipment</span>
+            <select id="armoury-availability-select" aria-label="Filter equipment by current availability">
+              ${availabilityFilters.map(([id, label, count]) => `<option value="${id}" ${armouryBrowserState.availability === id ? "selected" : ""}>${label} (${count})</option>`).join("")}
+            </select>
+            <div role="group" aria-label="Filter equipment by current availability">
+              ${availabilityFilters.map(([id, label, count, title]) => `<button type="button" data-equipment-availability="${id}" class="${armouryBrowserState.availability === id ? "active" : ""}" aria-pressed="${armouryBrowserState.availability === id}" title="${escapeHtmlAttribute(title)}">${label} <small>${count}</small></button>`).join("")}
+            </div>
+            <small>Choice grants, owned gear, and items obtainable during creation.</small>
+          </div>
+          <div class="armoury-categories" aria-label="Filter equipment by category">${categories.map((category) => `<button type="button" data-equipment-category="${category}" class="${armouryBrowserState.category === category ? "active" : ""}" aria-pressed="${armouryBrowserState.category === category}">${category}</button>`).join("")}</div>
         </div>
         <div class="armoury-list" id="armoury-list">
-          ${armoury.map((item) => `
-              <button class="armoury-item ${selected.id === item.id ? "selected" : ""}" type="button" data-equipment-item="${item.id}" data-equipment-search="${escapeHtmlAttribute(normaliseItemName(`${item.name} ${item.category} ${item.description}`))}" data-equipment-type="${item.category}" aria-pressed="${selected.id === item.id}">
+          ${armoury.map((item) => {
+            const availableNow = availableNowIds.has(item.id);
+            return `
+              <button class="armoury-item ${selected.id === item.id ? "selected" : ""}" type="button" data-equipment-item="${item.id}" data-equipment-search="${escapeHtmlAttribute(normaliseItemName(`${item.name} ${item.category} ${item.description}`))}" data-equipment-type="${item.category}" data-equipment-available="${availableNow}" aria-pressed="${selected.id === item.id}" ${itemMatchesArmouryFilters(item) ? "" : "hidden"}>
               <strong class="item-name">${item.name}</strong>
               <span class="item-category">${item.category}</span>
               <span>${effectiveAvailability(item) || "Availability not recorded"}${effectiveAvailability(item) !== item.availability ? ` (base ${item.availability})` : ""} · ${displayWeight(item)}</span>
@@ -3475,7 +3530,9 @@ function renderEquipment() {
                 : isStartingAcquisitionLegal(item)
                   ? `<em>Eligible starting acquisition</em>`
                   : `<em class="restricted">Requires acquisition test</em>`}
-            </button>`).join("")}
+            </button>`;
+          }).join("")}
+          <p class="armoury-empty" ${armoury.some(itemMatchesArmouryFilters) ? "hidden" : ""}>No equipment matches these filters.</p>
         </div>
       </section>
       <section class="item-inspector">
@@ -5308,6 +5365,42 @@ function actionGroupGlyph(group) {
   return `<svg ${common}><circle cx="8" cy="8" r="5.5"/><circle class="group-core" cx="8" cy="8" r="1.3"/></svg>`;
 }
 
+// The action index is deliberately organised around the way a player looks
+// for an option at the table: first the universal actions, then options added
+// by the character's loadout and choices. The underlying records still retain
+// their rules group for filtering and export.
+const actionSectionDefinitions = [
+  { key: "basic-attacks", title: "Basic Attacks", glyph: "Attacks", source: "Core combat actions", order: 10 },
+  { key: "basic-movement", title: "Basic Movement", glyph: "Movement", source: "Core movement actions", order: 20 },
+  { key: "basic-reactions", title: "Reactions", glyph: "Reactions", source: "Core reaction actions", order: 30 },
+  { key: "basic-tactics", title: "Basic Tactics", glyph: "Tactical", source: "Core tactical actions", order: 40 },
+  { key: "basic-utility", title: "Basic Utility", glyph: "Utility", source: "Core utility actions", order: 50 },
+  { key: "weapon-actions", title: "Weapon Actions", glyph: "Attacks", source: "From current weapon loadout", order: 60 },
+  { key: "skill-tests", title: "Skill Tests", glyph: "Skills", source: "From trained skills and characteristics", order: 70 },
+  { key: "psychic-powers", title: "Psychic Powers", glyph: "Psychic", source: "Known powers and Focus Power actions", order: 80 },
+  { key: "features-fate", title: "Talents, Traits & Fate", glyph: "Abilities", source: "From this Acolyte's choices and Fate points", order: 90 },
+  { key: "owned-equipment", title: "Owned Equipment", glyph: "Utility", source: "Actions provided by carried equipment", order: 100 },
+  { key: "other-actions", title: "Other Actions", glyph: "Abilities", source: "Additional character options", order: 110 },
+];
+
+function actionSectionPresentation(action = {}) {
+  const id = String(action.id || "").toLowerCase();
+  if (id.startsWith("weapon-") && !id.startsWith("weapon-unarmed-")) return actionSectionDefinitions[5];
+  if (id.startsWith("psychic-")) return actionSectionDefinitions[7];
+  if (id.startsWith("skill-") || id.startsWith("characteristic-test-")) return actionSectionDefinitions[6];
+  if (id.startsWith("gear-")) return actionSectionDefinitions[9];
+  if (id.startsWith("fate-") || id.startsWith("talent-") || id.startsWith("trait-") || id.startsWith("ability-")) return actionSectionDefinitions[8];
+  if (action.group === "Attacks") return actionSectionDefinitions[0];
+  if (action.group === "Movement") return actionSectionDefinitions[1];
+  if (action.group === "Reactions") return actionSectionDefinitions[2];
+  if (action.group === "Tactical") return actionSectionDefinitions[3];
+  if (action.group === "Utility") return actionSectionDefinitions[4];
+  if (action.group === "Skills") return actionSectionDefinitions[6];
+  if (action.group === "Psychic") return actionSectionDefinitions[7];
+  if (action.group === "Abilities") return actionSectionDefinitions[8];
+  return actionSectionDefinitions[10];
+}
+
 function renderActionIndex(actions) {
   if (!actionGroups.includes(actionIndexState.group)) actionIndexState.group = "All";
   const query = actionIndexState.query.trim().toLowerCase();
@@ -5323,6 +5416,38 @@ function renderActionIndex(actions) {
   const carriedWeaponActions = actions.filter((action) => /carried but not readied/i.test(action.unavailableReason || "")).length;
   currentActionRecords.clear();
   actions.forEach((action) => currentActionRecords.set(action.id, action));
+  const renderActionCard = (action) => {
+    const search = [action.name, action.group, action.type, action.summary, action.context, action.usesFate ? "Fate" : "", ...(action.subtypes || [])].join(" ").toLowerCase();
+    const initiallyHidden = !initiallyVisible(action);
+    const preview = action.test ? resolvedActionTest(action.test) : null;
+    const typePresentation = actionTypePresentation(action.type);
+    const groupKey = actionGroupKey(action.group);
+    return `<article class="action-card action-group-${groupKey} action-type-${typePresentation.key} ${action.usesFate ? "uses-fate" : ""} ${action.available ? "available" : "unavailable"}" data-action-card data-action-id="${escapeHtmlAttribute(action.id)}" data-action-group-value="${escapeHtmlAttribute(action.group)}" data-action-search="${escapeHtmlAttribute(search)}" data-action-available="${action.available}" data-action-uses-fate="${Boolean(action.usesFate)}" ${initiallyHidden ? "hidden" : ""}>
+        <header>
+          <div class="action-identity">
+            <span class="action-group-tag">${actionGroupGlyph(action.group)}<span>${escapeHtmlAttribute(action.group)}</span>${action.usesFate ? `<em class="action-fate-tag">${actionGroupGlyph("Fate")} Fate</em>` : ""}</span>
+            <h4>${escapeHtmlAttribute(action.name)}</h4>
+          </div>
+          <span class="action-type-badge" role="img" aria-label="Action type: ${escapeHtmlAttribute(action.type)}" title="${escapeHtmlAttribute(action.type)}">${actionTypeGlyph(typePresentation.key)}<span class="action-type-caption">${escapeHtmlAttribute(typePresentation.short)}</span></span>
+        </header>
+        <p>${escapeHtmlAttribute(action.summary)}</p>
+        <div class="action-context">${escapeHtmlAttribute(action.available ? action.context || "Available now" : action.unavailableReason || "Requirements are not met.")}</div>
+        ${preview ? `<div class="action-test-preview"><span>${escapeHtmlAttribute(action.test.characteristicName)}</span><strong>Target ${preview.target}</strong>${preview.actionModifier ? `<em>${preview.actionModifier > 0 ? "+" : ""}${preview.actionModifier} action modifier</em>` : ""}</div>` : ""}
+        <footer><small>${escapeHtmlAttribute(action.source || actionSource)}</small><button class="compact-button" type="button" data-open-action="${escapeHtmlAttribute(action.id)}" ${action.available ? "" : "disabled"}>${action.test ? "Roll Test" : "Details"}</button></footer>
+      </article>`;
+  };
+  const actionSectionsMarkup = actionSectionDefinitions.map((definition) => {
+    const sectionActions = actions.filter((action) => actionSectionPresentation(action).key === definition.key);
+    if (!sectionActions.length) return "";
+    const sectionInitiallyVisible = sectionActions.some(initiallyVisible);
+    return `<section class="action-group-section" data-action-section="${definition.key}" aria-labelledby="action-section-${definition.key}" ${sectionInitiallyVisible ? "" : "hidden"}>
+      <header class="action-section-heading">
+        <div><span class="action-section-icon">${actionGroupGlyph(definition.glyph)}</span><h4 id="action-section-${definition.key}">${definition.title}</h4></div>
+        <span>${definition.source}</span>
+      </header>
+      <div class="action-card-grid">${sectionActions.map(renderActionCard).join("")}</div>
+    </section>`;
+  }).join("");
   return `<section class="review-actions-index" aria-labelledby="current-actions-title">
     <div class="review-section-heading action-index-heading">
       <div>
@@ -5337,26 +5462,7 @@ function renderActionIndex(actions) {
       <label class="show-unavailable"><input id="show-unavailable-actions" type="checkbox" ${actionIndexState.showUnavailable ? "checked" : ""} /><span>Show unavailable options</span></label>
     </div>
     ${carriedWeaponActions ? `<p class="action-index-notice">Owned weapons do not add attack buttons until they are marked <strong>Readied</strong> in Inventory. Conditional attack modes remain available through “Show unavailable options.”</p>` : ""}
-    <div class="action-card-grid" id="action-card-grid">${actions.map((action) => {
-      const search = [action.name, action.group, action.type, action.summary, action.context, action.usesFate ? "Fate" : "", ...(action.subtypes || [])].join(" ").toLowerCase();
-      const initiallyHidden = !initiallyVisible(action);
-      const preview = action.test ? resolvedActionTest(action.test) : null;
-      const typePresentation = actionTypePresentation(action.type);
-      const groupKey = actionGroupKey(action.group);
-      return `<article class="action-card action-group-${groupKey} action-type-${typePresentation.key} ${action.usesFate ? "uses-fate" : ""} ${action.available ? "available" : "unavailable"}" data-action-card data-action-id="${escapeHtmlAttribute(action.id)}" data-action-group-value="${escapeHtmlAttribute(action.group)}" data-action-search="${escapeHtmlAttribute(search)}" data-action-available="${action.available}" data-action-uses-fate="${Boolean(action.usesFate)}" ${initiallyHidden ? "hidden" : ""}>
-        <header>
-          <div class="action-identity">
-            <span class="action-group-tag">${actionGroupGlyph(action.group)}<span>${escapeHtmlAttribute(action.group)}</span>${action.usesFate ? `<em class="action-fate-tag">${actionGroupGlyph("Fate")} Fate</em>` : ""}</span>
-            <h4>${escapeHtmlAttribute(action.name)}</h4>
-          </div>
-          <span class="action-type-badge" role="img" aria-label="Action type: ${escapeHtmlAttribute(action.type)}" title="${escapeHtmlAttribute(action.type)}">${actionTypeGlyph(typePresentation.key)}<span class="action-type-caption">${escapeHtmlAttribute(typePresentation.short)}</span></span>
-        </header>
-        <p>${escapeHtmlAttribute(action.summary)}</p>
-        <div class="action-context">${escapeHtmlAttribute(action.available ? action.context || "Available now" : action.unavailableReason || "Requirements are not met.")}</div>
-        ${preview ? `<div class="action-test-preview"><span>${escapeHtmlAttribute(action.test.characteristicName)}</span><strong>Target ${preview.target}</strong>${preview.actionModifier ? `<em>${preview.actionModifier > 0 ? "+" : ""}${preview.actionModifier} action modifier</em>` : ""}</div>` : ""}
-        <footer><small>${escapeHtmlAttribute(action.source || actionSource)}</small><button class="compact-button" type="button" data-open-action="${escapeHtmlAttribute(action.id)}" ${action.available ? "" : "disabled"}>${action.test ? "Roll Test" : "Details"}</button></footer>
-      </article>`;
-    }).join("")}</div>
+    <div class="action-section-list" id="action-card-grid">${actionSectionsMarkup}</div>
     <p class="action-empty" id="action-empty" ${initialVisibleCount ? "hidden" : ""}>No available actions match these filters. Change the filter or show unavailable options to inspect unmet requirements.</p>
   </section>`;
 }
@@ -5653,11 +5759,15 @@ function renderReview() {
         </div>
       </section>
       <aside class="validation-panel">
-        <h2>Validation</h2>
-        <button class="primary-button save-to-roster" type="button">Save to Archive <span>›</span></button>
+        <h2>Save Your Acolyte</h2>
+        <button class="primary-button save-to-roster" type="button">Save &amp; Return to Acolytes <span>›</span></button>
         ${warnings.length ? warnings.map((warning) => `<p class="warning">${warning}</p>`).join("") : `<p class="valid">Character creation record is complete.</p>`}
-        <button class="primary-button export-builder" type="button">Export Builder JSON <span>›</span></button>
-        <button class="compact-button export-foundry" type="button">Export Foundry Actor</button>
+        <section class="review-export-options" aria-labelledby="review-export-title">
+          <h3 id="review-export-title">Optional exports</h3>
+          <p>Download a copy for backup or import into Foundry VTT.</p>
+          <button class="compact-button export-builder" type="button">Export Builder JSON</button>
+          <button class="compact-button export-foundry" type="button">Export Foundry Actor</button>
+        </section>
         <p class="export-status" id="export-status" role="status" aria-live="polite"></p>
       </aside>
     </div>`;
@@ -5762,7 +5872,7 @@ function render() {
         </div>`}
         <div class="actions">
           ${isIdentity ? "" : `<button class="text-button" id="details">Rules</button>`}
-          <button class="primary-button" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : scene.id === "review" ? "Export Character JSON" : scene.action}<span>›</span></button>
+          <button class="primary-button" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : scene.id === "review" ? "Save Acolyte & Return" : scene.action}<span>›</span></button>
         </div>
       </footer>
     </main>
@@ -5859,6 +5969,9 @@ function filterReviewActionCards() {
     const searchMatches = !query || card.dataset.actionSearch.includes(query);
     card.hidden = !(groupMatches && fateMatches && availabilityMatches && searchMatches);
     if (!card.hidden) visible += 1;
+  });
+  document.querySelectorAll("[data-action-section]").forEach((section) => {
+    section.hidden = !section.querySelector("[data-action-card]:not([hidden])");
   });
   const empty = document.querySelector("#action-empty");
   if (empty) empty.hidden = visible > 0;
@@ -6379,7 +6492,10 @@ function wireEvents() {
       save();
       render();
     } else {
-      document.querySelector(".export-builder")?.click();
+      playMechanicalLock();
+      appView = "roster";
+      save({ markComplete: true });
+      render();
     }
   });
 
@@ -6700,13 +6816,45 @@ function wireEvents() {
     });
   });
   const filterArmoury = () => {
-    const query = normaliseItemName(document.querySelector("#armoury-search")?.value || "");
-    const category = document.querySelector("[data-equipment-category].active")?.dataset.equipmentCategory || "All";
+    armouryBrowserState.query = document.querySelector("#armoury-search")?.value || "";
+    armouryBrowserState.category = document.querySelector("[data-equipment-category].active")?.dataset.equipmentCategory || "All";
+    armouryBrowserState.availability = document.querySelector("[data-equipment-availability].active")?.dataset.equipmentAvailability || "available";
+    const query = normaliseItemName(armouryBrowserState.query);
+    let visibleCount = 0;
     document.querySelectorAll(".armoury-item").forEach((item) => {
-      item.hidden = !(item.dataset.equipmentSearch.includes(query) && (category === "All" || item.dataset.equipmentType === category));
+      const categoryMatches = armouryBrowserState.category === "All" || item.dataset.equipmentType === armouryBrowserState.category;
+      const availableNow = item.dataset.equipmentAvailable === "true";
+      const availabilityMatches = armouryBrowserState.availability === "all"
+        || (armouryBrowserState.availability === "available" && availableNow)
+        || (armouryBrowserState.availability === "unavailable" && !availableNow);
+      item.hidden = !(item.dataset.equipmentSearch.includes(query) && categoryMatches && availabilityMatches);
+      if (!item.hidden) visibleCount += 1;
     });
+    const emptyState = document.querySelector(".armoury-empty");
+    if (emptyState) emptyState.hidden = visibleCount > 0;
   };
   document.querySelector("#armoury-search")?.addEventListener("input", filterArmoury);
+  document.querySelector("#armoury-availability-select")?.addEventListener("change", (event) => {
+    playMechanicalLock();
+    document.querySelectorAll("[data-equipment-availability]").forEach((entry) => {
+      const active = entry.dataset.equipmentAvailability === event.currentTarget.value;
+      entry.classList.toggle("active", active);
+      entry.setAttribute("aria-pressed", String(active));
+    });
+    filterArmoury();
+  });
+  document.querySelectorAll("[data-equipment-availability]").forEach((button) => {
+    button.addEventListener("click", () => {
+      playMechanicalLock();
+      document.querySelectorAll("[data-equipment-availability]").forEach((entry) => {
+        entry.classList.toggle("active", entry === button);
+        entry.setAttribute("aria-pressed", String(entry === button));
+      });
+      const availabilitySelect = document.querySelector("#armoury-availability-select");
+      if (availabilitySelect) availabilitySelect.value = button.dataset.equipmentAvailability;
+      filterArmoury();
+    });
+  });
   document.querySelectorAll("[data-equipment-category]").forEach((button) => {
     button.addEventListener("click", () => {
       playMechanicalLock();

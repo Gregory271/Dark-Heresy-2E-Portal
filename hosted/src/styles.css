@@ -641,12 +641,22 @@ html[data-text-size="extra-large"] .scene-equipment .armoury-layout { margin-top
 .armoury-toolbar { min-width: 0; overflow: hidden; padding: 14px; border-bottom: 1px solid var(--line); background: rgba(4,7,7,.82); }
 .armoury-toolbar label { display: grid; gap: 4px; color: #b8b2a7; font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
 .armoury-toolbar input { width: 100%; min-height: 42px; border: 1px solid rgba(255,255,255,.22); padding: 9px 10px; background: #080c0b; color: #fff1d5; }
+.armoury-availability-filter { display: grid; gap: 6px; margin-top: 10px; }
+.armoury-availability-filter > span { color: #b8b2a7; font: 700 8px/1.2 "Barlow Condensed",sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+.armoury-availability-filter > select { display: none; width: 100%; min-width: 0; min-height: 42px; border: 1px solid #d3a55c; padding: 7px 34px 7px 9px; background: #10100d; color: #ffe7b9; font-weight: 600; }
+.armoury-availability-filter > div { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+.armoury-availability-filter button { min-width: 0; min-height: 36px; border: 1px solid rgba(255,255,255,.15); padding: 5px; background: rgba(255,255,255,.035); color: #bbb6ac; font: 600 8px/1.15 "Barlow Condensed",sans-serif; letter-spacing: .035em; text-transform: uppercase; cursor: pointer; }
+.armoury-availability-filter button small { display: block; margin-top: 2px; color: #8f8a81; font: 700 7px/1 "Barlow Condensed",sans-serif; }
+.armoury-availability-filter button.active { border-color: #d3a55c; background: rgba(151,100,37,.34); color: #ffe7b9; box-shadow: inset 0 -2px #d3a55c; }
+.armoury-availability-filter button.active small { color: #e4c68d; }
+.armoury-availability-filter > small { color: #9e998f; font-size: 7px; line-height: 1.35; }
 .armoury-categories { display: flex; width: 100%; min-width: 0; max-width: 100%; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .armoury-categories button { flex: 1 1 126px; min-height: 38px; border: 1px solid rgba(255,255,255,.15); padding: 6px 8px; background: rgba(255,255,255,.035); color: #b9b4aa; font: 600 8px/1.2 "Barlow Condensed",sans-serif; letter-spacing: .05em; text-align: center; text-transform: uppercase; cursor: pointer; }
 .armoury-categories button.active { border-color: #d3a55c; background: rgba(151,100,37,.34); color: #ffe7b9; }
 .armoury-list { min-height: 0; overflow-y: auto; scrollbar-color: #a77a3e #090d0c; scrollbar-width: thin; }
 .armoury-item { position: relative; display: grid; width: 100%; grid-template-columns: minmax(0,1.35fr) minmax(86px,.65fr); gap: 5px 12px; overflow: hidden; border: 0; border-bottom: 1px solid rgba(255,255,255,.09); padding: 11px 12px; background: rgba(4,7,7,.68); color: #aaa69d; text-align: left; cursor: pointer; }
-.armoury-item[hidden] { display: none; }
+.armoury-item[hidden],.armoury-empty[hidden] { display: none; }
+.armoury-empty { margin: 16px; border: 1px dashed rgba(255,255,255,.16); padding: 14px; color: #aaa49a; font-size: 10px; line-height: 1.45; text-align: center; }
 .armoury-item:hover,.armoury-item.selected { background: linear-gradient(90deg,rgba(151,100,37,.3),rgba(8,12,11,.86)); }
 .armoury-item.selected { box-shadow: inset 2px 0 #dfb36c; }
 .armoury-item .item-name { color: #fff0d5; font: 600 16px/1.12 "Barlow Condensed",sans-serif; letter-spacing: .015em; text-transform: uppercase; }
@@ -759,6 +769,12 @@ html[data-text-size="extra-large"] .armoury-categories {
 }
 html[data-text-size="large"] .armoury-categories button,
 html[data-text-size="extra-large"] .armoury-categories button { flex: 0 0 auto; white-space: nowrap; }
+html[data-text-size="large"] .armoury-availability-filter > select,
+html[data-text-size="extra-large"] .armoury-availability-filter > select { display: block; }
+html[data-text-size="large"] .armoury-availability-filter > div,
+html[data-text-size="extra-large"] .armoury-availability-filter > div { display: none; }
+html[data-text-size="large"] .armoury-availability-filter > small,
+html[data-text-size="extra-large"] .armoury-availability-filter > small { display: none; }
 html[data-text-size="large"] .equipment-state-grid,
 html[data-text-size="extra-large"] .equipment-state-grid,
 html[data-text-size="large"] .carried-equipment-list,
@@ -973,6 +989,10 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 .validation-panel { overflow-y: auto; }
 .validation-panel { border-left: 1px solid var(--line); }
 .validation-panel .save-to-roster { width: 100%; margin: 10px 0 8px; }
+.review-export-options { display: grid; gap: 5px; margin-top: 16px; border-top: 1px solid rgba(255,255,255,.11); padding-top: 12px; }
+.review-export-options h3 { margin: 0; color: #c9a96f; font: 600 13px "Barlow Condensed",sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.review-export-options p { margin: 0; color: #9e998f; font-size: 8px; line-height: 1.4; }
+.review-export-options button { margin-top: 3px; border-color: rgba(211,165,92,.38); color: #d7bd8d; }
 .review-dossier h2 { margin: 4px 0 10px; font: 500 24px "Barlow Condensed",sans-serif; text-transform: uppercase; }
 .review-characteristics { display: grid; grid-template-columns: repeat(10,1fr); border: 1px solid var(--line); }
 .review-characteristics div { padding: 10px 5px; text-align: center; border-right: 1px solid var(--line); }
@@ -1099,6 +1119,26 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 .show-unavailable input { width: 16px; height: 16px; accent-color: #b77b37; }
 .action-index-notice { margin: 0 0 8px; border-left: 2px solid #897046; padding: 6px 9px; background: rgba(111,80,35,.12); color: #b8ad9d; font-size: 8px; line-height: 1.35; }
 .action-index-notice strong { color: #e0c38c; }
+.action-section-list { display: grid; gap: 12px; }
+.action-group-section { min-width: 0; border: 1px solid rgba(207,169,98,.25); background: rgba(4,8,8,.32); }
+.action-group-section[hidden] { display: none; }
+.action-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  border-bottom: 1px solid rgba(235,196,119,.18);
+  padding: 7px 10px;
+  background: linear-gradient(90deg,rgba(148,99,38,.18),rgba(4,8,8,.16));
+}
+.action-section-heading > div { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.action-section-heading h4 { margin: 0; color: #f0cf8c; font: 700 15px/1 "CaslonAntique","Barlow Condensed",sans-serif; letter-spacing: .045em; }
+.action-section-heading > span { min-width: 0; color: #9e978a; font-size: 7px; letter-spacing: .055em; text-align: right; text-transform: uppercase; }
+.action-section-icon { display: inline-flex; flex: 0 0 auto; color: #d2a65e; }
+.action-section-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: square; stroke-linejoin: bevel; }
+.action-section-icon .group-core { fill: currentColor; stroke: none; }
+.action-group-section > .action-card-grid { padding: 8px; }
 .action-card-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
 .action-card {
   --action-accent: #c89a54;
@@ -3949,6 +3989,10 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
 }
 
 @media (max-width: 800px) {
+  .armoury-availability-filter > select { display: block; }
+  .armoury-availability-filter > div { display: none; }
+  .action-section-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .action-section-heading > span { text-align: left; }
   .scene-review .review-layout { display: block; overflow: visible; }
   .review-dossier { display: block; padding: 12px; overflow: visible; }
   .review-profile-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
