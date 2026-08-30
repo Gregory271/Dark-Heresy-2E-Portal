@@ -251,6 +251,7 @@ const portraitWrites = [];
 let directoryRefreshes = 0;
 ui.actors = { render() { directoryRefreshes += 1; } };
 const portraitActor = {
+  name: payload.name,
   isOwner: true, img: "old.webp", items: [],
   prototypeToken: { texture: { src: "token.webp" } },
   async update(change) {
@@ -269,6 +270,10 @@ assert.ok(!("img" in portraitWrites[1]), "Sheet autosave must preserve custom ar
 assert.equal(directoryRefreshes, 1, "Ordinary autosaves do not redraw the directory");
 hooks.on.get("updateActor")(portraitActor, { img: "worlds/my-game/remote.webp" });
 assert.equal(directoryRefreshes, 2, "Portrait updates received from another client refresh the directory too");
+await moduleRecord.api.updateActorFromPortal(portraitActor, { ...payload, name: "Renamed Acolyte" });
+assert.equal(portraitWrites.at(-1).name, "Renamed Acolyte");
+assert.equal(directoryRefreshes, 3, "Renaming an Actor refreshes the sidebar");
+assert.equal(portraitActor.prototypeToken.texture.src, "token.webp", "Renaming preserves token artwork");
 game.user = users.get("player");
 await assert.rejects(moduleRecord.api.saveActorPortrait({ ...portraitActor, isOwner: false }, "denied.webp"), /own/);
 game.user = users.get("gm");

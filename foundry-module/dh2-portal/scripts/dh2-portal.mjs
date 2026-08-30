@@ -337,15 +337,22 @@ Hooks.once("ready", () => {
 });
 
 Hooks.on("updateActor", (actor, changes) => {
-  if (game.system.id !== SYSTEM_ID || !("img" in changes)) return;
+  if (game.system.id !== SYSTEM_ID || !("img" in changes || "name" in changes)) return;
   // Portrait saves suppress full document rendering to preserve the live
   // sheet. Refresh the native Actors directory on every client explicitly.
   ui.actors?.render(false);
+  if ("name" in changes) ui.combat?.render(false);
   for (const sheet of portalActorSheets) {
     if (sheet.actor?.id !== actor.id) continue;
+    if ("name" in changes) {
+      const root = sheet.element?.[0] ?? sheet.element;
+      const title = root?.querySelector?.(".window-title");
+      if (title) title.textContent = actor.name;
+    }
     const frame = portalFrameFor(sheet);
     const origin = frame?.srcdoc ? window.location.origin : new URL(frame?.src || window.location.href, window.location.href).origin;
-    frame?.contentWindow?.postMessage({ source: "dh2-portal-module", type: "portrait-state", ...portraitState(actor) }, origin);
+    if ("img" in changes) frame?.contentWindow?.postMessage({ source: "dh2-portal-module", type: "portrait-state", ...portraitState(actor) }, origin);
+    if ("name" in changes) frame?.contentWindow?.postMessage({ source: "dh2-portal-module", type: "actor-name-state", name: actor.name }, origin);
   }
 });
 
@@ -858,7 +865,7 @@ async function updateActorFromPortal(actor, payload) {
   if (!actor || typeof actor.update !== "function") throw new Error("The Foundry Acolyte no longer exists.");
   const actorData = validateActorData(payload);
   await actor.update({
-    name: actorData.name,
+    ...(actorData.name !== actor.name ? { name: actorData.name } : {}),
     type: actorData.type,
     system: actorData.system,
     [`flags.${PORTAL_FLAG}`]: actorData.flags?.[PORTAL_FLAG] || {},

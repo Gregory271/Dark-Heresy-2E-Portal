@@ -3438,6 +3438,7 @@ function loadFoundryActor(actorData, actorId = "") {
   foundryActorId = actorId || actorData.id || actorData._id || foundryActorId;
   activeCharacterId = `foundry-${foundryActorId}`;
   character = prepareCharacter(source);
+  character.name = actorData.name || character.name;
   syncCreationConsequences();
   const now = new Date().toISOString();
   activeRecord = {
@@ -3467,6 +3468,12 @@ if (foundryEmbeddedMode) {
     })();
     if (![location.origin, parentOrigin, "null"].includes(event.origin)) return;
     if (event.data?.source !== "dh2-portal-module") return;
+    if (event.data.type === "actor-name-state" && foundryActorSheetMode) {
+      character.name = String(event.data.name || "Unnamed Acolyte");
+      const heading = document.querySelector("#review-character-name");
+      if (heading) heading.textContent = character.name;
+      return;
+    }
     if (event.data.type === "portrait-state" && foundryActorSheetMode) {
       foundryPortrait = { img: event.data.img, canEdit: Boolean(event.data.canEdit) };
       const image = document.querySelector("#actor-sheet-portrait");
@@ -6775,7 +6782,7 @@ function renderReview() {
     <div class="management-shell review-layout">
       <section class="review-dossier">
         <header class="review-profile-heading">
-          <div class="review-identity-with-portrait">${renderFoundryPortrait()}<div><h2>${escapeHtmlAttribute(character.name || "Unnamed Acolyte")}</h2><p class="review-profile-details">${homeWorldName} · ${backgroundName} · ${roleName}</p></div></div>
+          <div class="review-identity-with-portrait">${renderFoundryPortrait()}<div><div class="review-name-line"><h2 id="review-character-name">${escapeHtmlAttribute(character.name || "Unnamed Acolyte")}</h2>${!foundryActorSheetMode || foundryPortrait.canEdit ? `<button type="button" id="edit-character-name" class="sheet-edit-icon" aria-label="Edit character name" title="Edit character name">✎</button>` : ""}</div><p class="review-profile-details">${homeWorldName} · ${backgroundName} · ${roleName}</p></div></div>
           <span class="review-record-state">${warnings.length ? `${warnings.length} item${warnings.length === 1 ? "" : "s"} to review` : "Ready to play"}</span>
         </header>
         <div class="review-characteristics">${characteristics.map((entry) => {
@@ -6792,8 +6799,7 @@ function renderReview() {
           ].filter(Boolean);
           return `<div class="${breakdown.divination || breakdown.exceptional || breakdown.elite ? "modified" : ""}" title="${escapeHtmlAttribute(parts.join(" · "))}">
             <button type="button" class="review-characteristic-label rule-term lore-term lore-term-stat" data-rule-term="${characteristicRuleId}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${entry.name}. ${tooltip}`)}">${entry.abbreviation}</button>
-            <strong>${breakdown.total || (entry.id === "influence" ? "0" : "—")}</strong>${parts.length > 1 ? `<small>${escapeHtmlAttribute(parts.slice(1).join(" · "))}</small>` : ""}
-            ${entry.id === "influence" ? `<button type="button" id="change-influence" class="change-influence">Change Influence</button>` : ""}
+            <strong>${breakdown.total || (entry.id === "influence" ? "0" : "—")}${entry.id === "influence" ? `<button type="button" id="change-influence" class="change-influence sheet-edit-icon" aria-label="Change Influence" title="Change Influence">✎</button>` : ""}</strong>${parts.length > 1 ? `<small>${escapeHtmlAttribute(parts.slice(1).join(" · "))}</small>` : ""}
           </div>`;
         }).join("")}</div>
         ${Object.keys(divinationModifiers).length || Object.keys(exceptionalCharacteristicModifiers()).length || currentDivination()?.fateChange || character.exceptional?.creationCorruptionApplied ? `<div class="calculation-note"><strong>Creation effects applied:</strong> ${[
@@ -7021,6 +7027,16 @@ function render() {
       <p id="rule-dialog-summary"></p>
       <p class="source-note" id="rule-dialog-source"></p>
       <button class="primary-button" id="rule-dialog-open" type="button">Open in Compendium <span>›</span></button>
+    </dialog>
+
+    <dialog id="name-dialog" class="sheet-detail-dialog" aria-labelledby="name-dialog-title">
+      <form id="character-name-form">
+        <h2 id="name-dialog-title">Edit character name</h2>
+        <label for="character-name-value">Character name</label>
+        <input id="character-name-value" type="text" required maxlength="120" autocomplete="off" />
+        <button type="submit" class="primary-button">Save name</button>
+        <button type="button" id="cancel-character-name">Cancel</button>
+      </form>
     </dialog>
 
     <dialog id="influence-dialog" class="sheet-detail-dialog" aria-labelledby="influence-title">
@@ -8452,6 +8468,27 @@ function wireEvents() {
     downloadJson(filename, foundryActorPayload());
     const status = document.querySelector("#export-status");
     if (status) status.textContent = `Download started: ${filename}`;
+  });
+
+  const nameDialog = document.querySelector("#name-dialog");
+  const nameInput = document.querySelector("#character-name-value");
+  document.querySelector("#edit-character-name")?.addEventListener("click", () => {
+    nameInput.value = character.name || "";
+    nameInput.setCustomValidity("");
+    nameDialog.showModal(); nameInput.focus(); nameInput.select();
+  });
+  nameInput?.addEventListener("input", () => nameInput.setCustomValidity(""));
+  document.querySelector("#cancel-character-name")?.addEventListener("click", () => nameDialog.close());
+  document.querySelector("#character-name-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = nameInput.value.trim();
+    if (!name || name.length > 120) {
+      nameInput.setCustomValidity("Enter a name between 1 and 120 characters."); nameInput.reportValidity(); return;
+    }
+    character.name = name;
+    save();
+    nameDialog.close();
+    rerenderEquipmentStatePreservingScroll("#edit-character-name");
   });
 
   const influenceDialog = document.querySelector("#influence-dialog");

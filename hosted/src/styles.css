@@ -4541,17 +4541,40 @@ html[data-foundry-actor-sheet="true"] .completed-sheet-controls .actions {
   .foundry-sheet-backup > div { display: grid; grid-template-columns: 1fr; }
 }
 /* Keep the live Influence editor secondary to the characteristic value. */
-.review-characteristics .change-influence {
-  display: block;
-  max-width: 100%;
-  margin: .2rem auto 0;
-  padding: .15rem .3rem;
-  font-family: inherit;
-  font-size: .7rem;
-  line-height: 1.3;
-  white-space: normal;
-  overflow-wrap: normal;
-  text-transform: none;
+.sheet-edit-icon, .review-characteristics .change-influence {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; width: 26px; min-width: 26px; height: 26px; min-height: 26px;
+  margin: 0 0 0 5px; padding: 0;
+  border: 1px solid rgba(214,173,98,.45); border-radius: 2px;
+  background: #151711; color: #e7c688; font: 18px/1 sans-serif;
+  vertical-align: middle; cursor: pointer;
 }
+.sheet-edit-icon:hover { background: #302719; border-color: #e7c688; }
+.sheet-edit-icon:focus-visible { outline: 2px solid #ffe0a0; outline-offset: 3px; }
+.review-name-line { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.review-name-line h2 { min-width: 0; }
 #influence-form { display: grid; gap: .8rem; }
 #influence-form input { width: 100%; box-sizing: border-box; }
+#character-name-form { display: grid; gap: .8rem; }
+#character-name-form input { width: 100%; box-sizing: border-box; }
+#cancel-character-name, #cancel-influence { border: 1px solid #907344; background: #151711; color: #ead7b3; padding: 8px; }
+
+/* Live Foundry sheets prioritize playable tab height, not creation-stage framing. */
+html[data-foundry-actor-sheet="true"] .scene-review { padding: 12px 18px 12px; }
+html[data-foundry-actor-sheet="true"] .scene-review .management-content { max-width: none; margin: 6px 0; }
+html[data-foundry-actor-sheet="true"] .review-dossier { padding: 10px; }
+html[data-foundry-actor-sheet="true"] .review-profile-heading { align-items: center; gap: 10px; margin-bottom: 8px; }
+html[data-foundry-actor-sheet="true"] .review-identity-with-portrait { gap: 12px; }
+html[data-foundry-actor-sheet="true"] .sheet-portrait-panel { position: relative; flex-basis: 64px; gap: 0; }
+html[data-foundry-actor-sheet="true"] .sheet-portrait-panel img { width: 62px; height: 72px; }
+html[data-foundry-actor-sheet="true"] .sheet-portrait-panel [data-actor-portrait="edit-portrait"] {
+  position: absolute; bottom: 0; right: 0; width: 26px; height: 26px; padding: 0;
+  background: #151711; color: #e7c688; font-size: 0;
+}
+html[data-foundry-actor-sheet="true"] .sheet-portrait-panel [data-actor-portrait="edit-portrait"]::after { content: "✎"; font: 18px/1 sans-serif; }
+html[data-foundry-actor-sheet="true"] .review-characteristics > div { padding: 5px 3px; min-height: 0; }
+html[data-foundry-actor-sheet="true"] .action-index-heading p { display: none; }
+@media (max-width: 800px) {
+  html[data-foundry-actor-sheet="true"] .scene-review { padding: 10px; }
+  .sheet-edit-icon, .review-characteristics .change-influence { width: 32px; height: 32px; }
+}
