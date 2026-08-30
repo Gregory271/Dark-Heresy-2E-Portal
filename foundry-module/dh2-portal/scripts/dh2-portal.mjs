@@ -290,7 +290,10 @@ Hooks.once("ready", () => {
 });
 
 Hooks.on("updateActor", (actor, changes) => {
-  if (!("img" in changes)) return;
+  if (game.system.id !== SYSTEM_ID || !("img" in changes)) return;
+  // Portrait saves suppress full document rendering to preserve the live
+  // sheet. Refresh the native Actors directory on every client explicitly.
+  ui.actors?.render(false);
   for (const sheet of portalActorSheets) {
     if (sheet.actor?.id !== actor.id) continue;
     const frame = portalFrameFor(sheet);
