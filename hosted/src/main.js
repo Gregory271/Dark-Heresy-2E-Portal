@@ -232,11 +232,11 @@ function readCharacterLibrary() {
   }
 }
 
-let characterLibrary = readCharacterLibrary();
+let characterLibrary = foundryActorSheetMode ? [] : readCharacterLibrary();
 if (!characterLibrary.length) {
   let legacyCharacter = {};
   try {
-    legacyCharacter = JSON.parse(localStorage.getItem("dh2-character") || "{}");
+    legacyCharacter = foundryActorSheetMode ? {} : JSON.parse(localStorage.getItem("dh2-character") || "{}");
   } catch {
     legacyCharacter = {};
   }
@@ -257,7 +257,9 @@ let activeRecord = characterLibrary.find((entry) => entry.id === activeCharacter
 let step = Math.min(scenes.length - 1, Math.max(0, Number(activeRecord?.step || 0)));
 let character = prepareCharacter(activeRecord?.character);
 syncCreationConsequences();
-let appView = "roster";
+let appView = foundryActorSheetMode ? "builder" : "roster";
+let foundryActorLoaded = false;
+let foundryActorLoadError = "";
 let activeFloatingTooltipTarget = null;
 let floatingTooltipListenersReady = false;
 let foundryRequestTimeout = null;
@@ -1731,6 +1733,14 @@ function xpSpent() {
 }
 
 function save({ markComplete = false } = {}) {
+  if (foundryActorSheetMode) {
+    if (foundryActorSheetReady) {
+      syncCreationConsequences();
+      syncGrantedEquipment();
+      queueFoundryActorSync();
+    }
+    return;
+  }
   syncCreationConsequences();
   syncGrantedEquipment();
   const now = new Date().toISOString();
@@ -3623,8 +3633,14 @@ function queueFoundryActorSync() {
 }
 
 function loadFoundryActor(actorData, actorId = "") {
+  if (foundryActorLoaded) return true;
+  if (foundryActorId && actorId && actorId !== foundryActorId) return false;
   const source = actorData?.flags?.["dh2CharacterBuilder"]?.source;
-  if (!source || typeof source !== "object") return false;
+  if (!source || typeof source !== "object") {
+    foundryActorLoadError = "This Actor has no Portal character record. Choose its original system sheet in Foundry’s Sheet settings, or import its Portal character data first.";
+    render();
+    return false;
+  }
   foundryActorId = actorId || actorData.id || actorData._id || foundryActorId;
   activeCharacterId = `foundry-${foundryActorId}`;
   character = prepareCharacter(source);
@@ -3644,6 +3660,7 @@ function loadFoundryActor(actorData, actorId = "") {
   foundryActorSheetReady = false;
   foundryActorRevision = 0;
   foundryActorSaveRequests.clear();
+  foundryActorLoaded = true;
   render();
   foundryActorSheetReady = true;
   setFoundrySaveState("saved", "Synced");
@@ -6319,6 +6336,12 @@ function wireReinforcementEvents() {
 }
 
 function renderRoster() {
+  if (foundryActorSheetMode) {
+    appView = "builder";
+    step = scenes.findIndex((scene) => scene.id === "review");
+    render();
+    return;
+  }
   const orderedRecords = [...characterLibrary].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   const repositoryLabel = cloudStatus === "connected"
     ? "Shared campaign synchronized"
@@ -7112,6 +7135,15 @@ function renderStageBody(scene, selected) {
 }
 
 function render() {
+  if (foundryActorSheetMode && !foundryActorLoaded) {
+    root.innerHTML = `<main class="scene"><section role="status" aria-live="polite"><h1>${foundryActorLoadError ? "Character unavailable" : "Loading character…"}</h1><p>${escapeHtmlAttribute(foundryActorLoadError || "Opening this Actor’s sheet.")}</p><button type="button" id="retry-foundry-actor">Retry</button></section></main>`;
+    document.querySelector("#retry-foundry-actor")?.addEventListener("click", requestFoundryActor);
+    return;
+  }
+  if (foundryActorSheetMode && appView === "roster") {
+    appView = "builder";
+    step = scenes.findIndex((scene) => scene.id === "review");
+  }
   if (appView === "roster") {
     renderRoster();
     return;
@@ -8862,8 +8894,17 @@ root.addEventListener("click", (event) => {
   if (sheetClose) sheetClose.closest("dialog")?.close();
 });
 
-await initialiseLocalRepository();
-render();
-void initialiseCloudRepository().finally(() => {
-  if (appView === "roster") renderRoster();
-});
+function requestFoundryActor() {
+  window.parent.postMessage({ source: "dh2-portal-frame", type: "actor-sheet-ready", requestId: crypto.randomUUID() }, foundryParentOrigin());
+}
+
+if (foundryActorSheetMode) {
+  render();
+  requestFoundryActor();
+} else {
+  await initialiseLocalRepository();
+  render();
+  void initialiseCloudRepository().finally(() => {
+    if (appView === "roster") renderRoster();
+  });
+}

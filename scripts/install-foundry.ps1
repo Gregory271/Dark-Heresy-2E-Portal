@@ -11,7 +11,10 @@ $moduleDestination = Join-Path $FoundryDataPath 'modules\dh2-portal'
 if (-not $SkipBuild) {
   Write-Host 'Building the latest Foundry module...' -ForegroundColor Cyan
   Push-Location $repo
-  try { npm.cmd run build:foundry } finally { Pop-Location }
+  try {
+    npm.cmd run build:foundry
+    if ($LASTEXITCODE -ne 0) { throw 'Build failed. No Foundry files were copied.' }
+  } finally { Pop-Location }
 }
 
 if (-not (Test-Path (Join-Path $moduleSource 'module.json'))) {

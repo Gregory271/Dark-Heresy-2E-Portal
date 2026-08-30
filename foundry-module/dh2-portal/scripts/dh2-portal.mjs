@@ -491,6 +491,18 @@ async function handlePortalMessage(event) {
   if (event.data?.type === "load-actor" && event.data?.source === "dh2-portal-frame") return;
   if (event.data?.source !== "dh2-portal-frame" || !event.data.requestId) return;
 
+  if (event.data.type === "actor-sheet-ready") {
+    if (context.kind !== "actor-sheet" || !context.application.actor) return;
+    // Use this sheet's Actor, including a token's synthetic Actor, never a roster selection.
+    const actor = context.application.actor;
+    event.source.postMessage({
+      source: "dh2-portal-module", type: "load-actor",
+      actorId: actor.id, actor: actor.toObject?.() || actor,
+      portrait: portraitState(actor),
+    }, event.origin === "null" ? "*" : event.origin);
+    return;
+  }
+
   if (["sheet-roll", "sheet-chat"].includes(event.data.type)) {
     if (context.kind !== "actor-sheet") return;
     const reply = (result) => event.source?.postMessage({ source: "dh2-portal-module", type: "sheet-chat-result", requestId: event.data.requestId, ...result }, event.origin === "null" ? "*" : event.origin);
