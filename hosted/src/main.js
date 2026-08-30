@@ -96,6 +96,7 @@ const sheetDetailRecords = new Map();
 let sheetDetailCounter = 0;
 const currentActionRecords = new Map();
 let actionRollSession = null;
+let inventoryIndexState = { query: "", group: "All", equippedOnly: false };
 let actionIndexState = {
   query: localStorage.getItem("dh2-action-query") || "",
   group: localStorage.getItem("dh2-action-group") || "All",
@@ -541,6 +542,38 @@ function renderSheetEntry({ kind, name, summary, meta = "", source = "", rows = 
   </div>`;
 }
 
+function inventoryGroup(category) {
+  return category === "Weapons" ? "Weapons" : category === "Armour" ? "Armour" : category === "Weapon Mods" ? "Modifications" : "Gear";
+}
+
+function inventoryMatches(search, group, equipped, state = inventoryIndexState) {
+  return (state.group === "All" || state.group === group)
+    && (!state.equippedOnly || equipped)
+    && search.toLowerCase().includes(state.query.trim().toLowerCase());
+}
+
+function renderInventoryFilters() {
+  return `<div class="inventory-toolbar action-index-toolbar">
+    <label class="action-search"><span>Search inventory</span><input id="inventory-search" type="search" placeholder="Item name, type, or source…" value="${escapeHtmlAttribute(inventoryIndexState.query)}" /></label>
+    <div class="action-filter-list" role="group" aria-label="Filter inventory">${["All", "Weapons", "Armour", "Gear", "Modifications"].map(group => `<button type="button" class="compact-button ${inventoryIndexState.group === group ? "active" : ""}" data-inventory-group="${group}" aria-pressed="${inventoryIndexState.group === group}">${group}</button>`).join("")}</div>
+    <label class="show-unavailable"><input id="inventory-equipped-only" type="checkbox" ${inventoryIndexState.equippedOnly ? "checked" : ""} />Equipped only</label>
+    <span id="inventory-result-count" role="status" aria-live="polite"></span>
+  </div>`;
+}
+
+function applyInventoryFilters() {
+  const rows = [...document.querySelectorAll("[data-inventory-row]")];
+  let count = 0;
+  for (const row of rows) {
+    row.hidden = !inventoryMatches(row.dataset.inventorySearch || "", row.dataset.inventoryCategory, row.dataset.inventoryEquipped === "true");
+    if (!row.hidden) count++;
+  }
+  const status = document.querySelector("#inventory-result-count");
+  if (status) status.textContent = `${count} of ${rows.length} items`;
+  const empty = document.querySelector("#inventory-empty");
+  if (empty) empty.hidden = count > 0;
+}
+
 function renderInventorySheetEntry(item, provenance, ownedWeapons) {
   const safeSummary = itemRulesSummary(item) || "No additional effect is recorded.";
   const rows = [
@@ -550,7 +583,7 @@ function renderInventorySheetEntry(item, provenance, ownedWeapons) {
     ["Weight", displayWeight(item)],
     ...itemProfileRows(item),
   ];
-  return `<div class="sheet-entry inventory-sheet-entry">
+  return `<div class="sheet-entry inventory-sheet-entry" data-inventory-row data-inventory-category="${inventoryGroup(item.category)}" data-inventory-equipped="${equipmentItemIsActive(item.id)}" data-inventory-search="${escapeHtmlAttribute([item.name, item.category, provenance.label, safeSummary].join(" "))}">
     <span class="inventory-item-identity"><strong>${escapeHtmlAttribute(item.name)}</strong><small>${escapeHtmlAttribute(item.category)}</small><em>${escapeHtmlAttribute(provenance.label)}</em></span>
     <span class="sheet-entry-summary">${escapeHtmlAttribute(visibleSheetSummary(safeSummary))}</span>
     <span class="sheet-entry-meta">${reviewInventoryControl(item, ownedWeapons)}${sheetDetailButton({ kind: item.category, name: item.name, summary: safeSummary, source: item.source, rows })}</span>
@@ -2343,21 +2376,21 @@ function equipmentItemIsActive(itemId) {
 function reviewInventoryControl(item, ownedWeapons = []) {
   if (item.category === "Weapons") {
     const checked = character.equipment.readiedWeapons.includes(item.id) ? "checked" : "";
-    return `<label class="inventory-state-control"><input type="checkbox" data-ready-weapon="${item.id}" ${checked} /><span>Readied</span></label>`;
+    return `<label class="inventory-state-control"><input type="checkbox" data-ready-weapon="${item.id}" ${checked} aria-label="Equip ${escapeHtmlAttribute(item.name)}" /><span>${checked ? "Equipped" : "In inventory"}</span></label>`;
   }
   if (item.category === "Armour") {
     const checked = character.equipment.wornArmour.includes(item.id) ? "checked" : "";
-    return `<label class="inventory-state-control"><input type="checkbox" data-wear-armour="${item.id}" ${checked} /><span>Worn</span></label>`;
+    return `<label class="inventory-state-control"><input type="checkbox" data-wear-armour="${item.id}" ${checked} aria-label="Equip ${escapeHtmlAttribute(item.name)}" /><span>${checked ? "Equipped" : "In inventory"}</span></label>`;
   }
   if (item.category === "Weapon Mods") {
     const assignedWeaponId = character.equipment.weaponModAssignments[item.id] || "";
-    return `<label class="inventory-modification-control"><span>Installed on</span><select data-modification-target="${item.id}" aria-label="Weapon for ${escapeHtmlAttribute(item.name)}"><option value="">Not installed</option>${ownedWeapons.map((weapon) => {
+    return `<label class="inventory-modification-control"><span>Equip to weapon</span><select data-modification-target="${item.id}" aria-label="Weapon for ${escapeHtmlAttribute(item.name)}"><option value="">In inventory</option>${ownedWeapons.map((weapon) => {
       const compatibility = modificationCompatibility(item, weapon);
       return `<option value="${weapon.id}" ${assignedWeaponId === weapon.id ? "selected" : ""}>${escapeHtmlAttribute(weapon.name)}${compatibility.compatible ? "" : " · check eligibility"}</option>`;
     }).join("")}</select></label>`;
   }
   const checked = character.equipment.activeGear.includes(item.id) ? "checked" : "";
-  return `<label class="inventory-state-control"><input type="checkbox" data-active-gear="${item.id}" ${checked} /><span>Worn / in use</span></label>`;
+  return `<label class="inventory-state-control"><input type="checkbox" data-active-gear="${item.id}" ${checked} aria-label="Equip ${escapeHtmlAttribute(item.name)}" /><span>${checked ? "Equipped" : "In inventory"}</span></label>`;
 }
 
 function modificationCompatibility(modification, weapon) {
@@ -3659,13 +3692,13 @@ function actionAvailability(record, context) {
   let reason = "";
   if (record.requirement === "heavyWeapon" && !context.heavyWeapons.length) {
     available = false;
-    reason = "No readied Heavy weapon.";
+    reason = "No equipped Heavy weapon.";
   } else if (record.requirement === "meleeWeapon" && !context.meleeWeapons.length) {
     available = false;
-    reason = "No melee weapon is currently readied.";
+    reason = "No melee weapon is equipped.";
   } else if (record.requirement === "rangedWeapon" && !context.rangedWeapons.length) {
     available = false;
-    reason = "No ranged weapon is currently readied.";
+    reason = "No ranged weapon is equipped.";
   } else if (record.requirement === "psyker" && !hasPsykerAccess()) {
     available = false;
     reason = "Requires the Psyker elite advance.";
@@ -3727,7 +3760,7 @@ function weaponAttackRecord(weapon, mode, options = {}) {
     .map(([modId]) => equipmentItem(modId)?.name)
     .filter(Boolean);
   let reason = "";
-  if (!readied) reason = `${weapon.name} is carried but not readied.`;
+  if (!readied) reason = `${weapon.name} is in inventory but not equipped.`;
   else if (!baseTarget) reason = `${melee ? "Weapon Skill" : "Ballistic Skill"} has not been determined.`;
   const profile = weapon.profile || {};
   return {
@@ -3945,7 +3978,7 @@ function capabilityActionRecords(inventoryItems) {
         subtypes: ["Miscellaneous"],
         summary,
         source: item.source || "Owned equipment",
-        context: character.equipment.activeGear.includes(item.id) ? "Currently worn or in use" : "Carried in inventory",
+        context: character.equipment.activeGear.includes(item.id) ? "Equipped" : "In inventory",
         available: true,
         unavailableReason: "",
         test: null,
@@ -4413,16 +4446,7 @@ function renderEquipment() {
             <div class="carried-equipment-list unified-equipment-list">${inventoryItems.map((item) => {
               const source = equipmentProvenance(item.id, grantedEquipment);
               const assignedWeaponId = item.category === "Weapon Mods" ? character.equipment.weaponModAssignments[item.id] || "" : "";
-              const stateControl = item.category === "Weapons"
-                ? `<label class="inventory-state-control"><input type="checkbox" data-ready-weapon="${item.id}" ${character.equipment.readiedWeapons.includes(item.id) ? "checked" : ""} /><span>Readied</span></label>`
-                : item.category === "Armour"
-                  ? `<label class="inventory-state-control"><input type="checkbox" data-wear-armour="${item.id}" ${character.equipment.wornArmour.includes(item.id) ? "checked" : ""} /><span>Worn</span></label>`
-                  : item.category === "Weapon Mods"
-                    ? `<label class="inventory-mod-control"><span>Installed on</span><select data-modification-target="${item.id}"><option value="">Not installed</option>${ownedWeapons.map((weapon) => {
-                        const compatibility = modificationCompatibility(item, weapon);
-                        return `<option value="${weapon.id}" ${assignedWeaponId === weapon.id ? "selected" : ""}>${weapon.name}${compatibility.compatible ? "" : " · check eligibility"}</option>`;
-                      }).join("")}</select></label>`
-                    : `<label class="inventory-state-control"><input type="checkbox" data-active-gear="${item.id}" ${character.equipment.activeGear.includes(item.id) ? "checked" : ""} /><span>Worn / in use</span></label>`;
+              const stateControl = reviewInventoryControl(item, ownedWeapons);
               return `<div class="carried-equipment-entry ${selected.id === item.id ? "selected" : ""}">
                 <button type="button" data-equipment-item="${item.id}" title="View ${escapeHtmlAttribute(item.name)} details"><strong>${item.name}</strong><small class="item-origin">${source.label}</small></button>
                 <span>${item.category} · ${displayWeight(item)}</span>
@@ -6536,7 +6560,7 @@ function renderActionIndex(actions) {
   const initialVisibleCount = actions.filter(initiallyVisible).length;
   const availableCount = actions.filter((action) => action.available).length;
   const unavailableCount = actions.length - availableCount;
-  const carriedWeaponActions = actions.filter((action) => /carried but not readied/i.test(action.unavailableReason || "")).length;
+  const carriedWeaponActions = actions.filter((action) => /in inventory but not equipped/i.test(action.unavailableReason || "")).length;
   currentActionRecords.clear();
   actions.forEach((action) => currentActionRecords.set(action.id, action));
   const renderActionCard = (action) => {
@@ -6575,7 +6599,7 @@ function renderActionIndex(actions) {
     <div class="review-section-heading action-index-heading">
       <div>
         <h3 id="current-actions-title">Current Actions and Abilities</h3>
-        <p>Derived from this Acolyte's characteristics, training, readied weapons, inventory, psychic powers, and special rules.</p>
+        <p>Actions from your characteristics, training, equipped weapons, inventory, psychic powers, and special rules.</p>
       </div>
       <div class="action-index-counts" aria-label="Action availability"><strong>${availableCount}</strong><span>available</span>${unavailableCount ? `<em>${unavailableCount} conditional</em>` : ""}</div>
     </div>
@@ -6584,7 +6608,7 @@ function renderActionIndex(actions) {
       <div class="action-filter-list" role="group" aria-label="Filter actions">${actionGroups.map((group) => `<button class="compact-button ${actionIndexState.group === group ? "active" : ""}" type="button" data-action-group="${group}" aria-pressed="${actionIndexState.group === group}">${actionGroupGlyph(group)}<span>${group}</span></button>`).join("")}<button class="compact-button fate-action-filter ${actionIndexState.fateOnly ? "active" : ""}" type="button" data-action-fate-only aria-pressed="${actionIndexState.fateOnly}">${actionGroupGlyph("Fate")}<span>Fate</span></button></div>
       <label class="show-unavailable"><input id="show-unavailable-actions" type="checkbox" ${actionIndexState.showUnavailable ? "checked" : ""} /><span>Show unavailable options</span></label>
     </div>
-    ${carriedWeaponActions ? `<p class="action-index-notice">Owned weapons do not add attack buttons until they are marked <strong>Readied</strong> in Inventory. Conditional attack modes remain available through “Show unavailable options.”</p>` : ""}
+    ${carriedWeaponActions ? `<p class="action-index-notice">Mark weapons <strong>Equipped</strong> in Inventory to use their attacks.</p>` : ""}
     <div class="action-section-list" id="action-card-grid">${actionSectionsMarkup}</div>
     <p class="action-empty" id="action-empty" ${initialVisibleCount ? "hidden" : ""}>No available actions match these filters. Change the filter or show unavailable options to inspect unmet requirements.</p>
   </section>`;
@@ -6759,13 +6783,13 @@ function renderReview() {
   })).join("") || "<p>No elite advance recorded.</p>";
   const inventoryRows = [
     ...inventoryItems.map((item) => renderInventorySheetEntry(item, equipmentProvenance(item.id, grantedEquipment), ownedWeapons)),
-    ...unlinkedGrantedEquipment.map((entry) => renderSheetEntry({
+    ...unlinkedGrantedEquipment.map((entry) => `<div data-inventory-row data-inventory-category="Gear" data-inventory-equipped="false" data-inventory-search="${escapeHtmlAttribute(`${entry.label} ${entry.sourceName}`)}">${renderSheetEntry({
       kind: "Starting Equipment",
       name: entry.label,
       summary: "This starting item is recorded, but its Armoury profile has not yet been linked.",
       meta: entry.sourceType === "background-choice" ? `Chosen from ${entry.sourceName}` : `Granted by ${entry.sourceName}`,
       source: entry.sourceName,
-    })),
+    })}</div>`),
   ].join("") || "<p>No inventory recorded.</p>";
   const hasPsychicWorkspace = hasPsykerAccess() || psychicPowers.length > 0;
   const reviewTabs = [
@@ -6848,7 +6872,7 @@ function renderReview() {
               ${hasPsychicWorkspace ? `<div class="review-tab-panel" id="review-panel-psychic" role="tabpanel" aria-labelledby="review-tab-psychic" data-review-panel="psychic" ${reviewTabState === "psychic" ? "" : "hidden"}><section><div class="review-section-heading"><div><h3>Psychic Powers</h3><p>Psy Rating ${foundryPsyRating()} · powers and Warp-active abilities available to this Acolyte.</p></div></div><div class="dossier-list">${psychicRows}</div></section></div>` : ""}
               <div class="review-tab-panel" id="review-panel-inventory" role="tabpanel" aria-labelledby="review-tab-inventory" data-review-panel="inventory" ${reviewTabState === "inventory" ? "" : "hidden"}><section class="review-inventory-section">
                 <div class="review-section-heading"><div><h3>Inventory</h3><p>All owned weapons, armour, modifications, and carried gear. Change an item's current state here at any time.</p></div><div class="inventory-totals" aria-label="Inventory totals"><span>${inventoryItems.length + unlinkedGrantedEquipment.length} items</span><strong>${equipmentState.carryingStatsRecorded ? `${equipmentState.knownWeight.toFixed(1)} / ${equipmentState.carryingCapacity} kg` : `${equipmentState.knownWeight.toFixed(1)} kg`}</strong></div></div>
-                <div class="inventory-column-labels" aria-hidden="true"><span>Item</span><span>Rules summary</span><span>Current state</span></div><div class="dossier-list inventory-list">${inventoryRows}</div>
+                ${renderInventoryFilters()}<div class="dossier-list inventory-list">${inventoryRows}</div><p id="inventory-empty" hidden>No items match these filters.</p>
               </section></div>
               <div class="review-tab-panel" id="review-panel-features" role="tabpanel" aria-labelledby="review-tab-features" data-review-panel="features" ${reviewTabState === "features" ? "" : "hidden"}>
                 <div class="review-feature-grid"><section class="review-aptitudes-section"><h3>Aptitudes</h3>${aptitudeTags}</section><section class="review-talents-section"><h3>Talents</h3><div class="dossier-list">${talentRows}</div></section><section class="review-abilities-section"><h3>Traits and Special Abilities</h3><div class="dossier-list">${abilityRows}</div></section>${eliteAdvances.length ? `<section class="review-elites-section"><h3>Elite Advances</h3><div class="dossier-list">${eliteRows}</div></section>` : ""}</div>
@@ -7409,6 +7433,21 @@ function addDegreeToCurrentActionWithFate() {
 }
 
 function wireEvents() {
+  applyInventoryFilters();
+  document.querySelector("#inventory-search")?.addEventListener("input", (event) => {
+    inventoryIndexState.query = event.target.value; applyInventoryFilters();
+  });
+  document.querySelector("#inventory-equipped-only")?.addEventListener("change", (event) => {
+    inventoryIndexState.equippedOnly = event.target.checked; applyInventoryFilters();
+  });
+  document.querySelectorAll("[data-inventory-group]").forEach((button) => button.addEventListener("click", () => {
+    inventoryIndexState.group = button.dataset.inventoryGroup;
+    document.querySelectorAll("[data-inventory-group]").forEach((entry) => {
+      const active = entry.dataset.inventoryGroup === inventoryIndexState.group;
+      entry.classList.toggle("active", active); entry.setAttribute("aria-pressed", String(active));
+    });
+    applyInventoryFilters();
+  }));
   document.querySelectorAll("[data-send-sheet-rules]").forEach((button) => button.addEventListener("click", async () => {
     const prefix = button.dataset.sendSheetRules;
     const title = document.querySelector(`#${prefix}-title`)?.textContent || "Rules";
