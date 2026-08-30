@@ -7,6 +7,44 @@ const pendingPortalRequests = new Map();
 let portalApplication = null;
 const portalActorSheets = new Set();
 
+function portraitState(actor) {
+  return { img: actor.img || "icons/svg/mystery-man.svg", canEdit: Boolean(actor.isOwner || game.user.isGM) };
+}
+
+async function saveActorPortrait(actor, path) {
+  if (!actor || !(actor.isOwner || game.user.isGM)) throw new Error("You do not own this Actor.");
+  if (typeof path !== "string" || !path.trim()) throw new Error("Choose an image first.");
+  // Updating only img deliberately leaves prototype tokens and character data intact.
+  await actor.update({ img: path }, { render: false });
+  for (const sheet of portalActorSheets) {
+    if (sheet.actor?.id === actor.id) portalFrameFor(sheet)?.contentWindow?.postMessage({ source: "dh2-portal-module", type: "portrait-state", ...portraitState(actor) }, window.location.origin);
+  }
+  return actor;
+}
+
+function editActorPortrait(actor) {
+  if (!(actor?.isOwner || game.user.isGM)) return ui.notifications.warn("Only an Actor owner or GM can change its portrait.");
+  const Picker = foundry.applications?.apps?.FilePicker?.implementation || globalThis.FilePicker?.implementation || globalThis.FilePicker;
+  if (!Picker) throw new Error("Foundry's image picker is unavailable.");
+  return new Picker({ type: "image", current: actor.img, callback: async (path) => {
+    try {
+      await saveActorPortrait(actor, path);
+      if (!(actor.sheet instanceof PortalAcolyteSheet)) actor.sheet?.render(false);
+    } catch (error) { ui.notifications.error(error.message); }
+  } }).browse();
+}
+
+function viewActorPortrait(actor) {
+  const Popout = foundry.applications?.apps?.ImagePopout || globalThis.ImagePopout;
+  if (!Popout) return ui.notifications.warn("Foundry's image viewer is unavailable.");
+  // The image viewer API moved to ApplicationV2 in newer Foundry releases.
+  const options = { title: actor.name, uuid: actor.uuid, editable: false };
+  const viewer = foundry.applications?.apps?.ImagePopout
+    ? new Popout({ src: actor.img, uuid: actor.uuid, window: { title: actor.name } })
+    : new Popout(actor.img, options);
+  viewer.render(true);
+}
+
 function portalFrameRoot(application) {
   return application?.element?.[0] ?? application?.element;
 }
@@ -47,6 +85,7 @@ function attachPortalFrame(application, frame, documentState, options = {}) {
         type: "load-actor",
         actorId: application.actor.id,
         actor: application.actor.toObject?.() || application.actor,
+        portrait: portraitState(application.actor),
       }, "*");
     }
   };
@@ -201,6 +240,8 @@ class PortalReinforcementSheet extends PortalSheetBase {
     root?.querySelectorAll?.("[data-reinforcement-item]").forEach((button) => button.addEventListener("click", () => {
       this.actor.items?.get?.(button.dataset.reinforcementItem)?.sheet?.render(true);
     }));
+    root?.querySelector("[data-portrait-edit]")?.addEventListener("click", () => editActorPortrait(this.actor));
+    root?.querySelector("[data-portrait-view]")?.addEventListener("click", () => viewActorPortrait(this.actor));
   }
 }
 
@@ -222,6 +263,7 @@ Hooks.once("init", () => {
       validateReinforcementActorData,
       validateVehicleActorData,
       updateActorFromPortal,
+      saveActorPortrait,
     });
   }
   if (game.system.id === SYSTEM_ID && globalThis.Actors?.registerSheet) {
@@ -245,6 +287,33 @@ Hooks.once("ready", () => {
   }
   game.socket.on(SOCKET_NAME, handleSocketMessage);
   window.addEventListener("message", handlePortalMessage);
+});
+
+Hooks.on("updateActor", (actor, changes) => {
+  if (!("img" in changes)) return;
+  for (const sheet of portalActorSheets) {
+    if (sheet.actor?.id !== actor.id) continue;
+    const frame = portalFrameFor(sheet);
+    const origin = frame?.srcdoc ? window.location.origin : new URL(frame?.src || window.location.href, window.location.href).origin;
+    frame?.contentWindow?.postMessage({ source: "dh2-portal-module", type: "portrait-state", ...portraitState(actor) }, origin);
+  }
+});
+
+// Keep native NPC and vehicle sheets intact and give their existing portrait
+// an accessible view/change control. No token image is modified.
+Hooks.on("renderActorSheet", (sheet, html) => {
+  if (game.system.id !== SYSTEM_ID || !["npc", "vehicle"].includes(sheet.actor?.type) || sheet instanceof PortalReinforcementSheet) return;
+  const root = html?.[0] ?? html;
+  const portrait = root?.querySelector?.('img[data-edit="img"]');
+  if (!portrait || root.querySelector(".dh2-native-portrait-controls")) return;
+  const controls = document.createElement("div");
+  controls.className = "dh2-native-portrait-controls";
+  for (const [label, action] of [["View Portrait", () => viewActorPortrait(sheet.actor)], ...(sheet.actor.isOwner || game.user.isGM ? [["Change Portrait", () => editActorPortrait(sheet.actor)]] : [])]) {
+    const button = document.createElement("button");
+    button.type = "button"; button.textContent = label;
+    button.addEventListener("click", action); controls.append(button);
+  }
+  portrait.insertAdjacentElement("afterend", controls);
 });
 
 Hooks.on("renderActorDirectory", (_application, html) => {
@@ -347,6 +416,15 @@ async function handlePortalMessage(event) {
 
   if (event.data?.type === "load-actor" && event.data?.source === "dh2-portal-frame") return;
   if (event.data?.source !== "dh2-portal-frame" || !event.data.requestId) return;
+
+  if (["edit-portrait", "view-portrait"].includes(event.data.type)) {
+    if (context.kind !== "actor-sheet" || !context.application.actor) return;
+    try {
+      if (event.data.type === "edit-portrait") await editActorPortrait(context.application.actor);
+      else viewActorPortrait(context.application.actor);
+    } catch (error) { ui.notifications.error(error.message); }
+    return;
+  }
 
   if (event.data.type === "update-actor") {
     if (context.kind !== "actor-sheet" || !context.application.actor) return;

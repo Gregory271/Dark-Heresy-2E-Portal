@@ -4260,6 +4260,14 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
 .reinforcement-scene::before { content: ""; position: fixed; z-index: -2; inset: 0; background: linear-gradient(90deg, rgba(3,6,6,.96), rgba(3,6,6,.83) 50%, rgba(3,6,6,.62)), url("../public/assets/stages/review.webp?v=0.6.2") 74% center / cover no-repeat; filter: saturate(.52) contrast(1.08); }
 .reinforcement-scene::after { content: ""; position: fixed; z-index: -1; inset: 0; pointer-events: none; background: repeating-linear-gradient(90deg, transparent 0 11vw, rgba(255,255,255,.014) 11vw calc(11vw + 1px)); }
 .reinforcement-topbar { width: 100%; }
+.review-identity-with-portrait { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.review-identity-with-portrait > div:last-child { min-width: 0; overflow-wrap: anywhere; }
+.sheet-portrait-panel { flex: 0 0 92px; display: grid; gap: 4px; }
+.sheet-portrait-panel button { padding: 0; background: #0c1010; border: 1px solid #907344; color: #ead7b3; cursor: pointer; }
+.sheet-portrait-panel img { display: block; width: 90px; height: 108px; object-fit: contain; }
+.sheet-portrait-panel button:last-child { font: inherit; font-size: 12px; padding: 4px; line-height: 1.3; }
+.sheet-portrait-panel button:focus-visible { outline: 2px solid #f6d88c; outline-offset: 3px; }
+@media (max-width: 680px) { .sheet-portrait-panel { flex-basis: 70px; } .sheet-portrait-panel img { width: 68px; height: 82px; } }
 .reinforcement-content { width: min(1500px, 100%); margin: 5vh auto 3vh; }
 .reinforcement-heading { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 28px; }
 .reinforcement-heading h1 { margin: 0 0 10px; font-size: clamp(48px,7vw,88px); }

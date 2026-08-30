@@ -1,6 +1,9 @@
 <form class="dh2-reinforcement-sheet" autocomplete="off">
   <header class="dh2-rf-header">
-    <img class="dh2-rf-portrait" src="{{actor.img}}" data-edit="img" alt="{{actor.name}}" />
+    <div class="dh2-portrait-panel">
+      <button type="button" data-portrait-view aria-label="View portrait of {{actor.name}}"><img class="dh2-rf-portrait" src="{{actor.img}}" alt="{{actor.name}}" /></button>
+      {{#if editable}}<button type="button" data-portrait-edit>Change Portrait</button>{{/if}}
+    </div>
     <div class="dh2-rf-identity">
       <p>Inquisitorial Reinforcement</p>
       <input name="name" type="text" value="{{actor.name}}" aria-label="NPC name" />

@@ -247,4 +247,19 @@ assert.equal(vehicleLibraryResult.created.length, 1);
 assert.equal(vehicleLibraryResult.skipped.length, 1);
 assert.equal(createdRecords.length, 6);
 
-console.log("Foundry module QA passed: Acolytes, roster migration, reinforcement NPCs, native vehicles, folders, and duplicate protection.");
+const portraitWrites = [];
+const portraitActor = {
+  isOwner: true, img: "old.webp", items: [],
+  prototypeToken: { texture: { src: "token.webp" } },
+  async update(change) { portraitWrites.push(change); if (change.img) this.img = change.img; },
+};
+await moduleRecord.api.saveActorPortrait(portraitActor, "worlds/my-game/portraits/new portrait.webp");
+assert.deepEqual(portraitWrites[0], { img: "worlds/my-game/portraits/new portrait.webp" });
+assert.equal(portraitActor.prototypeToken.texture.src, "token.webp");
+await moduleRecord.api.updateActorFromPortal(portraitActor, payload);
+assert.equal(portraitActor.img, "worlds/my-game/portraits/new portrait.webp");
+assert.ok(!("img" in portraitWrites[1]), "Sheet autosave must preserve custom artwork");
+game.user = users.get("player");
+await assert.rejects(moduleRecord.api.saveActorPortrait({ ...portraitActor, isOwner: false }, "denied.webp"), /own/);
+game.user = users.get("gm");
+console.log("Foundry module QA passed: imports, duplicate protection, portrait permissions, token isolation, and autosave preservation.");

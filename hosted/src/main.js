@@ -68,6 +68,17 @@ const foundryEmbeddedMode = window.parent !== window
 const foundryActorSheetMode = foundryEmbeddedMode
   && (foundryQuery.get("actorSheet") === "1"
     || document.querySelector('meta[name="dh2-actor-sheet"]')?.content === "true");
+let foundryPortrait = { img: "", canEdit: false };
+
+function foundryPortraitUrl(path) {
+  try { return new URL(path || "icons/svg/mystery-man.svg", `${foundryParentOrigin()}/`).href; }
+  catch { return ""; }
+}
+
+function renderFoundryPortrait() {
+  if (!foundryActorSheetMode) return "";
+  return `<div class="sheet-portrait-panel"><button type="button" data-actor-portrait="view-portrait" aria-label="View full character portrait"><img id="actor-sheet-portrait" src="${escapeHtmlAttribute(foundryPortraitUrl(foundryPortrait.img))}" alt="Character portrait" /></button><button type="button" data-actor-portrait="edit-portrait" ${foundryPortrait.canEdit ? "" : "hidden"}>Change Portrait</button></div>`;
+}
 let foundryActorId = foundryQuery.get("actorId")
   || document.querySelector('meta[name="dh2-actor-id"]')?.content
   || "";
@@ -3414,7 +3425,16 @@ if (foundryEmbeddedMode) {
     })();
     if (![location.origin, parentOrigin, "null"].includes(event.origin)) return;
     if (event.data?.source !== "dh2-portal-module") return;
+    if (event.data.type === "portrait-state" && foundryActorSheetMode) {
+      foundryPortrait = { img: event.data.img, canEdit: Boolean(event.data.canEdit) };
+      const image = document.querySelector("#actor-sheet-portrait");
+      if (image) image.src = foundryPortraitUrl(foundryPortrait.img);
+      const edit = document.querySelector('[data-actor-portrait="edit-portrait"]');
+      if (edit) edit.hidden = !foundryPortrait.canEdit;
+      return;
+    }
     if (event.data?.type === "load-actor" && foundryActorSheetMode) {
+      foundryPortrait = event.data.portrait || { img: event.data.actor?.img, canEdit: false };
       loadFoundryActor(event.data.actor, event.data.actorId);
       return;
     }
@@ -6713,7 +6733,7 @@ function renderReview() {
     <div class="management-shell review-layout">
       <section class="review-dossier">
         <header class="review-profile-heading">
-          <div><h2>${character.name || "Unnamed Acolyte"}</h2><p class="review-profile-details">${homeWorldName} · ${backgroundName} · ${roleName}</p></div>
+          <div class="review-identity-with-portrait">${renderFoundryPortrait()}<div><h2>${escapeHtmlAttribute(character.name || "Unnamed Acolyte")}</h2><p class="review-profile-details">${homeWorldName} · ${backgroundName} · ${roleName}</p></div></div>
           <span class="review-record-state">${warnings.length ? `${warnings.length} item${warnings.length === 1 ? "" : "s"} to review` : "Ready to play"}</span>
         </header>
         <div class="review-characteristics">${characteristics.map((entry) => {
@@ -7312,6 +7332,10 @@ function addDegreeToCurrentActionWithFate() {
 }
 
 function wireEvents() {
+  document.querySelectorAll("[data-actor-portrait]").forEach((button) => button.addEventListener("click", () => {
+    if (!foundryActorSheetMode) return;
+    window.parent.postMessage({ source: "dh2-portal-frame", type: button.dataset.actorPortrait, requestId: crypto.randomUUID() }, foundryParentOrigin());
+  }));
   document.querySelector("#open-roster")?.addEventListener("click", () => {
     appView = "roster";
     save();

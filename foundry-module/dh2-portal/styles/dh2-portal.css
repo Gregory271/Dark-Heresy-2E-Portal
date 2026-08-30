@@ -249,6 +249,12 @@
   padding-top: 14px;
 }
 
+.dh2-portrait-panel { display: grid; align-content: start; gap: 5px; min-width: 0; }
+.dh2-portrait-panel button { color: #ead7b3; background: #111614; border: 1px solid #907344; padding: 3px; line-height: 1.4; }
+.dh2-portrait-panel .dh2-rf-portrait { display: block; max-width: 100%; object-fit: contain; }
+.dh2-portrait-panel button:focus-visible { outline: 2px solid #f6d88c; outline-offset: 2px; }
+.dh2-native-portrait-controls { display: flex; flex-wrap: wrap; gap: 4px; }
+.dh2-native-portrait-controls button { flex: 1 1 90px; font-size: 12px; line-height: 1.3; padding: 4px; }
 .dh2-rf-column { align-content: start; display: grid; gap: 14px; min-width: 0; }
 .dh2-rf-panel { background: rgba(2, 6, 6, 0.58); border: 1px solid var(--rf-line); min-width: 0; padding: 12px; }
 .dh2-rf-panel h2 { border-bottom: 1px solid rgba(214, 173, 98, 0.24); font-size: 0.82rem; margin: 0 0 10px; padding: 0 0 7px; }
