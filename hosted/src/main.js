@@ -1818,8 +1818,8 @@ function refreshCharacteristicDisplay(characteristicId) {
     article.classList.add("complete");
     resultBox.innerHTML = `<strong>${result.value}</strong><small>Entered manually</small>`;
     if (rollButton) {
-      rollButton.textContent = character.characteristicReroll === characteristicId ? "Re-roll kept" : "Use one re-roll";
-      rollButton.disabled = Boolean(character.characteristicReroll);
+      rollButton.textContent = "Roll Again";
+      rollButton.disabled = false;
     }
   } else {
     article.classList.remove("complete");
@@ -1918,17 +1918,150 @@ function randomizeCurrentCatalog(scene) {
   render();
 }
 
+function randomDie(sides = 10) {
+  return randomEntry(Array.from({ length: sides }, (_, index) => index + 1));
+}
+
+function rollGeneratedCharacteristic(id) {
+  const config = characteristicRollConfig(id);
+  const dice = Array.from({ length: config.quantity }, () => randomDie());
+  return { ...calculateCharacteristic(dice, config), dice, formula: `${config.quantity}d10+20`, keep: config.keep, source: "randomizer" };
+}
+
+function randomizeCreationChoices() {
+  character.homeWorld = randomEntry(catalogs.homeWorlds).id;
+  character.background = randomEntry(catalogs.backgrounds).id;
+  character.role = randomEntry(catalogs.roles).id;
+  if (!character.name.trim()) character.name = `${randomEntry(["Severin", "Mira", "Cassian", "Voss", "Lyra", "Merek", "Tavia", "Corvin"])} ${randomEntry(["Vale", "Drake", "Thorne", "Kast", "Vey", "Holt", "Rook", "Sable"])}`;
+  for (const { id } of characteristics) character.rolls[id] = rollGeneratedCharacteristic(id);
+  const rules = homeWorldRules();
+  const fateRoll = randomDie();
+  character.fate = { roll: fateRoll, threshold: rules.fate.threshold + (fateRoll >= rules.fate.blessing ? 1 : 0), source: "randomizer" };
+  const woundDice = Array.from({ length: rules.wounds.dice }, () => randomDie(5));
+  character.wounds = { dice: woundDice, total: rules.wounds.base + woundDice.reduce((sum, value) => sum + value, 0), source: "randomizer" };
+  const roll = randomDie(100);
+  const divination = divinationFor(roll);
+  character.divination = { roll, dice: [roll], result: divination, source: "randomizer", statChoices: {}, resolutions: {} };
+  for (const change of divination.statChanges || []) {
+    if (!change.target) character.divination.statChoices[change.id] = randomEntry(change.options);
+  }
+  const resolutions = character.divination.resolutions;
+  if (divination.talentGrant?.choice) resolutions.talentSpeciality = randomEntry(divination.talentGrant.choice === "hatred" ? hatredSpecialities : resistanceSpecialities);
+  if (divination.disorderGrant === "phobia") resolutions.disorderId = randomEntry(mentalDisorders.filter((entry) => entry.id.startsWith("phobia-"))).id;
+  if (divination.malignancyRoll) {
+    resolutions.malignancyRoll = randomDie(100);
+    const entry = tableEntryForRoll(malignancies, resolutions.malignancyRoll);
+    resolutions.malignancyId = entry.id;
+    if (entry.characteristicRoll) resolutions.malignancyMagnitude = randomDie(entry.characteristicRoll.sides);
+  }
+  if (character.homeWorld === "daemon-world") character.exceptional.daemonWorldCorruption = randomDie() + 5;
+  if (character.background === "mutant") {
+    character.exceptional.mutantTraitId = randomEntry(mutantStartingTraits).id;
+    const dice = Array.from({ length: 5 }, () => randomDie());
+    const total = dice.reduce((sum, value) => sum + value, 0);
+    const mutation = tableEntryForRoll(mutations, total);
+    Object.assign(character.exceptional, { mutationDice: dice, mutationRoll: total, mutationId: mutation.id, mutationSource: "randomizer" });
+    if (mutation.characteristicRoll) character.exceptional.mutationMagnitude = randomDie(mutation.characteristicRoll.sides);
+  }
+  if (character.background === "exorcised") {
+    const entry = randomEntry(malignancies);
+    character.exceptional.startingMalignancyId = entry.id;
+    if (entry.characteristicRoll) character.exceptional.startingMalignancyMagnitude = randomDie(entry.characteristicRoll.sides);
+  }
+  if (hasEliteAdvance("psyker")) character.eliteSetup.psykerCorruption = character.background === "astra-telepathica" ? 0 : randomDie() + 3;
+  for (const choice of grantAlternatives()) {
+    let selected = randomEntry(choice.options);
+    if (/^(Hatred|Resistance) \(one\)$/i.test(selected)) {
+      const family = selected.split(" ")[0];
+      selected = `${family} (${randomEntry(family === "Hatred" ? hatredSpecialities : resistanceSpecialities)})`;
+    }
+    character.grantChoices[choice.id] = selected;
+  }
+  const backgroundOptions = ruleValue(character.background, "Aptitude Choice").split(" or ").map((value) => value.trim()).filter(Boolean);
+  if (backgroundOptions.length) character.aptitudeSelections.background = randomEntry(backgroundOptions);
+  const roleOptions = (ruleValue(character.role, "Role Aptitudes").split(";").find((value) => value.includes(" or ")) || "").split(" or ").map((value) => value.trim()).filter(Boolean);
+  if (roleOptions.length) character.aptitudeSelections.role = randomEntry(roleOptions);
+  const { duplicateCount } = resolvedAptitudes();
+  for (let index = 0; index < duplicateCount; index += 1) {
+    const options = aptitudeChoices.filter((value) => !resolvedAptitudes().aptitudes.includes(value));
+    character.aptitudeReplacements.push(randomEntry(options));
+  }
+  syncCreationConsequences();
+  syncGrantedEquipment();
+  // Purchase one usable power for a Mystic before allocating the rest of the XP.
+  if (hasPsykerAccess()) {
+    const power = randomEntry(psychicPowerCatalogue.filter((entry) => !psychicPowerStatus(entry).missing.length && entry.cost <= character.xp.starting));
+    if (power) character.advances.psychicPowers.push({ id: power.id, name: power.name, cost: power.cost, source: power.source });
+  }
+  // Keep generated advances within the existing characteristic cost ladder; Influence is never bought.
+  for (let count = 0; count < 45; count += 1) {
+    const remaining = character.xp.starting - xpSpent();
+    const eligible = characteristics.filter((entry) => {
+      if (entry.id === "influence") return false;
+      const rank = character.advances.characteristics[entry.id] || 0;
+      const matches = aptitudeMatches(entry.aptitudes, resolvedAptitudes().aptitudes);
+      const cost = characteristicAdvanceCosts[matches][rank];
+      return rank < 5 && cost > 0 && cost <= remaining;
+    });
+    const entry = randomEntry(eligible);
+    if (!entry) break;
+    character.advances.characteristics[entry.id] = (character.advances.characteristics[entry.id] || 0) + 1;
+  }
+  // Acquisitions are owned, not free grants; random extras stay in inventory until equipped.
+  for (let index = 0; index < Math.max(0, characteristicBonus("influence")); index += 1) {
+    if (!addRandomStartingAcquisition()) break;
+  }
+  const owned = character.equipment.inventory.map(equipmentItem).filter(Boolean);
+  character.equipment.readiedWeapons = owned.filter((item) => item.category === "Weapons").slice(0, 1).map((item) => item.id);
+  character.equipment.wornArmour = owned.filter((item) => item.category === "Armour" && !/force field/i.test(item.profile?.type || "")).slice(0, 1).map((item) => item.id);
+}
+
 function randomizeCharacterOrigins() {
-  const confirmed = confirm(
-    "Randomize this character's Home World, Background, and Role? Identity fields remain unchanged. Later mechanical choices are reset, and all dice are still rolled by the player.",
-  );
-  if (!confirmed) return;
-  resetCreationDataFrom("homeWorld");
-  character.homeWorld = randomEntry(catalogs.homeWorlds, character.homeWorld)?.id || character.homeWorld;
-  character.background = randomEntry(catalogs.backgrounds, character.background)?.id || character.background;
-  character.role = randomEntry(catalogs.roles, character.role)?.id || character.role;
-  playMechanicalLock();
-  pendingFocusSelector = "#randomize-character";
+  if (!confirm("Create a finished random Acolyte? This replaces this character's creation choices, rolls, equipment, and XP purchases. Your name and personal details are kept; a blank name is generated. Any unspent XP remains available.")) return;
+  const previous = character;
+  const previousStep = step;
+  try {
+    character = prepareCharacter({ name: previous.name, player: previous.player, presentation: previous.presentation, appearance: previous.appearance, history: previous.history });
+    randomizeCreationChoices();
+    step = scenes.findIndex((scene) => scene.id === "review");
+    save({ markComplete: true });
+    pendingFocusSelector = "#scene-content";
+    render();
+  } catch (error) {
+    character = previous;
+    step = previousStep;
+    console.error(error);
+    alert("The random character could not be completed. Your previous character is still available. Please try again.");
+  }
+}
+
+function showCharacteristicRollResults(ids = characteristics.map((entry) => entry.id)) {
+  const dialog = document.querySelector("#characteristic-roll-dialog");
+  dialog.querySelector(".characteristic-roll-results").innerHTML = characteristics.filter((entry) => ids.includes(entry.id)).map((entry) => {
+    const result = character.rolls[entry.id];
+    return `<div><strong>${entry.name}</strong><span>Dice ${result.dice.join(", ")}${result.keep !== "all" ? ` · keep ${result.keep} two` : ""} + 20</span><b>${result.value}</b></div>`;
+  }).join("");
+  dialog.showModal();
+  dialog.querySelector("h2").focus({ preventScroll: true });
+  dialog.scrollTop = 0;
+}
+
+let characteristicRollSequence = 0;
+
+function rollAllCharacteristics() {
+  characteristicRollSequence += 1;
+  for (const { id } of characteristics) character.rolls[id] = rollGeneratedCharacteristic(id);
+  character.characteristicReroll = null;
+  save();
+  render();
+  showCharacteristicRollResults();
+}
+
+function navigateCreationBack() {
+  if (step <= 0) return;
+  // A live sheet's inventory/advancement editor returns to that sheet, not earlier creation.
+  step = foundryActorSheetMode ? scenes.findIndex((scene) => scene.id === "review") : step - 1;
+  pendingFocusSelector = "#scene-content";
   save();
   render();
 }
@@ -1989,7 +2122,7 @@ function renderCatalog(scene, selected) {
     <div class="catalog-randomizers" aria-label="Random character options">
       <button class="compact-button" id="randomize-stage" type="button">Randomize This Choice</button>
       <button class="compact-button" id="randomize-character" type="button">Randomize Character</button>
-      <small>Randomizes Home World, Background, and Role only. Dice are never rolled.</small>
+      <small>Randomize Character creates a finished sheet, including rolls, starting choices, equipment, and XP purchases.</small>
     </div>`;
 }
 
@@ -2045,6 +2178,7 @@ function renderIdentity() {
   ];
   return `
     <form class="identity-form" id="identity-form">
+      <button class="compact-button" id="randomize-character" type="button">Randomize Character</button>
       <label>
         <span>Name</span>
         <input name="name" maxlength="60" autocomplete="off" value="${character.name}" placeholder="UNASSIGNED" />
@@ -2081,7 +2215,7 @@ function renderCharacteristics() {
     <div class="management-shell characteristics-stage">
       <div class="management-heading">
         <span>${complete} / ${characteristics.length} recorded</span>
-        <strong>Roll each characteristic or enter a result rolled elsewhere.</strong>
+        <button class="compact-button" id="roll-all-characteristics" type="button">Roll All Characteristics</button>
       </div>
       <details class="gm-tools">
         <summary>GM controls</summary>
@@ -2097,7 +2231,6 @@ function renderCharacteristics() {
           const formula = config.quantity === 2
             ? "2d10 + 20"
             : `3d10, keep ${config.keep} 2, +20`;
-          const rerollUnavailable = Boolean(result && character.characteristicReroll);
           return `
             <article class="characteristic-entry ${result ? "complete" : ""}">
               <div class="characteristic-name">
@@ -2110,7 +2243,7 @@ function renderCharacteristics() {
                 ${result ? `<small>${result.source === "manual" ? "Entered manually" : `Dice: ${result.dice.join(", ")}`}</small>` : ""}
               </div>
               <div class="roll-actions">
-                <button class="compact-button roll-characteristic" data-characteristic="${entry.id}" type="button" ${rerollUnavailable ? "disabled" : ""}>${result ? character.characteristicReroll === entry.id ? "Re-roll kept" : "Use one re-roll" : "Roll for Characteristic"}</button>
+                <button class="compact-button roll-characteristic" data-characteristic="${entry.id}" type="button">${result ? "Roll Again" : "Roll for Characteristic"}</button>
                 <label class="manual-result">
                   <span>Enter result</span>
                   <input type="number" min="22" max="${manualMaximum}" value="${result?.source === "manual" ? result.value : ""}" data-manual-characteristic="${entry.id}" placeholder="—" />
@@ -2119,7 +2252,7 @@ function renderCharacteristics() {
             </article>`;
         }).join("")}
       </div>
-      <p class="rules-footnote">After all ten rolls, one characteristic may be re-rolled. The second result must be kept.</p>
+      <p class="rules-footnote">Unlimited rerolls enabled (house rule). Each roll replaces and immediately saves the previous result.</p>
     </div>`;
 }
 
@@ -2301,6 +2434,23 @@ function effectiveAvailability(item) {
 function isStartingAcquisitionLegal(item) {
   const index = availabilityOrder.indexOf(effectiveAvailability(item));
   return index >= 0 && index <= availabilityOrder.indexOf("Scarce");
+}
+
+function eligibleStartingAcquisitions() {
+  const slots = Math.max(0, characteristicBonus("influence"));
+  if (!character.rolls.influence?.value || character.acquisitions.filter(Boolean).length >= slots) return [];
+  const owned = new Set([...character.equipment.inventory, ...character.acquisitions,
+    ...resolvedGrantedEquipment().entries.map((entry) => entry.itemId).filter(Boolean)]);
+  return armoury.filter((item) => !owned.has(item.id) && isStartingAcquisitionLegal(item));
+}
+
+function addRandomStartingAcquisition() {
+  const item = randomEntry(eligibleStartingAcquisitions());
+  if (!item) return null;
+  character.acquisitions.push(item.id);
+  character.equipment.inventory.push(item.id);
+  character.equipment.selected = item.id;
+  return item;
 }
 
 function specialSummary(special = {}) {
@@ -4152,6 +4302,11 @@ function grantAlternatives() {
         .map((option) => option.replace(/^.*?·\s*Gain\s+/i, "").replace(/\.$/, "").trim())
         .filter(Boolean);
       if (sourceId === "background-skills") options = options.flatMap(expandSpecialistGrantOption);
+      if (sourceId === "role-talent") options = options.flatMap((option) => {
+        if (/^Hatred \(one\)$/i.test(option)) return hatredSpecialities.map((speciality) => `Hatred (${speciality})`);
+        if (/^Resistance \(one\)$/i.test(option)) return resistanceSpecialities.map((speciality) => `Resistance (${speciality})`);
+        return [option];
+      });
       if (options.length < 2) return;
       alternatives.push({ id: `${sourceId}-${index}`, sourceId, label, source: entry, options });
     });
@@ -4425,6 +4580,8 @@ function renderEquipment() {
             <strong>${character.acquisitions.filter(Boolean).length} / ${slots} starting acquisitions recorded</strong>
           </div>
           <div class="acquisition-heading"><strong>Optional Starting Acquisitions</strong><span>Each recorded item spends 1 of ${slots} slots.</span></div>
+          <button class="compact-button" type="button" id="random-starting-acquisition" ${eligibleStartingAcquisitions().length ? "" : "disabled"} title="Add an eligible, unowned item using one remaining starting-acquisition slot">Random Acquisition · 1 slot</button>
+          <p id="random-acquisition-status" class="item-cost-note" role="status" aria-live="polite"></p>
           <div class="acquisition-picks">
             ${character.acquisitions.filter(Boolean).map((id) => {
               const item = armoury.find((entry) => entry.id === id);
@@ -7027,7 +7184,7 @@ function render() {
       </aside>
 
       <footer class="controls ${scene.id === "review" ? "completed-sheet-controls" : ""}" aria-label="${actorSheetReview ? "Foundry Actor sheet controls" : scene.id === "review" ? "Completed character controls" : "Character creation navigation"}">
-        ${actorSheetReview ? "" : `<button class="text-button" id="back" ${step === 0 ? "disabled" : ""}>Back</button>`}
+        ${actorSheetReview ? "" : `<button class="text-button" id="back" type="button" ${step === 0 ? "disabled" : ""}>${foundryActorSheetMode ? "Return to Sheet" : "Back"}</button>`}
         ${scene.id === "review" ? "" : `<div class="progress" aria-label="Step ${step + 1} of ${scenes.length}">
           ${scenes.map((entry, index) => `<i class="${index === step ? "active" : index < step ? "done" : ""}" ${index === step ? 'aria-current="step"' : ""}><span class="sr-only">${entry.title}${index === step ? ", current step" : index < step ? ", completed" : ""}</span></i>`).join("")}
         </div>`}
@@ -7040,6 +7197,13 @@ function render() {
     </main>
 
     <div class="sr-only" id="selection-announcer" aria-live="polite"></div>
+
+    <dialog id="characteristic-roll-dialog" class="sheet-detail-dialog" aria-labelledby="characteristic-roll-title">
+      <h2 id="characteristic-roll-title" tabindex="-1" autofocus>Characteristic rolls</h2>
+      <p>Saved. These are your starting rolls, before advances and other bonuses.</p>
+      <div class="characteristic-roll-results"></div>
+      <form method="dialog"><button class="compact-button">Done</button></form>
+    </dialog>
 
     <dialog id="detail-dialog" aria-labelledby="detail-dialog-title">
       <button class="dialog-close" aria-label="Close details">×</button>
@@ -7689,6 +7853,7 @@ function wireEvents() {
   });
 
   const form = document.querySelector("#identity-form");
+  form?.addEventListener("submit", (event) => event.preventDefault());
   form?.addEventListener("input", (event) => {
     const historyField = event.target.dataset?.historyField;
     if (historyField) {
@@ -7702,12 +7867,11 @@ function wireEvents() {
     if (recordName) recordName.textContent = character.name || "Designation pending";
   });
 
-  document.querySelector("#back")?.addEventListener("click", () => {
-    if (foundryActorSheetMode) return;
-    if (step > 0) step -= 1;
-    pendingFocusSelector = "#scene-content";
-    save();
-    render();
+  document.querySelector("#back")?.addEventListener("click", navigateCreationBack);
+  document.querySelector("#randomize-character")?.addEventListener("click", randomizeCharacterOrigins);
+  document.querySelector("#roll-all-characteristics")?.addEventListener("click", rollAllCharacteristics);
+  document.querySelector("#characteristic-roll-dialog")?.addEventListener("close", () => {
+    document.querySelector("#roll-all-characteristics")?.focus({ preventScroll: true });
   });
 
   document.querySelector("#continue").addEventListener("click", () => {
@@ -7736,7 +7900,6 @@ function wireEvents() {
     document.querySelector("#previous-choice").addEventListener("click", () => cycleChoice(-1));
     document.querySelector("#next-choice").addEventListener("click", () => cycleChoice(1));
     document.querySelector("#randomize-stage")?.addEventListener("click", () => randomizeCurrentCatalog(scene));
-    document.querySelector("#randomize-character")?.addEventListener("click", randomizeCharacterOrigins);
     document.querySelectorAll(".catalog-slot").forEach((slot) => {
       slot.addEventListener("click", () => {
         if (!selectCatalogChoice(scene, slot.dataset.choiceId)) return;
@@ -7757,22 +7920,29 @@ function wireEvents() {
 
   document.querySelectorAll(".roll-characteristic").forEach((button) => {
     button.addEventListener("click", async () => {
-      button.disabled = true;
+      const rolledCharacter = character;
+      const rolledStep = step;
+      const rolledHomeWorld = character.homeWorld;
+      const sequence = ++characteristicRollSequence;
+      document.querySelectorAll(".roll-characteristic, #roll-all-characteristics, [data-manual-characteristic]").forEach((control) => { control.disabled = true; });
       try {
         const id = button.dataset.characteristic;
-        const prior = character.rolls[id];
-        if (prior && character.characteristicReroll && character.characteristicReroll !== id) return;
         const config = characteristicRollConfig(id);
         const dice = await rollVisualDice(config.quantity, 10);
+        if (character !== rolledCharacter || character.homeWorld !== rolledHomeWorld || sequence !== characteristicRollSequence) return;
         const calculated = calculateCharacteristic(dice, config);
-        if (prior) character.characteristicReroll = id;
+        character.characteristicReroll = null;
         character.rolls[id] = { ...calculated, dice, formula: `${config.quantity}d10+20`, keep: config.keep, source: "local-3d" };
         save();
-        render();
+        if (step === rolledStep) {
+          render();
+          showCharacteristicRollResults([id]);
+        }
       } catch (error) {
-        button.disabled = false;
-        button.textContent = "3D unavailable";
         console.error(error);
+        if (character === rolledCharacter && step === rolledStep) alert("The dice could not be rolled. Please try again; your previous result has not been replaced.");
+      } finally {
+        document.querySelectorAll(".roll-characteristic, #roll-all-characteristics, [data-manual-characteristic]").forEach((control) => { control.disabled = false; });
       }
     });
   });
@@ -8133,13 +8303,22 @@ function wireEvents() {
     rerenderEquipmentStatePreservingScroll();
   });
   document.querySelector("[data-acquire-equipment]")?.addEventListener("click", (event) => {
-    playMechanicalLock();
     const id = event.currentTarget.dataset.acquireEquipment;
+    if (!eligibleStartingAcquisitions().some((item) => item.id === id)) return;
+    playMechanicalLock();
     if (!character.acquisitions.includes(id)) character.acquisitions.push(id);
     if (!character.equipment.inventory.includes(id)) character.equipment.inventory.push(id);
     character.equipment.noCostGrants = character.equipment.noCostGrants.filter((entry) => entry !== id);
     save();
     rerenderEquipmentStatePreservingScroll();
+  });
+  document.querySelector("#random-starting-acquisition")?.addEventListener("click", () => {
+    const item = addRandomStartingAcquisition();
+    if (!item) return;
+    save();
+    rerenderEquipmentStatePreservingScroll("#random-starting-acquisition");
+    const remaining = Math.max(0, characteristicBonus("influence") - character.acquisitions.filter(Boolean).length);
+    document.querySelector("#random-acquisition-status").textContent = `Added ${item.name}. Used 1 starting acquisition; ${remaining} remaining.`;
   });
   document.querySelectorAll("[data-remove-acquisition]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -8583,9 +8762,7 @@ function keyboardNavigation(event) {
   } else if (event.key === "ArrowRight" && scenes[step].catalog) {
     cycleChoice(1);
   } else if (event.key === "ArrowLeft" && step > 0) {
-    step -= 1;
-    save();
-    render();
+    navigateCreationBack();
   } else if (event.key === "ArrowRight" && step < scenes.length - 1) {
     step += 1;
     save();

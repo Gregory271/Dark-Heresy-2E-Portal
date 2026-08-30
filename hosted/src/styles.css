@@ -435,6 +435,14 @@ h1 { max-width: 820px; margin: 8px 0 20px; font-size: clamp(52px, 7.2vw, 112px);
 .text-button { border: 0; padding: 12px 0; background: transparent; color: #d3cfc5; font: 700 13px "Barlow Condensed", sans-serif; letter-spacing: .16em; text-transform: uppercase; cursor: pointer; }
 .text-button:hover:not(:disabled) { color: #fff; }
 .text-button:disabled { opacity: .25; cursor: default; }
+
+#characteristic-roll-dialog { width: min(46rem, calc(100vw - 2rem)); max-height: 85dvh; overflow-y: auto; }
+.characteristic-roll-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1.5rem; margin: 1rem 0; }
+@media (max-width: 600px) { .characteristic-roll-results { grid-template-columns: minmax(0, 1fr); } }
+.characteristic-roll-results > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .15rem .75rem; padding: .55rem 0; border-bottom: 1px solid #665331; }
+.characteristic-roll-results strong { color: #f2d58b; overflow-wrap: anywhere; }
+.characteristic-roll-results span { grid-column: 1; font-size: .85em; color: #c8c3b7; line-height: 1.4; }
+.characteristic-roll-results b { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 1.4em; color: #fff0c8; font-variant-numeric: tabular-nums; }
 .primary-button { min-width: 220px; border: 2px solid #e1bb76; padding: 15px 17px 15px 22px; display: flex; justify-content: space-between; gap: 24px; background: linear-gradient(110deg, rgba(137, 89, 37, .58), rgba(13, 15, 13, .86)); color: #fff7e6; font: 700 14px "Barlow Condensed", sans-serif; letter-spacing: .13em; text-transform: uppercase; cursor: pointer; clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); }
 .primary-button:hover { border-color: var(--accent-hot); box-shadow: 0 0 28px rgba(199, 136, 60, .15); }
 .primary-button:disabled { border-color: rgba(255,255,255,.18); background: rgba(45,43,39,.5); color: #858077; box-shadow: none; cursor: not-allowed; }

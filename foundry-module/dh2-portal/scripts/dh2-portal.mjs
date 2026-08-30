@@ -80,6 +80,15 @@ function attachPortalFrame(application, frame, documentState, options = {}) {
   const portalUrl = documentState.portalUrl || REMOTE_PORTAL_URL;
   const html = documentState.portalHtml || "";
   const onLoad = () => {
+    // Events inside an iframe do not bubble to Foundry's window activation handler.
+    // Activate the containing window without cancelling native input focus or typing.
+    try {
+      const activate = () => application.bringToTop?.();
+      frame.contentDocument?.addEventListener("pointerdown", activate, { capture: true });
+      frame.contentDocument?.addEventListener("focusin", activate);
+    } catch (_error) {
+      // A remotely hosted fallback is cross-origin; leave its native focus untouched.
+    }
     if (options.actorSheet && application.actor) {
       frame.contentWindow?.postMessage({
         source: "dh2-portal-module",
@@ -91,6 +100,7 @@ function attachPortalFrame(application, frame, documentState, options = {}) {
     }
   };
   frame.addEventListener?.("load", onLoad, { once: true });
+  frame.tabIndex = 0;
   if (!html || portalUrl === REMOTE_PORTAL_URL) {
     frame.src = portalUrl;
     return;
