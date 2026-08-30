@@ -242,10 +242,10 @@
 
 .dh2-rf-body {
   display: grid;
-  flex: 1;
+  flex: 0 0 auto;
   gap: 14px;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  min-height: 0;
+  min-height: auto;
   padding-top: 14px;
 }
 
@@ -269,6 +269,12 @@
 .dh2-rf-compact-list { columns: 2; gap: 24px; margin: 0; padding-left: 18px; }
 .dh2-rf-compact-list li { break-inside: avoid; color: #d5cec2; font-size: 0.76rem; line-height: 1.5; }
 .dh2-rf-footer { border-top: 1px solid var(--rf-line); color: #938d83; display: flex; font-size: 0.68rem; gap: 16px; justify-content: space-between; margin-top: 14px; padding: 9px 2px 0; }
+.dh2-reinforcement-sheet > * { flex-shrink: 0; }
+.dh2-reinforcement-sheet { box-sizing: border-box; }
+.dh2-rf-detail-list button, .dh2-rf-record { height: auto; min-height: 0; white-space: normal; line-height: 1.45; }
+.dh2-rf-footer { position: static; flex-wrap: wrap; }
+.dh2-record-controls { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.dh2-record-controls button, .dh2-send-chat { width: auto; height: auto; font: 12px/1.4 sans-serif; padding: 3px 7px; }
 
 @media (max-width: 720px) {
   .dh2-portal-directory-controls {

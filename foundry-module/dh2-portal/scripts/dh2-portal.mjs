@@ -1,3 +1,4 @@
+import { rollSheetDice, sendSheetText } from "./sheet-chat.mjs";
 const MODULE_ID = "dh2-portal";
 const SYSTEM_ID = "dark-heresy-2nd";
 const PORTAL_FLAG = "dh2CharacterBuilder";
@@ -178,6 +179,32 @@ class PortalAcolyteSheet extends PortalSheetBase {
   }
 }
 
+function addItemChatControls(actor, anchor, item, includeRolls = true) {
+  if (!item || !(actor.isOwner || game.user.isGM)) return;
+  const controls = document.createElement("span");
+  controls.className = "dh2-record-controls";
+  const actions = [["Send to Chat", async () => {
+    const text = document.createElement("div");
+    text.innerHTML = item.flags?.[PORTAL_FLAG]?.sourceText || item.system?.benefit || item.system?.description || "No rules description recorded.";
+    await sendSheetText(actor, { title: item.name, text: text.textContent });
+  }]];
+  if (includeRolls && ["weapon", "psychicPower", "forceField"].includes(item.type) && typeof actor.rollItem === "function") actions.unshift(["Roll", () => actor.rollItem(item.id)]);
+  if (includeRolls && ["weapon", "psychicPower"].includes(item.type) && typeof actor.damageItem === "function") actions.push(["Damage", () => actor.damageItem(item.id)]);
+  for (const [label, action] of actions) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.setAttribute("aria-label", `${label}: ${item.name}`);
+    button.addEventListener("click", async (event) => {
+      event.preventDefault(); event.stopPropagation(); button.disabled = true;
+      try { await action(); } catch (error) { ui.notifications.error(error.message); }
+      finally { button.disabled = false; }
+    });
+    controls.append(button);
+  }
+  anchor.insertAdjacentElement("afterend", controls);
+}
+
 class PortalReinforcementSheet extends PortalSheetBase {
   static get defaultOptions() {
     const base = super.defaultOptions || {};
@@ -235,11 +262,31 @@ class PortalReinforcementSheet extends PortalSheetBase {
     if (typeof super.activateListeners === "function") super.activateListeners(html);
     const root = html?.[0] ?? html;
     root?.querySelectorAll?.("[data-roll-characteristic]").forEach((button) => button.addEventListener("click", () => {
-      this.actor.rollCharacteristic?.(button.dataset.rollCharacteristic);
+      if (this.actor.isOwner || game.user.isGM) this.actor.rollCharacteristic?.(button.dataset.rollCharacteristic)?.catch((error) => ui.notifications.error(error.message));
     }));
     root?.querySelectorAll?.("[data-reinforcement-item]").forEach((button) => button.addEventListener("click", () => {
       this.actor.items?.get?.(button.dataset.reinforcementItem)?.sheet?.render(true);
     }));
+    root?.querySelectorAll?.("[data-reinforcement-item]").forEach((button) => addItemChatControls(this.actor, button, this.actor.items?.get?.(button.dataset.reinforcementItem)));
+    root?.querySelectorAll?.(".dh2-rf-compact-list li").forEach((row) => {
+      const label = row.textContent.trim();
+      const normalize = (value) => String(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+      const wanted = normalize(label.replace(/\s*[+-]\d+\s*$/, ""));
+      for (const [key, skill] of Object.entries(this.actor.system.skills || {})) {
+        const entries = skill.isSpecialist
+          ? Object.entries(skill.specialities || {}).map(([speciality, entry]) => ({ speciality, label: `${skill.label} (${entry.label})` }))
+          : [{ label: skill.label || key }];
+        for (const entry of entries) {
+          if (normalize(entry.label) !== wanted) continue;
+          const button = document.createElement("button"); button.type = "button"; button.textContent = label; button.title = `Roll ${label}`;
+          button.addEventListener("click", async () => {
+            if (!(this.actor.isOwner || game.user.isGM)) return;
+            try { await this.actor.rollSkill(key, entry.speciality); } catch (error) { ui.notifications.error(error.message); }
+          });
+          row.replaceChildren(button);
+        }
+      }
+    });
     root?.querySelector("[data-portrait-edit]")?.addEventListener("click", () => editActorPortrait(this.actor));
     root?.querySelector("[data-portrait-view]")?.addEventListener("click", () => viewActorPortrait(this.actor));
   }
@@ -307,6 +354,13 @@ Hooks.on("updateActor", (actor, changes) => {
 Hooks.on("renderActorSheet", (sheet, html) => {
   if (game.system.id !== SYSTEM_ID || !["npc", "vehicle"].includes(sheet.actor?.type) || sheet instanceof PortalReinforcementSheet) return;
   const root = html?.[0] ?? html;
+  const seen = new Set();
+  root?.querySelectorAll?.(".item-edit[data-item-id]").forEach((anchor) => {
+    const id = anchor.dataset.itemId;
+    if (seen.has(id) || anchor.parentElement.querySelector(".dh2-record-controls")) return;
+    seen.add(id);
+    addItemChatControls(sheet.actor, anchor, sheet.actor.items?.get?.(id), false);
+  });
   const portrait = root?.querySelector?.('img[data-edit="img"]');
   if (!portrait || root.querySelector(".dh2-native-portrait-controls")) return;
   const controls = document.createElement("div");
@@ -419,6 +473,16 @@ async function handlePortalMessage(event) {
 
   if (event.data?.type === "load-actor" && event.data?.source === "dh2-portal-frame") return;
   if (event.data?.source !== "dh2-portal-frame" || !event.data.requestId) return;
+
+  if (["sheet-roll", "sheet-chat"].includes(event.data.type)) {
+    if (context.kind !== "actor-sheet") return;
+    const reply = (result) => event.source?.postMessage({ source: "dh2-portal-module", type: "sheet-chat-result", requestId: event.data.requestId, ...result }, event.origin === "null" ? "*" : event.origin);
+    try {
+      const result = await (event.data.type === "sheet-roll" ? rollSheetDice : sendSheetText)(context.application.actor, event.data.payload || {});
+      reply({ ok: true, ...result });
+    } catch (error) { reply({ ok: false, error: error.message }); }
+    return;
+  }
 
   if (["edit-portrait", "view-portrait"].includes(event.data.type)) {
     if (context.kind !== "actor-sheet" || !context.application.actor) return;

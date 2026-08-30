@@ -3335,6 +3335,36 @@ function sendCharacterToFoundry() {
   }
 }
 
+function requestFoundrySheet(type, payload) {
+  return new Promise((resolve, reject) => {
+    const requestId = crypto.randomUUID();
+    const origin = foundryParentOrigin();
+    const finish = (error, result) => {
+      clearTimeout(timer);
+      window.removeEventListener("message", receive);
+      if (error) reject(error); else resolve(result);
+    };
+    const receive = (event) => {
+      if (event.source !== window.parent || event.origin !== origin || event.data?.source !== "dh2-portal-module" || event.data.type !== "sheet-chat-result" || event.data.requestId !== requestId) return;
+      finish(event.data.ok ? null : new Error(event.data.error || "Foundry could not complete the request."), event.data);
+    };
+    const timer = setTimeout(() => finish(new Error("Foundry did not confirm the request. Check chat before trying again.")), 20000);
+    window.addEventListener("message", receive);
+    window.parent.postMessage({ source: "dh2-portal-frame", type, requestId, payload }, origin);
+  });
+}
+
+async function rollPlayableDice(quantity, sides, title, target = null, damage = null) {
+  if (!foundryActorSheetMode) return rollVisualDice(quantity, sides);
+  const result = await requestFoundrySheet("sheet-roll", { quantity, sides, title, target, damage });
+  if (result.hidden) {
+    const error = new Error("Blind roll sent to Foundry chat. The GM can see its result.");
+    error.rollSubmitted = true;
+    throw error;
+  }
+  return result.dice;
+}
+
 function foundryParentOrigin() {
   try { return new URL(document.referrer || document.baseURI).origin; } catch { return location.origin; }
 }
@@ -7009,11 +7039,13 @@ function render() {
       <p class="eyebrow" id="sheet-detail-kind">Character Record</p>
       <h2 id="sheet-detail-title">Record details</h2>
       <p id="sheet-detail-summary"></p>
+      ${foundryActorSheetMode ? `<button type="button" data-send-sheet-rules="sheet-detail">Send to Chat</button>` : ""}
       <dl class="sheet-detail-profile" id="sheet-detail-profile"></dl>
       <p class="source-note" id="sheet-detail-source"></p>
     </dialog>
 
     <dialog id="action-dialog" class="action-dialog" aria-labelledby="action-dialog-title">
+      ${foundryActorSheetMode ? `<button type="button" data-send-sheet-rules="action-dialog">Send Rules to Chat</button>` : ""}
       <button class="dialog-close" aria-label="Close action">×</button>
       <p class="eyebrow" id="action-dialog-kind">Current Action</p>
       <div class="action-dialog-title-row" id="action-dialog-title-row">
@@ -7207,16 +7239,17 @@ function actionRollResultMarkup(action, session) {
 }
 
 function wireActionRollResultButtons(action, result) {
-  result.querySelector(".reroll-action-with-fate")?.addEventListener("click", rerollCurrentActionWithFate);
+  result.querySelector(".reroll-action-with-fate")?.addEventListener("click", () => rerollCurrentActionWithFate().catch((error) => window.alert(error.message)));
   result.querySelector(".add-action-degree-with-fate")?.addEventListener("click", addDegreeToCurrentActionWithFate);
   result.querySelector(".roll-action-damage")?.addEventListener("click", async (event) => {
     event.currentTarget.disabled = true;
-    await rollWeaponDamage(action, result);
+    try { await rollWeaponDamage(action, result); } catch (error) { window.alert(error.message); }
   });
   result.querySelector(".roll-psychic-phenomena")?.addEventListener("click", async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
-    const [roll] = await rollVisualDice(1, 100);
+    let roll;
+    try { [roll] = await rollPlayableDice(1, 100, "Psychic Phenomena"); } catch (error) { window.alert(error.message); return; }
     button.insertAdjacentHTML("afterend", `<p class="psychic-phenomena-result"><strong>${roll}</strong><span>Apply this result on Table 6–2: Psychic Phenomena (Core Rulebook, p. 196) before resolving the power.</span></p>`);
   });
 }
@@ -7270,6 +7303,7 @@ function openActionDialog(actionId) {
   dialog.querySelector("#action-roll-fate-plus-ten").checked = false;
   dialog.querySelector("#action-roll-result").replaceChildren();
   const rollButton = dialog.querySelector("#execute-action-roll");
+  delete rollButton.dataset.rollSubmitted;
   rollButton.disabled = false;
   rollButton.innerHTML = "Roll d100 <span>›</span>";
   actionRollSession = action.test ? { actionId: action.id, plusTenSpent: false, rerolled: false, addedDegree: false, roll: null, originalRoll: null, outcome: null, resolved: null } : null;
@@ -7293,7 +7327,7 @@ async function rollWeaponDamage(action, targetElement) {
   const sides = Number(match[2]);
   const fixed = Number(String(match[3] || "0").replace(/\s/g, ""));
   const tearing = Boolean(weapon.profile?.special?.tearing);
-  const rolled = await rollVisualDice(baseDice + (tearing ? 1 : 0), sides);
+  const rolled = await rollPlayableDice(baseDice + (tearing ? 1 : 0), sides, `${weapon.name}: damage`, null, { keep: baseDice, primitive: Number(weapon.profile?.special?.primitive || 0), modifier: fixed + (weaponIsMelee(weapon) ? characteristicBonus("strength") : 0) });
   const kept = tearing ? [...rolled].sort((a, b) => b - a).slice(0, baseDice) : rolled;
   const primitive = Number(weapon.profile?.special?.primitive || 0);
   const adjusted = primitive ? kept.map((die) => Math.min(die, primitive)) : kept;
@@ -7321,12 +7355,15 @@ async function executeCurrentActionRoll() {
       : null;
     const test = psychic ? { ...action.test, actionModifier: Number(action.test.actionModifier || 0) + psychic.modifier } : action.test;
     const resolved = resolvedActionTest(test, situation, plusTen ? 10 : 0);
-    const [roll] = await rollVisualDice(1, 100);
+    const [roll] = await rollPlayableDice(1, 100, action.name, resolved.target);
     const outcome = testOutcome(roll, resolved.target);
     actionRollSession = { ...actionRollSession, actionId: action.id, resolved, psychic, roll, originalRoll: roll, outcome };
     renderCurrentActionRollResult(action);
+  } catch (error) {
+    if (error.rollSubmitted) button.dataset.rollSubmitted = "true";
+    window.alert(error.message);
   } finally {
-    const resolved = Boolean(actionRollSession?.roll);
+    const resolved = Boolean(actionRollSession?.roll || button.dataset.rollSubmitted);
     button.disabled = resolved;
     button.innerHTML = resolved ? "Test resolved" : "Roll d100 <span>›</span>";
   }
@@ -7339,7 +7376,7 @@ async function rerollCurrentActionWithFate() {
   if (!spendFateForActionRoll()) return;
   const button = document.querySelector(".reroll-action-with-fate");
   if (button) button.disabled = true;
-  const [roll] = await rollVisualDice(1, 100);
+  const [roll] = await rollPlayableDice(1, 100, `${action.name}: Fate reroll`, actionRollSession.resolved.target);
   actionRollSession.roll = roll;
   actionRollSession.rerolled = true;
   actionRollSession.outcome = testOutcome(roll, actionRollSession.resolved.target);
@@ -7356,6 +7393,15 @@ function addDegreeToCurrentActionWithFate() {
 }
 
 function wireEvents() {
+  document.querySelectorAll("[data-send-sheet-rules]").forEach((button) => button.addEventListener("click", async () => {
+    const prefix = button.dataset.sendSheetRules;
+    const title = document.querySelector(`#${prefix}-title`)?.textContent || "Rules";
+    const text = ["summary", "profile", "context", "source"].map((part) => document.querySelector(`#${prefix}-${part}`)?.textContent || "").filter(Boolean).join("\n\n");
+    button.disabled = true;
+    try { await requestFoundrySheet("sheet-chat", { title, text }); }
+    catch (error) { window.alert(error.message); }
+    finally { button.disabled = false; }
+  }));
   document.querySelectorAll("[data-actor-portrait]").forEach((button) => button.addEventListener("click", () => {
     if (!foundryActorSheetMode) return;
     window.parent.postMessage({ source: "dh2-portal-frame", type: button.dataset.actorPortrait, requestId: crypto.randomUUID() }, foundryParentOrigin());
