@@ -7854,6 +7854,11 @@ function wireEvents() {
 
   const form = document.querySelector("#identity-form");
   form?.addEventListener("submit", (event) => event.preventDefault());
+  form?.querySelectorAll("input, textarea").forEach((field) => field.addEventListener("pointerdown", (event) => {
+    // Keep Foundry's containing window from treating an input click as a drag/focus change.
+    event.stopPropagation();
+    field.focus({ preventScroll: true });
+  }));
   form?.addEventListener("input", (event) => {
     const historyField = event.target.dataset?.historyField;
     if (historyField) {

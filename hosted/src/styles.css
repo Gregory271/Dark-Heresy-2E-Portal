@@ -387,10 +387,10 @@ h1 { max-width: 820px; margin: 8px 0 20px; font-size: clamp(52px, 7.2vw, 112px);
 .catalog-selection-column { min-width: 0; }
 .catalog-stage-layout { flex: 0 0 auto; }
 
-.identity-form { display: grid; gap: 16px; max-width: 580px; margin-top: 30px; }
+.identity-form { display: grid; gap: 16px; max-width: 580px; margin-top: 30px; position: relative; z-index: 30; pointer-events: auto; }
 .identity-form label { display: grid; gap: 7px; }
 .identity-form label span { color: #a9a69d; font-size: 9px; letter-spacing: .17em; text-transform: uppercase; }
-.identity-form input, .identity-form textarea { width: 100%; border: 0; border-bottom: 1px solid var(--line); padding: 10px 2px; background: rgba(6, 10, 9, .36); color: #eee9de; outline: none; }
+.identity-form input, .identity-form textarea { width: 100%; border: 0; border-bottom: 1px solid var(--line); padding: 10px 2px; background: rgba(6, 10, 9, .36); color: #eee9de; outline: none; pointer-events: auto; user-select: text; cursor: text; }
 .identity-form input:focus, .identity-form textarea:focus { border-color: var(--accent-hot); }
 .identity-form input:first-of-type { font: 500 22px "Barlow Condensed", sans-serif; letter-spacing: .06em; text-transform: uppercase; }
 .identity-form textarea { min-height: 56px; resize: vertical; }
