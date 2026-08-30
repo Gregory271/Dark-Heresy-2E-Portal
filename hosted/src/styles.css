@@ -4540,3 +4540,18 @@ html[data-foundry-actor-sheet="true"] .completed-sheet-controls .actions {
   .foundry-save-status { display: none; }
   .foundry-sheet-backup > div { display: grid; grid-template-columns: 1fr; }
 }
+/* Keep the live Influence editor secondary to the characteristic value. */
+.review-characteristics .change-influence {
+  display: block;
+  max-width: 100%;
+  margin: .2rem auto 0;
+  padding: .15rem .3rem;
+  font-family: inherit;
+  font-size: .7rem;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: normal;
+  text-transform: none;
+}
+#influence-form { display: grid; gap: .8rem; }
+#influence-form input { width: 100%; box-sizing: border-box; }

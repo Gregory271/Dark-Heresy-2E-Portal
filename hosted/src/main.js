@@ -125,6 +125,7 @@ function prepareCharacter(input = {}) {
   prepared.gmOverrides.highCharacteristics = Boolean(prepared.gmOverrides.highCharacteristics);
   prepared.gmOverrides.eliteAdvances = Boolean(prepared.gmOverrides.eliteAdvances);
   prepared.rolls ||= {};
+  prepared.influenceAdjustment = Number.isSafeInteger(prepared.influenceAdjustment) ? prepared.influenceAdjustment : 0;
   prepared.characteristicReroll ||= null;
   prepared.fate ||= {};
   prepared.wounds ||= {};
@@ -1244,6 +1245,7 @@ function characteristicBreakdown(characteristicId) {
   const divination = divinationCharacteristicModifiers()[characteristicId] || 0;
   const exceptional = exceptionalCharacteristicModifiers()[characteristicId] || 0;
   const beforeElite = generated + advancement + divination + exceptional;
+  const campaign = characteristicId === "influence" ? Number(character.influenceAdjustment || 0) : 0;
   const elite = hasEliteAdvance("untouchable") && characteristicId === "fellowship"
     ? Math.floor(beforeElite / 2) - beforeElite
     : 0;
@@ -1253,12 +1255,22 @@ function characteristicBreakdown(characteristicId) {
     divination,
     exceptional,
     elite,
-    total: beforeElite + elite,
+    campaign,
+    total: beforeElite + elite + campaign,
   };
 }
 
 function characteristicValue(characteristicId) {
   return characteristicBreakdown(characteristicId).total;
+}
+
+function setCurrentInfluence(value) {
+  if (String(value).trim() === "") return false;
+  const next = Number(value);
+  if (!Number.isSafeInteger(next) || next < 0) return false;
+  const breakdown = characteristicBreakdown("influence");
+  character.influenceAdjustment = next - (breakdown.total - breakdown.campaign);
+  return true;
 }
 
 function finalFateThreshold() {
@@ -2615,7 +2627,7 @@ function foundryCharacteristicData(characteristicId) {
   return {
     base: breakdown.generated,
     advance: Number(character.advances.characteristics[characteristicId] || 0),
-    modifier: breakdown.divination + breakdown.exceptional + breakdown.elite,
+    modifier: breakdown.divination + breakdown.exceptional + breakdown.elite + breakdown.campaign,
     unnatural: 0,
     cost: characteristicXpCost(characteristicId),
   };
@@ -6750,7 +6762,8 @@ function renderReview() {
           ].filter(Boolean);
           return `<div class="${breakdown.divination || breakdown.exceptional || breakdown.elite ? "modified" : ""}" title="${escapeHtmlAttribute(parts.join(" · "))}">
             <button type="button" class="review-characteristic-label rule-term lore-term lore-term-stat" data-rule-term="${characteristicRuleId}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${entry.name}. ${tooltip}`)}">${entry.abbreviation}</button>
-            <strong>${breakdown.total || "—"}</strong>${parts.length > 1 ? `<small>${escapeHtmlAttribute(parts.slice(1).join(" · "))}</small>` : ""}
+            <strong>${breakdown.total || (entry.id === "influence" ? "0" : "—")}</strong>${parts.length > 1 ? `<small>${escapeHtmlAttribute(parts.slice(1).join(" · "))}</small>` : ""}
+            ${entry.id === "influence" ? `<button type="button" id="change-influence" class="change-influence">Change Influence</button>` : ""}
           </div>`;
         }).join("")}</div>
         ${Object.keys(divinationModifiers).length || Object.keys(exceptionalCharacteristicModifiers()).length || currentDivination()?.fateChange || character.exceptional?.creationCorruptionApplied ? `<div class="calculation-note"><strong>Creation effects applied:</strong> ${[
@@ -6978,6 +6991,17 @@ function render() {
       <p id="rule-dialog-summary"></p>
       <p class="source-note" id="rule-dialog-source"></p>
       <button class="primary-button" id="rule-dialog-open" type="button">Open in Compendium <span>›</span></button>
+    </dialog>
+
+    <dialog id="influence-dialog" class="sheet-detail-dialog" aria-labelledby="influence-title">
+      <form id="influence-form">
+        <h2 id="influence-title">Change Influence</h2>
+        <p id="influence-help">Record the new total agreed with your GM. This does not spend XP or change your starting roll.</p>
+        <label for="influence-value">Current Influence</label>
+        <input id="influence-value" type="number" min="0" step="1" required aria-describedby="influence-help" />
+        <button type="submit" class="primary-button">Apply Influence</button>
+        <button type="button" id="cancel-influence">Cancel</button>
+      </form>
     </dialog>
 
     <dialog id="sheet-detail-dialog" class="sheet-detail-dialog" aria-labelledby="sheet-detail-title">
@@ -8382,6 +8406,29 @@ function wireEvents() {
     downloadJson(filename, foundryActorPayload());
     const status = document.querySelector("#export-status");
     if (status) status.textContent = `Download started: ${filename}`;
+  });
+
+  const influenceDialog = document.querySelector("#influence-dialog");
+  const influenceInput = document.querySelector("#influence-value");
+  document.querySelector("#change-influence")?.addEventListener("click", () => {
+    influenceInput.value = characteristicValue("influence");
+    influenceInput.setCustomValidity("");
+    influenceDialog.showModal();
+    influenceInput.focus();
+    influenceInput.select();
+  });
+  influenceInput?.addEventListener("input", () => influenceInput.setCustomValidity(""));
+  document.querySelector("#cancel-influence")?.addEventListener("click", () => influenceDialog.close());
+  document.querySelector("#influence-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!setCurrentInfluence(influenceInput.value)) {
+      influenceInput.setCustomValidity("Enter a whole number of zero or more.");
+      influenceInput.reportValidity();
+      return;
+    }
+    save();
+    influenceDialog.close();
+    rerenderEquipmentStatePreservingScroll("#change-influence");
   });
 
   const dialog = document.querySelector("#detail-dialog");
