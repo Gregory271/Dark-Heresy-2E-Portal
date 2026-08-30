@@ -6513,8 +6513,8 @@ function actionGroupGlyph(group) {
 }
 
 // The action index is deliberately organised around the way a player looks
-// for an option at the table: first the universal actions, then options added
-// by the character's loadout and choices. The underlying records still retain
+// for an option at the table: equipped weapon attacks first, then common
+// actions and specialist options. The underlying records still retain
 // their rules group for filtering and export.
 const actionSectionDefinitions = [
   { key: "basic-attacks", title: "Basic Attacks", glyph: "Attacks", source: "Core combat actions", order: 10 },
@@ -6522,7 +6522,7 @@ const actionSectionDefinitions = [
   { key: "basic-reactions", title: "Reactions", glyph: "Reactions", source: "Core reaction actions", order: 30 },
   { key: "basic-tactics", title: "Basic Tactics", glyph: "Tactical", source: "Core tactical actions", order: 40 },
   { key: "basic-utility", title: "Basic Utility", glyph: "Utility", source: "Core utility actions", order: 50 },
-  { key: "weapon-actions", title: "Weapon Actions", glyph: "Attacks", source: "From current weapon loadout", order: 60 },
+  { key: "weapon-actions", title: "Weapon Attacks", glyph: "Attacks", source: "", order: 0 },
   { key: "skill-tests", title: "Skill Tests", glyph: "Skills", source: "From trained skills and characteristics", order: 70 },
   { key: "psychic-powers", title: "Psychic Powers", glyph: "Psychic", source: "Known powers and Focus Power actions", order: 80 },
   { key: "features-fate", title: "Talents, Traits & Fate", glyph: "Abilities", source: "From this Acolyte's choices and Fate points", order: 90 },
@@ -6548,6 +6548,17 @@ function actionSectionPresentation(action = {}) {
   return actionSectionDefinitions[10];
 }
 
+function comparePlayableActions(a, b, weaponIds = []) {
+  const availability = Number(!a.available) - Number(!b.available);
+  if (availability) return availability;
+  const modes = ["Standard Attack", "Semi-Auto Burst", "Full Auto Burst", "Called Shot", "Suppressing Fire"];
+  const rank = (action) => { const index = modes.indexOf(action.test?.mode); return index < 0 ? modes.length : index; };
+  const modeOrder = rank(a) - rank(b);
+  if (modeOrder) return modeOrder;
+  const weaponRank = (action) => { const index = weaponIds.indexOf(action.test?.weaponId); return index < 0 ? weaponIds.length : index; };
+  return weaponRank(a) - weaponRank(b) || String(a.name).localeCompare(String(b.name));
+}
+
 function renderActionIndex(actions) {
   if (!actionGroups.includes(actionIndexState.group)) actionIndexState.group = "All";
   const query = actionIndexState.query.trim().toLowerCase();
@@ -6558,8 +6569,6 @@ function renderActionIndex(actions) {
     && (!query || [action.name, action.group, action.type, action.summary, action.context, action.usesFate ? "Fate" : "", ...(action.subtypes || [])].join(" ").toLowerCase().includes(query))
   );
   const initialVisibleCount = actions.filter(initiallyVisible).length;
-  const availableCount = actions.filter((action) => action.available).length;
-  const unavailableCount = actions.length - availableCount;
   const carriedWeaponActions = actions.filter((action) => /in inventory but not equipped/i.test(action.unavailableReason || "")).length;
   currentActionRecords.clear();
   actions.forEach((action) => currentActionRecords.set(action.id, action));
@@ -6573,7 +6582,7 @@ function renderActionIndex(actions) {
         <header>
           <div class="action-identity">
             <span class="action-group-tag">${actionGroupGlyph(action.group)}<span>${escapeHtmlAttribute(action.group)}</span>${action.usesFate ? `<em class="action-fate-tag">${actionGroupGlyph("Fate")} Fate</em>` : ""}</span>
-            <h4>${escapeHtmlAttribute(action.name)}</h4>
+            <h4>${escapeHtmlAttribute(action.test?.weaponName ? `${action.test.weaponName} — ${action.test.mode}` : action.name)}</h4>
           </div>
           <span class="action-type-badge" role="img" aria-label="Action type: ${escapeHtmlAttribute(action.type)}" title="${escapeHtmlAttribute(action.type)}">${actionTypeGlyph(typePresentation.key)}<span class="action-type-caption">${escapeHtmlAttribute(typePresentation.short)}</span></span>
         </header>
@@ -6583,8 +6592,10 @@ function renderActionIndex(actions) {
         <footer><small>${escapeHtmlAttribute(action.source || actionSource)}</small><button class="compact-button" type="button" data-open-action="${escapeHtmlAttribute(action.id)}" ${action.available ? "" : "disabled"}>${action.test ? "Roll Test" : "Details"}</button></footer>
       </article>`;
   };
-  const actionSectionsMarkup = actionSectionDefinitions.map((definition) => {
-    const sectionActions = actions.filter((action) => actionSectionPresentation(action).key === definition.key);
+  const weaponIds = [character.equipment.equipped?.primary, ...character.equipment.readiedWeapons].filter(Boolean);
+  const actionSectionsMarkup = [...actionSectionDefinitions].sort((a, b) => a.order - b.order).map((definition) => {
+    const sectionActions = actions.filter((action) => actionSectionPresentation(action).key === definition.key)
+      .sort((a, b) => comparePlayableActions(a, b, weaponIds));
     if (!sectionActions.length) return "";
     const sectionInitiallyVisible = sectionActions.some(initiallyVisible);
     return `<section class="action-group-section" data-action-section="${definition.key}" aria-labelledby="action-section-${definition.key}" ${sectionInitiallyVisible ? "" : "hidden"}>
@@ -6595,22 +6606,16 @@ function renderActionIndex(actions) {
       <div class="action-card-grid">${sectionActions.map(renderActionCard).join("")}</div>
     </section>`;
   }).join("");
-  return `<section class="review-actions-index" aria-labelledby="current-actions-title">
-    <div class="review-section-heading action-index-heading">
-      <div>
-        <h3 id="current-actions-title">Current Actions and Abilities</h3>
-        <p>Actions from your characteristics, training, equipped weapons, inventory, psychic powers, and special rules.</p>
-      </div>
-      <div class="action-index-counts" aria-label="Action availability"><strong>${availableCount}</strong><span>available</span>${unavailableCount ? `<em>${unavailableCount} conditional</em>` : ""}</div>
-    </div>
+  return `<section class="review-actions-index" aria-label="Actions">
     <div class="action-index-controls">
       <label class="action-search"><span>Search actions</span><input id="action-search" type="search" value="${escapeHtmlAttribute(actionIndexState.query)}" placeholder="Attack, Dodge, Tech-Use…" autocomplete="off" /></label>
       <div class="action-filter-list" role="group" aria-label="Filter actions">${actionGroups.map((group) => `<button class="compact-button ${actionIndexState.group === group ? "active" : ""}" type="button" data-action-group="${group}" aria-pressed="${actionIndexState.group === group}">${actionGroupGlyph(group)}<span>${group}</span></button>`).join("")}<button class="compact-button fate-action-filter ${actionIndexState.fateOnly ? "active" : ""}" type="button" data-action-fate-only aria-pressed="${actionIndexState.fateOnly}">${actionGroupGlyph("Fate")}<span>Fate</span></button></div>
       <label class="show-unavailable"><input id="show-unavailable-actions" type="checkbox" ${actionIndexState.showUnavailable ? "checked" : ""} /><span>Show unavailable options</span></label>
     </div>
-    ${carriedWeaponActions ? `<p class="action-index-notice">Mark weapons <strong>Equipped</strong> in Inventory to use their attacks.</p>` : ""}
     <div class="action-section-list" id="action-card-grid">${actionSectionsMarkup}</div>
     <p class="action-empty" id="action-empty" ${initialVisibleCount ? "hidden" : ""}>No available actions match these filters. Change the filter or show unavailable options to inspect unmet requirements.</p>
+    <p class="action-result-count" id="action-result-count" role="status" aria-live="polite">${initialVisibleCount} actions</p>
+    ${carriedWeaponActions ? `<p class="action-index-notice">Mark weapons <strong>Equipped</strong> in Inventory to use their attacks.</p>` : ""}
   </section>`;
 }
 
@@ -7155,6 +7160,8 @@ function filterReviewActionCards() {
   });
   const empty = document.querySelector("#action-empty");
   if (empty) empty.hidden = visible > 0;
+  const count = document.querySelector("#action-result-count");
+  if (count) count.textContent = `${visible} actions`;
 }
 
 function activateReviewTab(tabId, { focus = false } = {}) {

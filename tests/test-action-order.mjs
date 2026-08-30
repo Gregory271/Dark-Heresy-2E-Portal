@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+const source=readFileSync(new URL('../hosted/src/main.js',import.meta.url),'utf8');
+const start=source.indexOf('function comparePlayableActions(');
+const context=vm.createContext({});
+vm.runInContext(source.slice(start,source.indexOf('\n}\n',start)+2),context);
+const make=(name,mode,weaponId,available=true)=>({name,available,test:{mode,weaponId}});
+const entries=[make('Autogun called','Called Shot','auto'),make('Pistol','Standard Attack','pistol'),make('Autogun suppress','Suppressing Fire','auto'),make('Autogun','Standard Attack','auto'),make('Autogun burst','Semi-Auto Burst','auto'),make('Stored rifle','Standard Attack','stored',false)];
+entries.sort((a,b)=>context.comparePlayableActions(a,b,['auto','pistol']));
+assert.deepEqual(entries.map(a=>a.name),['Autogun','Pistol','Autogun burst','Autogun called','Autogun suppress','Stored rifle']);
+assert(!source.includes('Current Actions and Abilities'));
+assert(source.includes('id="action-result-count"'));
+assert(source.includes('[...actionSectionDefinitions].sort((a, b) => a.order - b.order)'));
+assert.match(source,/key: "weapon-actions"[^\n]+order: 0/);
+console.log('Action ordering passed: equipped primary standard attack first, basic fire modes before situational options, unavailable last, footer count.');

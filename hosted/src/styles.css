@@ -4627,3 +4627,4 @@ html[data-foundry-actor-sheet="true"] .action-index-heading p { display: none; }
   .action-card > footer { justify-content: flex-start; }
   .inventory-toolbar .action-filter-list { display: flex; flex-wrap: wrap; }
 }
+.action-result-count { margin: 10px 0 0; color: #bcb4a5; font-size: 12px; }
