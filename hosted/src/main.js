@@ -3148,7 +3148,7 @@ function reinforcementFoundryActorPayload(entry) {
 }
 
 function vehicleProfileNumber(value) {
-  const match = String(value ?? "").match(/[+-]?\d+(?:\.\d+)?/);
+  const match = String(value ?? "").replace(/,/g, "").match(/[+-]?\d+(?:\.\d+)?/);
   return Number(match?.[0] || 0);
 }
 
