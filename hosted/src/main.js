@@ -197,6 +197,7 @@ function prepareCharacter(input = {}) {
   prepared.conditions ||= { insanity: 0, corruption: 0 };
   prepared.conditions.insanity = Math.max(0, Number(prepared.conditions.insanity || 0));
   prepared.conditions.corruption = Math.max(0, Number(prepared.conditions.corruption || 0));
+  prepared.conditions.fatigue = Math.max(0, Number(prepared.conditions.fatigue || 0));
   prepared.combat ||= {};
   prepared.combat.damage = Math.max(0, Number(prepared.combat.damage || 0));
   prepared.psychicFilters ||= { query: "", discipline: "All Powers", showUnavailable: true };
@@ -2709,6 +2710,12 @@ function woundStatus() {
   };
 }
 
+function fatigueStatus() {
+  const threshold = Math.max(0, characteristicBonus("toughness") + characteristicBonus("willpower"));
+  const current = Math.max(0, Math.min(100, Number(character.conditions?.fatigue || 0)));
+  return { threshold, current };
+}
+
 function renderReviewWounds() {
   const status = woundStatus();
   return `<section class="review-wounds-card" aria-labelledby="review-wounds-heading">
@@ -3014,7 +3021,7 @@ function foundryActorPayload() {
         critical: woundStatus().critical,
         rolled: Boolean(character.wounds?.total),
       },
-      fatigue: { value: 0 },
+      fatigue: { max: fatigueStatus().threshold, value: fatigueStatus().current },
       psy: {
         rating: foundryPsyRating(),
         sustained: 0,
@@ -7001,9 +7008,10 @@ function renderReview() {
         </div>
         <section class="review-status-strip" aria-label="Movement and character resources">
           <article class="review-status-card">
-            <span>Fatigue Threshold</span>
-            <strong>${toughnessBonus + willpowerBonus}</strong>
-            <small>TB ${toughnessBonus} + WPB ${willpowerBonus}</small>
+            <span>Fatigue</span>
+            <strong data-fatigue-current>${fatigueStatus().current}</strong><span class="status-slash">/ ${fatigueStatus().threshold}</span>
+            <small>Current / Threshold · TB ${toughnessBonus} + WPB ${willpowerBonus}</small>
+            <div class="status-adjust-controls"><button type="button" data-adjust-fatigue="-1" aria-label="Reduce fatigue" ${fatigueStatus().current <= 0 ? "disabled" : ""}>−</button><input type="number" min="0" max="100" step="1" inputmode="numeric" data-current-fatigue aria-label="Current fatigue" value="${fatigueStatus().current}" /><button type="button" data-adjust-fatigue="1" aria-label="Increase fatigue">+</button></div>
           </article>
           <article class="review-status-card review-movement-card">
             <span>Movement · metres</span>
@@ -7727,6 +7735,24 @@ function wireEvents() {
     refreshReviewWounds();
   });
   document.querySelector("[data-current-damage]")?.addEventListener("change", refreshReviewWounds);
+  document.querySelector("[data-current-fatigue]")?.addEventListener("input", (event) => {
+    const value = Math.max(0, Math.min(100, Math.floor(Number(event.target.value || 0))));
+    character.conditions.fatigue = value;
+    event.target.value = String(value);
+    document.querySelector("[data-fatigue-current]")?.replaceChildren(String(value));
+    save();
+  });
+  document.querySelectorAll("[data-adjust-fatigue]").forEach((button) => button.addEventListener("click", () => {
+    const status = fatigueStatus();
+    const value = Math.max(0, Math.min(100, status.current + Number(button.dataset.adjustFatigue || 0)));
+    character.conditions.fatigue = value;
+    const input = document.querySelector("[data-current-fatigue]");
+    if (input) input.value = String(value);
+    document.querySelector("[data-fatigue-current]")?.replaceChildren(String(value));
+    document.querySelector('[data-adjust-fatigue="-1"]')?.toggleAttribute("disabled", value <= 0);
+    playMechanicalLock();
+    save();
+  }));
   document.querySelectorAll("[data-adjust-damage]").forEach((button) => {
     button.addEventListener("click", () => {
       character.combat.damage = Math.max(0, Number(character.combat.damage || 0) + Number(button.dataset.adjustDamage || 0));
