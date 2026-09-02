@@ -1,4 +1,6 @@
 import { rollSheetDice, sendSheetText } from "./sheet-chat.mjs";
+import {openTest, openItem, openDamage, openAmmunition, skillRows, characteristicValue, armourLocations, updateCombatField, chatControlMarkup} from "./portal-combat.mjs";
+import {ammoLock} from './ammunition.mjs';
 const MODULE_ID = "dh2-portal";
 const SYSTEM_ID = "dark-heresy-2nd";
 const PORTAL_FLAG = "dh2CharacterBuilder";
@@ -198,16 +200,24 @@ function addItemChatControls(actor, anchor, item, includeRolls = true) {
     text.innerHTML = item.flags?.[PORTAL_FLAG]?.sourceText || item.system?.benefit || item.system?.description || "No rules description recorded.";
     await sendSheetText(actor, { title: item.name, text: text.textContent });
   }]];
-  if (includeRolls && ["weapon", "psychicPower", "forceField"].includes(item.type) && typeof actor.rollItem === "function") actions.unshift(["Roll", () => actor.rollItem(item.id)]);
-  if (includeRolls && ["weapon", "psychicPower"].includes(item.type) && typeof actor.damageItem === "function") actions.push(["Damage", () => actor.damageItem(item.id)]);
+  if (includeRolls && ["weapon", "psychicPower"].includes(item.type)) actions.unshift(["Roll", () => openTest(actor, {
+    title: item.name, weapon: item.type === "weapon" ? item : null, psychic: item.type === "psychicPower",
+    target: item.type === "psychicPower" ? characteristicValue(actor, item.system?.target?.characteristic || "willpower") + Number(item.system?.target?.bonus || 0) : characteristicValue(actor, String(item.system?.class).toLowerCase() === "melee" ? "weaponSkill" : "ballisticSkill")
+  })]);
+  if (includeRolls && ["weapon", "psychicPower"].includes(item.type) && item.system?.damage && item.system.damage !== "0") actions.push(["Damage", () => openDamage(actor, item)]);
   for (const [label, action] of actions) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = label;
     button.setAttribute("aria-label", `${label}: ${item.name}`);
+    if(label==='Send to Chat') {
+      button.className='dh2-chat-share';
+      button.innerHTML=chatControlMarkup;
+      button.title='Send this description to chat (no roll)';
+    }
     button.addEventListener("click", async (event) => {
       event.preventDefault(); event.stopPropagation(); button.disabled = true;
-      try { await action(); } catch (error) { ui.notifications.error(error.message); }
+      try { await action(); if(label==='Send to Chat') ui.notifications.info(`${item.name} sent to chat.`); } catch (error) { ui.notifications.error(error.message); }
       finally { button.disabled = false; }
     });
     controls.append(button);
@@ -216,6 +226,20 @@ function addItemChatControls(actor, anchor, item, includeRolls = true) {
 }
 
 class PortalReinforcementSheet extends PortalSheetBase {
+  async _render(force, options) {
+    const prior = this.element?.[0] ?? this.element;
+    const active = document.activeElement;
+    const focusName = prior?.contains?.(active) ? active?.name : null;
+    const selection = focusName ? [active.selectionStart, active.selectionEnd] : null;
+    await super._render(force, options);
+    if (focusName) {
+      const root = this.element?.[0] ?? this.element;
+      const field = [...(root?.querySelectorAll?.('input[name],textarea[name]') || [])].find(e=>e.name===focusName);
+      field?.focus({preventScroll:true});
+      if (selection?.[0] != null) { try { field?.setSelectionRange(...selection); } catch {} }
+    }
+    return this;
+  }
   static get defaultOptions() {
     const base = super.defaultOptions || {};
     return foundry.utils.mergeObject(base, {
@@ -227,14 +251,16 @@ class PortalReinforcementSheet extends PortalSheetBase {
       height: Math.min(940, Math.max(680, window.innerHeight - 120)),
       resizable: true,
       minimizable: true,
-      submitOnChange: true,
+      submitOnChange: false,
       closeOnSubmit: false,
+      scrollY: [".dh2-rf-body"],
     });
   }
 
   async getData(options = {}) {
     const context = typeof super.getData === "function" ? await super.getData(options) : {};
-    const source = cloneData(this.actor.flags?.[PORTAL_FLAG]?.reinforcement || {});
+    const isVehicle = this.actor.type === "vehicle";
+    const source = cloneData(this.actor.flags?.[PORTAL_FLAG]?.[isVehicle ? "vehicle" : "reinforcement"] || {});
     const characteristicOrder = ["weaponSkill", "ballisticSkill", "strength", "toughness", "agility", "intelligence", "perception", "willpower", "fellowship", "influence"];
     const characteristics = characteristicOrder.map((key) => {
       const characteristic = this.actor.system?.characteristics?.[key] || {};
@@ -247,6 +273,8 @@ class PortalReinforcementSheet extends PortalSheetBase {
       const record = {
         id: item.id,
         name: item.name,
+        hasClip: item.type === "weapon" && Number(item.system?.clip?.max) > 0,
+        clip: item.system?.clip || {},
         description: item.flags?.[PORTAL_FLAG]?.sourceText || item.system?.benefit || item.system?.description || "",
       };
       if (group === "weapon" || item.type === "weapon") itemGroups.weapons.push(record);
@@ -262,7 +290,17 @@ class PortalReinforcementSheet extends PortalSheetBase {
       system: this.actor.system,
       source,
       characteristics,
+      armourLocations: isVehicle ? [] : armourLocations(this.actor),
       itemGroups,
+      isVehicle,
+      editable: Boolean(this.actor.isOwner || game.user.isGM),
+      skills: skillRows(this.actor),
+      combatModifier: this.actor.flags?.[PORTAL_FLAG]?.combatModifier || 0,
+      combatNotes: this.actor.flags?.[PORTAL_FLAG]?.combatNotes || "",
+      statuses: (globalThis.CONFIG?.statusEffects || []).filter(s => s.id).map(s => ({id:s.id, label:game.i18n?.localize(s.name || s.label || s.id) || s.id, active:Boolean(this.actor.statuses?.has(s.id))})),
+      activeEffects: [...(this.actor.effects?.contents || this.actor.effects || [])].map(e => ({name:e.name, disabled:e.disabled})),
+      isGM: Boolean(game.user.isGM),
+      profileHeading: isVehicle ? "Vehicle" : source.gmNotes ? "Adventure NPC" : "NPC",
       tags: source.tags || [],
       sourceLabel: [source.source, source.page ? `p. ${source.page}` : ""].filter(Boolean).join(", "),
     };
@@ -271,36 +309,69 @@ class PortalReinforcementSheet extends PortalSheetBase {
   activateListeners(html) {
     if (typeof super.activateListeners === "function") super.activateListeners(html);
     const root = html?.[0] ?? html;
-    root?.querySelectorAll?.("[data-roll-characteristic]").forEach((button) => button.addEventListener("click", () => {
-      if (this.actor.isOwner || game.user.isGM) this.actor.rollCharacteristic?.(button.dataset.rollCharacteristic)?.catch((error) => ui.notifications.error(error.message));
-    }));
-    root?.querySelectorAll?.("[data-reinforcement-item]").forEach((button) => button.addEventListener("click", () => {
-      this.actor.items?.get?.(button.dataset.reinforcementItem)?.sheet?.render(true);
-    }));
-    root?.querySelectorAll?.("[data-reinforcement-item]").forEach((button) => addItemChatControls(this.actor, button, this.actor.items?.get?.(button.dataset.reinforcementItem)));
-    root?.querySelectorAll?.(".dh2-rf-compact-list li").forEach((row) => {
-      const label = row.textContent.trim();
-      const normalize = (value) => String(value).toLowerCase().replace(/[^a-z0-9]/g, "");
-      const wanted = normalize(label.replace(/\s*[+-]\d+\s*$/, ""));
-      for (const [key, skill] of Object.entries(this.actor.system.skills || {})) {
-        const entries = skill.isSpecialist
-          ? Object.entries(skill.specialities || {}).map(([speciality, entry]) => ({ speciality, label: `${skill.label} (${entry.label})` }))
-          : [{ label: skill.label || key }];
-        for (const entry of entries) {
-          if (normalize(entry.label) !== wanted) continue;
-          const button = document.createElement("button"); button.type = "button"; button.textContent = label; button.title = `Roll ${label}`;
-          button.addEventListener("click", async () => {
-            if (!(this.actor.isOwner || game.user.isGM)) return;
-            try { await this.actor.rollSkill(key, entry.speciality); } catch (error) { ui.notifications.error(error.message); }
-          });
-          row.replaceChildren(button);
-        }
-      }
+    const editable = this.actor.isOwner || game.user.isGM;
+    const statePanel = root?.querySelector('.dh2-rf-state');
+    if (statePanel) { statePanel.open = Boolean(this._stateOpen); statePanel.addEventListener('toggle',()=>{this._stateOpen=statePanel.open;}); }
+    root?.querySelectorAll?.("input[name],textarea[name]").forEach(input => {
+      input.disabled = !editable;
+      let timer, savedValue = input.value;
+      const save = async () => {
+        clearTimeout(timer);
+        if (input.value === savedValue) return;
+        savedValue = input.value;
+        try { await updateCombatField(this.actor,input.name,input.value); }
+        catch(error) { ui.notifications.error(error.message); this.render(false); }
+      };
+      input.addEventListener("input", () => {clearTimeout(timer); timer=setTimeout(save,500);});
+      input.addEventListener("change", save);
+      input.addEventListener("blur", save);
     });
-    root?.querySelector("[data-portrait-edit]")?.addEventListener("click", () => editActorPortrait(this.actor));
-    root?.querySelector("[data-portrait-view]")?.addEventListener("click", () => viewActorPortrait(this.actor));
+    root?.querySelectorAll?.("[data-roll-characteristic]").forEach(button => button.addEventListener("click", () =>
+      openTest(this.actor,{title:button.title,target:characteristicValue(this.actor,button.dataset.rollCharacteristic)})));
+    root?.querySelectorAll?.("[data-roll-skill]").forEach(button => button.addEventListener("click", () => {
+      const skill=skillRows(this.actor).find(s=>s.key===button.dataset.rollSkill && s.speciality===button.dataset.speciality);
+      if(skill) openTest(this.actor,{title:skill.label,target:skill.target});
+    }));
+    root?.querySelectorAll?.("[data-reinforcement-item]").forEach(button => {
+      const item=this.actor.items?.get?.(button.dataset.reinforcementItem);
+      button.addEventListener("click",()=>openItem(this.actor,item));
+      addItemChatControls(this.actor,button,item);
+    });
+    root?.querySelectorAll?.("[data-status]").forEach(button => {
+      button.disabled=!editable;
+      button.addEventListener("click",async()=>{
+        button.disabled=true;
+        try { await this.actor.toggleStatusEffect(button.dataset.status,{active:!this.actor.statuses?.has(button.dataset.status)}); }
+        catch(error){ui.notifications.error(error.message);}
+        finally{button.disabled=!editable;}
+      });
+    });
+    root?.querySelectorAll?.('[data-manage-ammo]').forEach(button=>{
+      button.disabled=!editable;
+      button.onclick=()=>{try{openAmmunition(this.actor,{id:button.dataset.manageAmmo});}catch(e){ui.notifications.error(e.message);}};
+    });
+    root?.querySelectorAll?.('[data-ammo]').forEach(input=>{
+      input.disabled=!editable;
+      input.addEventListener('change',async()=>{
+        if(!editable)return;
+        const value=Number(input.value), item=this.actor.items?.get(input.dataset.ammo);
+        try{
+          if(!item||!Number.isInteger(value)||value<0||value>Number(item.system.clip.max))throw Error('Ammunition must be between zero and the clip capacity.');
+          await item.update({'system.clip.value':value});
+        }catch(error){ui.notifications.error(error.message);this.render(false);}
+      });
+    });
+    root?.querySelector("[data-crew-test]")?.addEventListener("click",()=>openTest(this.actor,{title:"Crew / Operate test",target:0}));
+    root?.querySelector("[data-initiative]")?.addEventListener("click",async()=>{
+      if(!editable)return;
+      try{await this.actor.rollInitiative({createCombatants:true});}catch(error){ui.notifications.error(error.message);}
+    });
+    root?.querySelector("[data-portrait-edit]")?.addEventListener("click",()=>editActorPortrait(this.actor));
+    root?.querySelector("[data-portrait-view]")?.addEventListener("click",()=>viewActorPortrait(this.actor));
   }
 }
+
+class PortalVehicleSheet extends PortalReinforcementSheet {}
 
 Hooks.once("init", () => {
   const module = game.modules.get(MODULE_ID);
@@ -331,19 +402,32 @@ Hooks.once("init", () => {
     });
     Actors.registerSheet(MODULE_ID, PortalReinforcementSheet, {
       types: ["npc"],
-      makeDefault: false,
-      label: "Portal Reinforcement Statblock",
+      makeDefault: true,
+      label: "Portal NPC Combat Sheet",
     });
+    Actors.registerSheet(MODULE_ID, PortalVehicleSheet, {types:["vehicle"],makeDefault:true,label:"Portal Vehicle Combat Sheet"});
   }
 });
 
-Hooks.once("ready", () => {
+Hooks.once("ready", async () => {
   if (game.system.id !== SYSTEM_ID) {
     console.warn(`${MODULE_ID} | This module requires the ${SYSTEM_ID} system.`);
     return;
   }
   game.socket.on(SOCKET_NAME, handleSocketMessage);
   window.addEventListener("message", handlePortalMessage);
+  // Upgrade only the built-in/Portal NPC and vehicle sheets, preserving custom third-party overrides.
+  if (game.user.isGM && game.users?.find?.(u=>u.isGM && u.active)?.id === game.user.id) {
+    const updates = [...(game.actors?.contents || game.actors || [])].filter(a=>['npc','vehicle'].includes(a.type)).flatMap(a=>{
+      const current=a.flags?.core?.sheetClass || '';
+      const next=`${MODULE_ID}.${a.type==='vehicle'?'PortalVehicleSheet':'PortalReinforcementSheet'}`;
+      if(current===next || (current && !current.startsWith(SYSTEM_ID+'.') && !current.startsWith(MODULE_ID+'.')))return [];
+      return [{_id:a.id,'flags.core.sheetClass':next,'flags.dh2CharacterBuilder.previousSheetClass':current}];
+    });
+    if(updates.length) {
+      try{await Actor.updateDocuments(updates);}catch(error){console.error('Portal sheet upgrade failed',error);ui.notifications.warn('Some NPC sheets could not be upgraded. Choose Portal NPC/Vehicle Combat Sheet in Sheet settings.');}
+    }
+  }
 });
 
 Hooks.on("updateActor", (actor, changes) => {
@@ -503,11 +587,11 @@ async function handlePortalMessage(event) {
     return;
   }
 
-  if (["sheet-roll", "sheet-chat"].includes(event.data.type)) {
+  if (["sheet-roll", "sheet-chat", "sheet-ammunition"].includes(event.data.type)) {
     if (context.kind !== "actor-sheet") return;
     const reply = (result) => event.source?.postMessage({ source: "dh2-portal-module", type: "sheet-chat-result", requestId: event.data.requestId, ...result }, event.origin === "null" ? "*" : event.origin);
     try {
-      const result = await (event.data.type === "sheet-roll" ? rollSheetDice : sendSheetText)(context.application.actor, event.data.payload || {});
+      const result = event.data.type === 'sheet-ammunition' ? (openAmmunition(context.application.actor,event.data.payload || {}), {}) : await (event.data.type === "sheet-roll" ? rollSheetDice : sendSheetText)(context.application.actor, event.data.payload || {});
       reply({ ok: true, ...result });
     } catch (error) { reply({ ok: false, error: error.message }); }
     return;
@@ -790,7 +874,15 @@ async function importReinforcementActorData(payload, { openSheet = true, notify 
     if (openSheet) existing.sheet?.render(true);
     return existing;
   }
-  const folder = await findOrCreateActorFolder("Reinforcement Characters");
+  const adventure = actorData.flags?.[PORTAL_FLAG]?.adventure;
+  let folder;
+  if (adventure?.id === "dark-pursuits") {
+    const root = await findOrCreateActorFolder("Dark Pursuits (GM)");
+    const names = { 1: "I - City of Lies", 2: "II - Beneath the Sky", 3: "III - Hunting Damnation" };
+    folder = await findOrCreateActorFolder(names[adventure.part] || "Supporting NPCs", root?.id || null);
+    actorData.ownership = { default: 0 };
+    actorData.prototypeToken = { actorLink: false, disposition: 0 };
+  } else folder = await findOrCreateActorFolder("Reinforcement Characters");
   if (folder?.id) actorData.folder = folder.id;
   const actor = await Actor.create(actorData);
   if (!actor) throw new Error("Foundry did not create the reinforcement NPC.");
@@ -884,6 +976,9 @@ async function importVehicleActorLibrary(payload) {
 }
 
 async function updateActorFromPortal(actor, payload) {
+  return ammoLock(actor, () => syncActorFromPortal(actor, payload));
+}
+async function syncActorFromPortal(actor, payload) {
   if (!actor || typeof actor.update !== "function") throw new Error("The Foundry Acolyte no longer exists.");
   const actorData = validateActorData(payload);
   await actor.update({
@@ -902,7 +997,13 @@ async function updateActorFromPortal(actor, payload) {
     const match = existingItems.find((item) => !used.has(item.id) && item.type === desired.type && item.name === desired.name);
     if (match) {
       used.add(match.id);
-      updates.push({ ...cloneData(desired), _id: match.id });
+      const update = { ...cloneData(desired), _id: match.id };
+      // A builder snapshot must never refill a live weapon or lose its reserves.
+      if (match.type === 'weapon' && match.system?.clip) {
+        update.system.clip = cloneData(match.system.clip);
+        if(match.flags?.dh2Ammo) update.flags = {...update.flags, dh2Ammo:cloneData(match.flags.dh2Ammo)};
+      }
+      updates.push(update);
     } else {
       creates.push(cloneData(desired));
     }
@@ -1005,7 +1106,7 @@ function validateVehicleActorData(payload) {
     throw new Error("This file is not a Dark Heresy Portal vehicle export.");
   }
   const flags = cloneData(source.flags || {});
-  if (flags.core?.sheetClass) delete flags.core.sheetClass;
+  flags.core = {...flags.core, sheetClass: `${MODULE_ID}.PortalVehicleSheet`};
   return {
     name: String(source.name || "Unnamed Vehicle"),
     type: "vehicle",
@@ -1019,6 +1120,7 @@ function validateVehicleActorData(payload) {
 function normalisePortalAssetPath(value = "") {
   const path = String(value || "").split("?")[0];
   if (path.startsWith("./")) return `modules/${MODULE_ID}/portal/${path.slice(2)}`;
+  if (path.startsWith("../public/")) return `modules/${MODULE_ID}/portal/public/${path.slice("../public/".length)}`;
   if (path.startsWith("public/")) return `modules/${MODULE_ID}/portal/${path}`;
   return path || "icons/svg/mystery-man.svg";
 }
@@ -1048,11 +1150,11 @@ function findMatchingPortalActor(entry) {
   }) || null;
 }
 
-async function findOrCreateActorFolder(name) {
-  const existing = game.folders?.find?.((folder) => folder.type === "Actor" && folder.name === name);
+async function findOrCreateActorFolder(name, parent = null) {
+  const existing = game.folders?.find?.((folder) => folder.type === "Actor" && folder.name === name && (folder.folder?.id || folder.folder || null) === parent);
   if (existing) return existing;
   if (typeof globalThis.Folder?.create !== "function") return null;
-  return Folder.create({ name, type: "Actor", sorting: "a" });
+  return Folder.create({ name, type: "Actor", sorting: "a", folder: parent });
 }
 
 function serialiseForComparison(value) {

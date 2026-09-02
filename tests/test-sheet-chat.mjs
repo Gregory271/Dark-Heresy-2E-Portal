@@ -20,6 +20,10 @@ assert.deepEqual(await rollSheetDice(actor, { quantity: 1, sides: 100, target: 5
 assert.match(messages.at(-1).flavor, /3 degree\(s\) of success/);
 assert.equal(messages.at(-1).speaker.actor, actor.id);
 assert.deepEqual(messages.at(-1).whisper, ["gm"]);
+await rollSheetDice(actor,{quantity:1,sides:100,target:60,attack:{mode:'semi',maxHits:3},title:'Burst'});
+assert.match(messages.at(-1).flavor,/2 potential hit/);
+assert.match(messages.at(-1).flavor,/Left arm/);
+await assert.rejects(rollSheetDice(actor,{quantity:1,sides:100,attack:{mode:'bad',maxHits:1}}));
 dice = [100];
 await rollSheetDice(actor, { quantity: 1, sides: 100, target: 150 });
 assert.match(messages.at(-1).flavor, /failure/);

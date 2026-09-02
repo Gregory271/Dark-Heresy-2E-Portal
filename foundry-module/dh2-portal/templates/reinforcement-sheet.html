@@ -2,11 +2,11 @@
   <header class="dh2-rf-header">
     <div class="dh2-portrait-panel">
       <button type="button" data-portrait-view aria-label="View portrait of {{actor.name}}"><img class="dh2-rf-portrait" src="{{actor.img}}" alt="{{actor.name}}" /></button>
-      {{#if editable}}<button type="button" data-portrait-edit>Change Portrait</button>{{/if}}
+      {{#if editable}}<button type="button" data-portrait-edit aria-label="Change portrait for {{actor.name}}">Change Portrait</button>{{/if}}
     </div>
     <div class="dh2-rf-identity">
-      <p>Inquisitorial Reinforcement</p>
-      <input name="name" type="text" value="{{actor.name}}" aria-label="NPC name" />
+      <p>{{profileHeading}}</p>
+      <input name="name" type="text" value="{{actor.name}}" aria-label="Actor name" />
       <div class="dh2-rf-tags">
         {{#each tags}}<span>{{this}}</span>{{/each}}
       </div>
@@ -15,24 +15,66 @@
     <div class="dh2-rf-source">
       <span>{{source.tier}}</span>
       <strong>{{sourceLabel}}</strong>
+      {{#if source.threat}}<span>Threat {{source.threat}}</span>{{/if}}
     </div>
   </header>
 
-  <section class="dh2-rf-characteristics" aria-label="Characteristics">
+  {{#unless isVehicle}}<section class="dh2-rf-characteristics" aria-label="Characteristics">
     {{#each characteristics}}
-      <button type="button" data-roll-characteristic="{{key}}" title="Roll {{label}}">
+      <button type="button" data-roll-characteristic="{{key}}" title="Roll {{label}}" aria-label="Roll {{label}}, target {{total}}">
         <span>{{short}}</span><strong>{{total}}</strong><small>Bonus {{bonus}}</small>
       </button>
     {{/each}}
-  </section>
+  </section>{{/unless}}
 
+  <div class="dh2-rf-health {{#unless isVehicle}}dh2-rf-health-with-armour{{/unless}}">
   <section class="dh2-rf-vitals">
-    <label><span>Wounds</span><div><input name="system.wounds.value" type="number" value="{{system.wounds.value}}" min="0" /><b>/</b><input name="system.wounds.max" type="number" value="{{system.wounds.max}}" min="0" /></div></label>
-    <label><span>Fate</span><div><input name="system.fate.value" type="number" value="{{system.fate.value}}" min="0" /><b>/</b><input name="system.fate.max" type="number" value="{{system.fate.max}}" min="0" /></div></label>
+    {{#if isVehicle}}
+    <label><span>Hull integrity remaining</span><input aria-label="Hull integrity remaining" name="system.integrity.value" type="number" value="{{system.integrity.value}}" min="0" /></label>
+    <label><span>Maximum integrity</span><input name="system.integrity.max" type="number" value="{{system.integrity.max}}" min="0" /></label>
+    <label><span>Critical damage</span><input name="system.integrity.critical" type="number" value="{{system.integrity.critical}}" min="0" /></label>
+    <label><span>Front AP</span><input name="system.front" type="number" value="{{system.front}}" min="0" /></label>
+    <label><span>Side AP</span><input name="system.side" type="number" value="{{system.side}}" min="0" /></label>
+    <label><span>Rear AP</span><input name="system.rear" type="number" value="{{system.rear}}" min="0" /></label>
+    {{else}}
+    <label><span>Wounds remaining</span><div><input aria-label="Wounds remaining" name="system.wounds.value" type="number" value="{{system.wounds.value}}" min="0" /><b>/</b><input aria-label="Maximum wounds" name="system.wounds.max" type="number" value="{{system.wounds.max}}" min="0" /></div></label>
+    <label><span>Critical damage</span><input name="system.wounds.critical" type="number" value="{{system.wounds.critical}}" min="0" /></label>
+    <label><span>Fatigue</span><input name="system.fatigue.value" type="number" value="{{system.fatigue.value}}" min="0" /></label>
+    <label><span>Fate</span><div><input aria-label="Current Fate" name="system.fate.value" type="number" value="{{system.fate.value}}" min="0" /><b>/</b><input aria-label="Maximum Fate" name="system.fate.max" type="number" value="{{system.fate.max}}" min="0" /></div></label>
+    {{/if}}
+  </section>
+  {{#unless isVehicle}}<section class="dh2-npc-armour" aria-label="Armour protection by body location">
+    <h2>Armour</h2>
+    <div class="dh2-npc-armour-map">
+      <svg class="dh2-npc-silhouette" viewBox="0 0 60 120" aria-hidden="true" focusable="false"><circle cx="30" cy="12" r="10"/><path d="M20 26 L40 26 L51 65 L43 68 L36 44 L36 72 L43 116 L32 116 L30 82 L28 116 L17 116 L24 72 L24 44 L17 68 L9 65 Z"/></svg>
+      {{#each armourLocations}}<div class="dh2-npc-location dh2-npc-location-{{id}}" aria-label="{{label}}: {{total}} protection, armour {{ap}}, Toughness Bonus {{toughness}} {{extra}}"><span>{{label}}</span><strong>{{total}}</strong><small>AP {{ap}} + TB {{toughness}} {{extra}}</small></div>{{/each}}
+    </div>
+    <small>Penetration reduces AP only.</small>
+  </section>{{/unless}}
+  </div>
+  <details class="dh2-rf-state">
+    <summary>Conditions, modifiers & profile details</summary>
+    <div class="dh2-rf-play-fields">
+    <label>Persistent roll modifier<input name="flags.dh2CharacterBuilder.combatModifier" type="number" value="{{combatModifier}}" /></label>
+    {{#if isVehicle}}
+    <label>Manoeuvrability<input name="system.manoeuverability" type="number" value="{{system.manoeuverability}}" /></label>
+    <label>Tactical speed (metres)<input name="system.speed.tactical" type="number" value="{{system.speed.tactical}}" /></label>
+    <label>Crew<input name="system.crew" value="{{system.crew}}" /></label>
+    {{else}}
     <div><span>Movement</span><strong>{{source.movement}}</strong></div>
     <div><span>Armour</span><strong>{{source.armour}}</strong>{{#unless source.armour}}<strong>{{source.profileText}}</strong>{{/unless}}</div>
-    {{#if system.psy.rating}}<div><span>Psy Rating</span><strong>{{system.psy.rating}}</strong></div>{{/if}}
-  </section>
+    {{#if system.psy.rating}}<label>Psy Rating<input name="system.psy.rating" type="number" value="{{system.psy.rating}}" min="0" /></label>{{/if}}
+    {{/if}}
+    </div>
+    <div class="dh2-rf-statuses" aria-label="Conditions">{{#each statuses}}<button type="button" data-status="{{id}}" aria-label="Toggle {{label}} condition" aria-pressed="{{active}}">{{label}}</button>{{/each}}</div>
+    {{#each activeEffects}}<p class="dh2-effect-name">{{name}}{{#if disabled}} (disabled){{/if}}</p>{{/each}}
+    <label>Ongoing effects & durations<textarea name="flags.dh2CharacterBuilder.combatNotes" rows="2" placeholder="Bleeding, stunned until next turn, temporary bonuses…">{{combatNotes}}</textarea></label>
+    <small>Condition icons are tracked on the Actor/token. Notes do not automate effects; adjust the roll modifier only for effects not already handled by the system.</small>
+  </details>
+  <nav class="dh2-rf-combat-bar" aria-label="Combat controls">
+    {{#if isVehicle}}<button type="button" data-crew-test>Crew / Operate test</button>{{else}}<button type="button" data-initiative>Roll initiative</button>{{/if}}
+    <span>Changes save immediately · Click an item name for rules</span>
+  </nav>
 
   <main class="dh2-rf-body">
     <div class="dh2-rf-column dh2-rf-combat-column">
@@ -40,47 +82,51 @@
         <section class="dh2-rf-panel dh2-rf-weapons">
           <h2>Weapons</h2>
           {{#each itemGroups.weapons}}
-            <button type="button" class="dh2-rf-record" data-reinforcement-item="{{id}}"><strong>{{name}}</strong><span>{{description}}</span></button>
+            <button type="button" class="dh2-rf-record" data-reinforcement-item="{{id}}" aria-label="Open {{name}} weapon rules"><strong>{{name}}</strong><span>{{description}}</span></button>
+            {{#if hasClip}}<div class="dh2-ammo">Loaded {{clip.value}} / {{clip.max}} <button type="button" data-manage-ammo="{{id}}" aria-label="Manage {{name}} ammunition">Ammo / Reload</button></div>{{/if}}
           {{/each}}
         </section>
       {{/if}}
-      {{#if source.skills.length}}
+      {{#if skills.length}}
         <section class="dh2-rf-panel">
           <h2>Skills</h2>
-          <ul class="dh2-rf-compact-list">{{#each source.skills}}<li>{{this}}</li>{{/each}}</ul>
+          <ul class="dh2-rf-compact-list">{{#each skills}}<li><button type="button" data-roll-skill="{{key}}" data-speciality="{{speciality}}" aria-label="Roll {{label}}, target {{target}}">{{label}} <strong>{{target}}</strong></button></li>{{/each}}</ul>
         </section>
       {{/if}}
       {{#if itemGroups.gear.length}}
         <section class="dh2-rf-panel">
           <h2>Armour & Gear</h2>
-          <div class="dh2-rf-chip-list">{{#each itemGroups.gear}}<button type="button" data-reinforcement-item="{{id}}">{{name}}</button>{{/each}}</div>
+          <div class="dh2-rf-chip-list">{{#each itemGroups.gear}}<button type="button" data-reinforcement-item="{{id}}" aria-label="Open {{name}} rules">{{name}}</button>{{/each}}</div>
         </section>
       {{/if}}
     </div>
 
     <div class="dh2-rf-column">
+      {{#if isGM}}{{#if source.gmNotes}}
+        <section class="dh2-rf-panel"><h2>GM Encounter Notes</h2><p>{{source.gmNotes}}</p></section>
+      {{/if}}{{/if}}
       {{#if itemGroups.talents.length}}
         <section class="dh2-rf-panel">
           <h2>Talents</h2>
-          <div class="dh2-rf-detail-list">{{#each itemGroups.talents}}<button type="button" data-reinforcement-item="{{id}}"><strong>{{name}}</strong><span>{{description}}</span></button>{{/each}}</div>
+          <div class="dh2-rf-detail-list">{{#each itemGroups.talents}}<button type="button" data-reinforcement-item="{{id}}" aria-label="Open {{name}} talent rules"><strong>{{name}}</strong><span>{{description}}</span></button>{{/each}}</div>
         </section>
       {{/if}}
       {{#if itemGroups.traits.length}}
         <section class="dh2-rf-panel">
           <h2>Traits</h2>
-          <div class="dh2-rf-chip-list">{{#each itemGroups.traits}}<button type="button" data-reinforcement-item="{{id}}">{{name}}</button>{{/each}}</div>
+          <div class="dh2-rf-chip-list">{{#each itemGroups.traits}}<button type="button" data-reinforcement-item="{{id}}" aria-label="Open {{name}} trait rules">{{name}}</button>{{/each}}</div>
         </section>
       {{/if}}
       {{#if itemGroups.psychicPowers.length}}
         <section class="dh2-rf-panel">
           <h2>Psychic Powers</h2>
-          <div class="dh2-rf-detail-list">{{#each itemGroups.psychicPowers}}<button type="button" data-reinforcement-item="{{id}}"><strong>{{name}}</strong><span>{{description}}</span></button>{{/each}}</div>
+          <div class="dh2-rf-detail-list">{{#each itemGroups.psychicPowers}}<button type="button" data-reinforcement-item="{{id}}" aria-label="Open {{name}} psychic power rules"><strong>{{name}}</strong><span>{{description}}</span></button>{{/each}}</div>
         </section>
       {{/if}}
       {{#if itemGroups.specialRules.length}}
         <section class="dh2-rf-panel dh2-rf-special-rules">
           <h2>Special Rules</h2>
-          <div class="dh2-rf-detail-list">{{#each itemGroups.specialRules}}<button type="button" data-reinforcement-item="{{id}}"><strong>{{name}}</strong><span>{{description}}</span></button>{{/each}}</div>
+          <div class="dh2-rf-detail-list">{{#each itemGroups.specialRules}}<button type="button" data-reinforcement-item="{{id}}" aria-label="Open {{name}} special rule"><strong>{{name}}</strong><span>{{description}}</span></button>{{/each}}</div>
         </section>
       {{/if}}
     </div>

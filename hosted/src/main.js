@@ -1,4 +1,4 @@
-import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.10.4";
+import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.11.0";
 import { armoury } from "./armoury-data.js?v=0.8.1";
 import { actionGroups, actionSource, combatActionCatalogue } from "./action-data.js?v=0.1.0";
 import { talentCatalogue as baseTalentCatalogue } from "./talent-data.js?v=0.9.1";
@@ -185,6 +185,7 @@ function prepareCharacter(input = {}) {
     )),
   );
   delete prepared.equipment.equipped;
+  syncAutomaticEquipmentState(prepared);
   prepared.equipment.selected ||= null;
   prepared.advances ||= { characteristics: {}, skills: {}, talents: [] };
   prepared.advances.characteristics ||= {};
@@ -223,6 +224,31 @@ function prepareCharacter(input = {}) {
   return prepared;
 }
 
+function syncAutomaticEquipmentState(target = character) {
+  const ids = [...new Set(target.equipment?.inventory || [])];
+  const items = ids.map((id)=>armoury.find((item)=>item.id===id)).filter(Boolean);
+  target.equipment.readiedWeapons = items.filter((item)=>item.category==='Weapons').map((item)=>item.id);
+  target.equipment.wornArmour = items.filter((item)=>item.category==='Armour').map((item)=>item.id);
+  target.equipment.activeGear = items.filter((item)=>!['Weapons','Armour','Weapon Mods'].includes(item.category)).map((item)=>item.id);
+  target.equipment.weaponModAssignments ||= {};
+  for (const modification of items.filter((item)=>item.category==='Weapon Mods')) {
+    if (target.equipment.weaponModAssignments[modification.id]) continue;
+    const weapon=items.find((item)=>item.category==='Weapons'&&modificationCompatibility(modification,item).compatible);
+    if (weapon) target.equipment.weaponModAssignments[modification.id]=weapon.id;
+  }
+}
+
+function untouchedPlaceholderRecord(record) {
+  const candidate=record?.character;
+  if(!candidate || String(candidate.name||'').trim() || Number(record.step||0)!==0 || candidate.completedAt) return false;
+  if([candidate.player,candidate.presentation,candidate.appearance,...Object.values(candidate.history||{})].some((value)=>String(value||'').trim())) return false;
+  return !Object.keys(candidate.rolls||{}).length
+    && !(candidate.acquisitions||[]).length
+    && !Object.values(candidate.advances?.characteristics||{}).some(Number)
+    && !Object.values(candidate.advances?.skills||{}).some(Number)
+    && !(candidate.advances?.talents||[]).length;
+}
+
 function readCharacterLibrary() {
   try {
     const parsed = JSON.parse(localStorage.getItem(libraryStorageKey) || "[]");
@@ -232,7 +258,7 @@ function readCharacterLibrary() {
   }
 }
 
-let characterLibrary = foundryActorSheetMode ? [] : readCharacterLibrary();
+let characterLibrary = foundryActorSheetMode ? [] : readCharacterLibrary().filter((record)=>!untouchedPlaceholderRecord(record));
 if (!characterLibrary.length) {
   let legacyCharacter = {};
   try {
@@ -241,10 +267,11 @@ if (!characterLibrary.length) {
     legacyCharacter = {};
   }
   const now = new Date().toISOString();
-  characterLibrary.push({
+  const legacyStep=Number(sessionStorage.getItem("dh2-step") || 0);
+  if(Object.keys(legacyCharacter).length&&!untouchedPlaceholderRecord({character:legacyCharacter,step:legacyStep})) characterLibrary.push({
     id: characterId(),
     character: prepareCharacter(legacyCharacter),
-    step: Number(sessionStorage.getItem("dh2-step") || 0),
+    step: legacyStep,
     createdAt: now,
     updatedAt: now,
     origin: Object.keys(legacyCharacter).length ? "Migrated local character" : "Created locally",
@@ -252,7 +279,8 @@ if (!characterLibrary.length) {
 }
 
 let activeCharacterId = localStorage.getItem(activeCharacterStorageKey);
-if (!characterLibrary.some((entry) => entry.id === activeCharacterId)) activeCharacterId = characterLibrary[0].id;
+if (!characterLibrary.some((entry) => entry.id === activeCharacterId)) activeCharacterId = characterLibrary[0]?.id || characterId();
+let transientEmptyCharacter = !characterLibrary.length;
 let activeRecord = characterLibrary.find((entry) => entry.id === activeCharacterId);
 let step = Math.min(scenes.length - 1, Math.max(0, Number(activeRecord?.step || 0)));
 let character = prepareCharacter(activeRecord?.character);
@@ -292,7 +320,7 @@ async function initialiseLocalRepository() {
   }
   try {
     const payload = await repositoryRequest();
-    const repositoryRecords = Array.isArray(payload.characters) ? payload.characters : [];
+    const repositoryRecords = Array.isArray(payload.characters) ? payload.characters.filter((record)=>!untouchedPlaceholderRecord(record)) : [];
     const merged = new Map(repositoryRecords.map((record) => [record.id, record]));
     for (const localRecord of characterLibrary) {
       const storedRecord = merged.get(localRecord.id);
@@ -311,18 +339,8 @@ async function initialiseLocalRepository() {
     repositoryStatus = "browser-only";
   }
 
-  if (!characterLibrary.length) {
-    const now = new Date().toISOString();
-    characterLibrary.push({
-      id: characterId(),
-      character: prepareCharacter(),
-      step: 0,
-      createdAt: now,
-      updatedAt: now,
-      origin: "Created locally",
-    });
-  }
-  if (!characterLibrary.some((entry) => entry.id === activeCharacterId)) activeCharacterId = characterLibrary[0].id;
+  if (!characterLibrary.some((entry) => entry.id === activeCharacterId)) activeCharacterId = characterLibrary[0]?.id || activeCharacterId || characterId();
+  transientEmptyCharacter = !characterLibrary.length;
   activeRecord = characterLibrary.find((entry) => entry.id === activeCharacterId);
   step = Math.min(scenes.length - 1, Math.max(0, Number(activeRecord?.step || 0)));
   character = prepareCharacter(activeRecord?.character);
@@ -339,7 +357,7 @@ function withTimeout(promise, milliseconds, message) {
 
 function mergeCloudRecords(records = []) {
   const merged = new Map(characterLibrary.map((record) => [record.id, record]));
-  for (const remote of records) {
+  for (const remote of records.filter((record)=>!untouchedPlaceholderRecord(record))) {
     const local = merged.get(remote.id);
     if (!local || String(remote.updatedAt || "") >= String(local.updatedAt || "")) merged.set(remote.id, remote);
   }
@@ -551,7 +569,6 @@ function inventoryGroup(category) {
 
 function inventoryMatches(search, group, equipped, state = inventoryIndexState) {
   return (state.group === "All" || state.group === group)
-    && (!state.equippedOnly || equipped)
     && search.toLowerCase().includes(state.query.trim().toLowerCase());
 }
 
@@ -559,7 +576,6 @@ function renderInventoryFilters() {
   return `<div class="inventory-toolbar action-index-toolbar">
     <label class="action-search"><span>Search inventory</span><input id="inventory-search" type="search" placeholder="Item name, type, or source…" value="${escapeHtmlAttribute(inventoryIndexState.query)}" /></label>
     <div class="action-filter-list" role="group" aria-label="Filter inventory">${["All", "Weapons", "Armour", "Gear", "Modifications"].map(group => `<button type="button" class="compact-button ${inventoryIndexState.group === group ? "active" : ""}" data-inventory-group="${group}" aria-pressed="${inventoryIndexState.group === group}">${group}</button>`).join("")}</div>
-    <label class="show-unavailable"><input id="inventory-equipped-only" type="checkbox" ${inventoryIndexState.equippedOnly ? "checked" : ""} />Equipped only</label>
     <span id="inventory-result-count" role="status" aria-live="polite"></span>
   </div>`;
 }
@@ -589,7 +605,7 @@ function renderInventorySheetEntry(item, provenance, ownedWeapons) {
   return `<div class="sheet-entry inventory-sheet-entry" data-inventory-row data-inventory-category="${inventoryGroup(item.category)}" data-inventory-equipped="${equipmentItemIsActive(item.id)}" data-inventory-search="${escapeHtmlAttribute([item.name, item.category, provenance.label, safeSummary].join(" "))}">
     <span class="inventory-item-identity"><strong>${escapeHtmlAttribute(item.name)}</strong><small>${escapeHtmlAttribute(item.category)}</small><em>${escapeHtmlAttribute(provenance.label)}</em></span>
     <span class="sheet-entry-summary">${escapeHtmlAttribute(visibleSheetSummary(safeSummary))}</span>
-    <span class="sheet-entry-meta">${reviewInventoryControl(item, ownedWeapons)}${sheetDetailButton({ kind: item.category, name: item.name, summary: safeSummary, source: item.source, rows })}</span>
+    <span class="sheet-entry-meta">${reviewInventoryControl(item, ownedWeapons)}${foundryActorSheetMode && item.category === 'Weapons' && weaponIsRanged(item) ? `<button class="compact-button" type="button" data-manage-ammo="${escapeHtmlAttribute(item.name)}">Ammo / Reload</button>` : ''}${sheetDetailButton({ kind: item.category, name: item.name, summary: safeSummary, source: item.source, rows })}</span>
   </div>`;
 }
 
@@ -985,9 +1001,12 @@ function applyTextScale(scope = root) {
       const baseSize = Math.max(computedSize, minimumSize);
       const scaledSize = baseSize * textScale;
       const phoneHeadingCap = Math.max(56, Math.min(78, window.innerWidth * 0.145));
+      const archiveHeadingCap = element.matches(".reinforcement-heading h1")
+        ? Math.max(68, Math.min(88, window.innerWidth * 0.07))
+        : Number.POSITIVE_INFINITY;
       const finalSize = isPhone && element.matches("h1")
         ? Math.min(scaledSize, phoneHeadingCap)
-        : scaledSize;
+        : Math.min(scaledSize, archiveHeadingCap);
       element.dataset.accessFont = "";
       element.style.fontSize = `${finalSize.toFixed(2)}px`;
     });
@@ -1173,6 +1192,13 @@ function characteristicRollConfig(characteristicId) {
     quantity: modifier === 0 ? 2 : 3,
     keep: modifier > 0 ? "highest" : modifier < 0 ? "lowest" : "all",
   };
+}
+
+const startingInfluenceBaseline = 30;
+
+function setStartingInfluenceBaseline(target = character) {
+  target.rolls ||= {};
+  target.rolls.influence = { value: 30, dice: [], formula: "Fixed 30", keep: "fixed", source: "fixed" };
 }
 
 function calculateCharacteristic(dice, config) {
@@ -1743,6 +1769,8 @@ function save({ markComplete = false } = {}) {
   }
   syncCreationConsequences();
   syncGrantedEquipment();
+  syncAutomaticEquipmentState();
+  if(transientEmptyCharacter && appView==='roster') return;
   const now = new Date().toISOString();
   if (markComplete) character.completedAt = now;
   else if (step < scenes.length - 1 && !character.completedAt) character.completedAt = null;
@@ -1860,6 +1888,7 @@ function refreshXpMeter() {
 function resetCreationDataFrom(sceneId) {
   if (sceneId === "homeWorld") {
     character.rolls = {};
+    setStartingInfluenceBaseline();
     character.characteristicReroll = null;
     character.fate = {};
     character.wounds = {};
@@ -1944,7 +1973,8 @@ function randomizeCreationChoices() {
   character.background = randomEntry(catalogs.backgrounds).id;
   character.role = randomEntry(catalogs.roles).id;
   if (!character.name.trim()) character.name = `${randomEntry(["Severin", "Mira", "Cassian", "Voss", "Lyra", "Merek", "Tavia", "Corvin"])} ${randomEntry(["Vale", "Drake", "Thorne", "Kast", "Vey", "Holt", "Rook", "Sable"])}`;
-  for (const { id } of characteristics) character.rolls[id] = rollGeneratedCharacteristic(id);
+  for (const { id } of characteristics.filter((entry) => entry.id !== "influence")) character.rolls[id] = rollGeneratedCharacteristic(id);
+  setStartingInfluenceBaseline();
   const rules = homeWorldRules();
   const fateRoll = randomDie();
   character.fate = { roll: fateRoll, threshold: rules.fate.threshold + (fateRoll >= rules.fate.blessing ? 1 : 0), source: "randomizer" };
@@ -2046,7 +2076,7 @@ function randomizeCharacterOrigins() {
   }
 }
 
-function showCharacteristicRollResults(ids = characteristics.map((entry) => entry.id)) {
+function showCharacteristicRollResults(ids = characteristics.filter((entry) => entry.id !== "influence").map((entry) => entry.id)) {
   const dialog = document.querySelector("#characteristic-roll-dialog");
   dialog.querySelector(".characteristic-roll-results").innerHTML = characteristics.filter((entry) => ids.includes(entry.id)).map((entry) => {
     const result = character.rolls[entry.id];
@@ -2061,7 +2091,8 @@ let characteristicRollSequence = 0;
 
 function rollAllCharacteristics() {
   characteristicRollSequence += 1;
-  for (const { id } of characteristics) character.rolls[id] = rollGeneratedCharacteristic(id);
+  for (const { id } of characteristics.filter((entry) => entry.id !== "influence")) character.rolls[id] = rollGeneratedCharacteristic(id);
+  setStartingInfluenceBaseline();
   character.characteristicReroll = null;
   save();
   render();
@@ -2219,6 +2250,7 @@ function renderIdentity() {
 }
 
 function renderCharacteristics() {
+  setStartingInfluenceBaseline();
   const complete = characteristics.filter((entry) => character.rolls[entry.id]?.value).length;
   const highCharacteristicOverride = Boolean(character.gmOverrides?.highCharacteristics);
   const manualMaximum = highCharacteristicOverride ? 100 : 50;
@@ -2226,7 +2258,7 @@ function renderCharacteristics() {
     <div class="management-shell characteristics-stage">
       <div class="management-heading">
         <span>${complete} / ${characteristics.length} recorded</span>
-        <button class="compact-button" id="roll-all-characteristics" type="button">Roll All Characteristics</button>
+        <button class="compact-button" id="roll-all-characteristics" type="button">Roll All Other Characteristics</button>
       </div>
       <details class="gm-tools">
         <summary>GM controls</summary>
@@ -2237,6 +2269,16 @@ function renderCharacteristics() {
       </details>
       <div class="characteristic-grid">
         ${characteristics.map((entry) => {
+          if (entry.id === "influence") return `
+            <article class="characteristic-entry complete fixed-characteristic">
+              <div class="characteristic-name">
+                <span class="characteristic-abbreviation">${entry.abbreviation}</span>
+                <strong>${entry.name}</strong>
+                <small>Shared starting baseline</small>
+              </div>
+              <div class="characteristic-result"><strong>${startingInfluenceBaseline}</strong><small>Before later modifiers</small></div>
+              <p>Character choices and campaign effects can modify this value. It remains editable on the completed character sheet.</p>
+            </article>`;
           const config = characteristicRollConfig(entry.id);
           const result = character.rolls[entry.id];
           const formula = config.quantity === 2
@@ -2263,7 +2305,7 @@ function renderCharacteristics() {
             </article>`;
         }).join("")}
       </div>
-      <p class="rules-footnote">Unlimited rerolls enabled (house rule). Each roll replaces and immediately saves the previous result.</p>
+      <p class="rules-footnote">Influence begins at 30. The other nine Characteristics have unlimited rerolls (house rule); each roll replaces and saves its previous result.</p>
     </div>`;
 }
 
@@ -2278,9 +2320,8 @@ function renderFateWounds() {
   return `
     <div class="management-shell ceremony-grid">
       <article class="ceremony-card">
-        <p class="choice-source">Fate Threshold</p>
-        <h2>The Emperor's Blessing</h2>
-        <p>Base threshold ${rules.fate.threshold}. Roll 1d10; ${rules.fate.blessing}+ increases it by 1.</p>
+        <h2>Fate</h2>
+        <p>Starts at ${rules.fate.threshold}. A roll of ${rules.fate.blessing}+ adds 1.</p>
         <div class="ceremony-result">${fateRoll ?? "—"} <span>Threshold ${fateRoll ? fateThreshold : "—"}</span></div>
         <div class="dual-actions">
           <button class="compact-button" id="roll-fate" type="button">Roll 1d10</button>
@@ -2288,9 +2329,8 @@ function renderFateWounds() {
         </div>
       </article>
       <article class="ceremony-card">
-        <p class="choice-source">Starting Wounds</p>
-        <h2>${rules.wounds.base} + ${rules.wounds.dice}d5</h2>
-        <p>Roll each d5 using a d10, divide by two, and round up.</p>
+        <h2>Wounds</h2>
+        <p>${rules.wounds.base} + ${rules.wounds.dice}d5. The roller handles the d10 conversion.</p>
         <div class="ceremony-result">${woundsTotal ?? "—"} <span>${woundsDice.length ? `d5: ${woundsDice.join(", ")}` : "Wounds"}</span></div>
         <div class="dual-actions">
           <button class="compact-button" id="roll-wounds" type="button">Roll ${rules.wounds.dice}d10</button>
@@ -2334,16 +2374,16 @@ function renderDivination() {
       const characteristic = characteristics.find((entry) => entry.id === change.target);
       return `<div class="applied-change"><span>Applied automatically</span><strong>${characteristic?.name || change.target} ${change.amount > 0 ? "+" : ""}${change.amount}</strong></div>`;
     }
-    return `<label class="divination-choice">
-      <span>${change.label || "Choose characteristic"} ${change.amount > 0 ? "+" : ""}${change.amount}</span>
-      <select data-divination-choice="${change.id}">
-        <option value="">Choose...</option>
+    return `<div class="divination-choice ${choices[change.id] ? "choice-complete" : "needs-choice"}">
+      ${choices[change.id] ? "" : '<span class="choice-needed-label">Changes needed</span>'}
+      <strong>${change.label || "Choose characteristic"} ${change.amount > 0 ? "+" : ""}${change.amount}</strong>
+      <div class="inline-choice-buttons" role="group" aria-label="${escapeHtmlAttribute(change.label || "Choose characteristic")}">
         ${change.options.map((id) => {
           const characteristic = characteristics.find((entry) => entry.id === id);
-          return `<option value="${id}" ${choices[change.id] === id ? "selected" : ""}>${characteristic?.name || id}</option>`;
+          return `<button type="button" data-divination-choice-option="${change.id}" data-choice-value="${id}" class="${choices[change.id] === id ? "selected" : ""}" aria-pressed="${choices[change.id] === id}">${characteristic?.name || id}</button>`;
         }).join("")}
-      </select>
-    </label>`;
+      </div>
+    </div>`;
   }).join("");
   const fateControl = result?.fateChange
     ? `<div class="applied-change"><span>Applied automatically</span><strong>Fate Threshold +${result.fateChange}</strong></div>`
@@ -2397,20 +2437,22 @@ function renderAptitudes() {
   const backgroundOptions = ruleValue(character.background, "Aptitude Choice").split(" or ").map((value) => value.trim()).filter(Boolean);
   const roleChoiceText = (ruleValue(character.role, "Role Aptitudes").split(";").find((value) => value.includes(" or ")) || "").trim();
   const roleOptions = roleChoiceText.split(" or ").map((value) => value.trim()).filter(Boolean);
+  const replacementsMissing = Array.from({ length: duplicateCount }, (_, index) => character.aptitudeReplacements[index]).some((value) => !value);
   return `
     <div class="management-shell">
       <div class="aptitude-ledger">
         <section>
           <p class="choice-source">Received from character creation</p>
           <div class="replacement-grid aptitude-source-choices">
-            ${backgroundOptions.length > 1 ? `<label><span>Background aptitude</span><select data-aptitude-source="background">${backgroundOptions.map((option) => `<option ${rawAptitudes().includes(option) && (character.aptitudeSelections.background || backgroundOptions[0]) === option ? "selected" : ""}>${option}</option>`).join("")}</select></label>` : ""}
-            ${roleOptions.length > 1 ? `<label><span>Role aptitude</span><select data-aptitude-source="role">${roleOptions.map((option) => `<option ${(character.aptitudeSelections.role || roleOptions[0]) === option ? "selected" : ""}>${option}</option>`).join("")}</select></label>` : ""}
+            ${backgroundOptions.length > 1 ? `<div class="aptitude-choice-group"><strong>Background aptitude</strong><div class="inline-choice-buttons">${backgroundOptions.map((option) => `<button type="button" data-aptitude-source-option="background" data-choice-value="${escapeHtmlAttribute(option)}" class="${(character.aptitudeSelections.background || backgroundOptions[0]) === option ? "selected" : ""}" aria-pressed="${(character.aptitudeSelections.background || backgroundOptions[0]) === option}">${option}</button>`).join("")}</div></div>` : ""}
+            ${roleOptions.length > 1 ? `<div class="aptitude-choice-group"><strong>Role aptitude</strong><div class="inline-choice-buttons">${roleOptions.map((option) => `<button type="button" data-aptitude-source-option="role" data-choice-value="${escapeHtmlAttribute(option)}" class="${(character.aptitudeSelections.role || roleOptions[0]) === option ? "selected" : ""}" aria-pressed="${(character.aptitudeSelections.role || roleOptions[0]) === option}">${option}</button>`).join("")}</div></div>` : ""}
           </div>
           <div class="tag-list">${rawAptitudes().map((aptitude) => `<span>${aptitude}</span>`).join("")}</div>
         </section>
         <section>
           <p class="choice-source">Duplicate replacements required: ${duplicateCount}</p>
-          <div class="replacement-grid">
+          <div class="replacement-grid ${replacementsMissing ? "needs-choice" : "choice-complete"}">
+            ${replacementsMissing ? '<span class="choice-needed-label">Changes needed</span>' : ""}
             ${Array.from({ length: duplicateCount }, (_, index) => `
               <label>
                 <span>Replacement ${index + 1}</span>
@@ -2528,30 +2570,18 @@ function removeEquipmentState(itemId) {
 }
 
 function equipmentItemIsActive(itemId) {
-  return character.equipment.readiedWeapons.includes(itemId)
-    || character.equipment.wornArmour.includes(itemId)
-    || character.equipment.activeGear.includes(itemId)
-    || Boolean(character.equipment.weaponModAssignments[itemId]);
+  return character.equipment.inventory.includes(itemId);
 }
 
 function reviewInventoryControl(item, ownedWeapons = []) {
-  if (item.category === "Weapons") {
-    const checked = character.equipment.readiedWeapons.includes(item.id) ? "checked" : "";
-    return `<label class="inventory-state-control"><input type="checkbox" data-ready-weapon="${item.id}" ${checked} aria-label="Equip ${escapeHtmlAttribute(item.name)}" /><span>${checked ? "Equipped" : "In inventory"}</span></label>`;
-  }
-  if (item.category === "Armour") {
-    const checked = character.equipment.wornArmour.includes(item.id) ? "checked" : "";
-    return `<label class="inventory-state-control"><input type="checkbox" data-wear-armour="${item.id}" ${checked} aria-label="Equip ${escapeHtmlAttribute(item.name)}" /><span>${checked ? "Equipped" : "In inventory"}</span></label>`;
-  }
   if (item.category === "Weapon Mods") {
     const assignedWeaponId = character.equipment.weaponModAssignments[item.id] || "";
-    return `<label class="inventory-modification-control"><span>Equip to weapon</span><select data-modification-target="${item.id}" aria-label="Weapon for ${escapeHtmlAttribute(item.name)}"><option value="">In inventory</option>${ownedWeapons.map((weapon) => {
+    return `<label class="inventory-modification-control"><span>Installed on</span><select data-modification-target="${item.id}" aria-label="Weapon for ${escapeHtmlAttribute(item.name)}"><option value="">No compatible weapon</option>${ownedWeapons.map((weapon) => {
       const compatibility = modificationCompatibility(item, weapon);
       return `<option value="${weapon.id}" ${assignedWeaponId === weapon.id ? "selected" : ""}>${escapeHtmlAttribute(weapon.name)}${compatibility.compatible ? "" : " · check eligibility"}</option>`;
     }).join("")}</select></label>`;
   }
-  const checked = character.equipment.activeGear.includes(item.id) ? "checked" : "";
-  return `<label class="inventory-state-control"><input type="checkbox" data-active-gear="${item.id}" ${checked} aria-label="Equip ${escapeHtmlAttribute(item.name)}" /><span>${checked ? "Equipped" : "In inventory"}</span></label>`;
+  return `<span class="inventory-auto-state">In inventory · ready to use</span>`;
 }
 
 function modificationCompatibility(modification, weapon) {
@@ -2587,9 +2617,9 @@ function isSightModification(item) {
 const carryingWeights = [0.9, 2.25, 4.5, 9, 18, 27, 36, 45, 56, 67, 78, 90, 112, 225, 337, 450, 675, 900, 1350, 1800, 2250];
 
 function equipmentRulesState(inventoryItems = []) {
-  const readiedWeapons = inventoryItems.filter((item) => character.equipment.readiedWeapons.includes(item.id));
-  const wornArmour = inventoryItems.filter((item) => character.equipment.wornArmour.includes(item.id));
-  const activeGear = inventoryItems.filter((item) => character.equipment.activeGear.includes(item.id));
+  const readiedWeapons = inventoryItems.filter((item) => item.category === "Weapons");
+  const wornArmour = inventoryItems.filter((item) => item.category === "Armour");
+  const activeGear = inventoryItems.filter((item) => !["Weapons","Armour","Weapon Mods"].includes(item.category));
   const weaponModifications = inventoryItems.filter((item) => item.category === "Weapon Mods");
   const assignedModifications = weaponModifications.filter((item) => character.equipment.weaponModAssignments[item.id]);
   const knownWeight = inventoryItems.reduce((sum, item) => sum + (Number.isFinite(item.weight) ? item.weight : 0), 0);
@@ -3554,9 +3584,10 @@ function requestFoundrySheet(type, payload) {
   });
 }
 
-async function rollPlayableDice(quantity, sides, title, target = null, damage = null) {
+async function rollPlayableDice(quantity, sides, title, target = null, damage = null, ammunition = null) {
   if (!foundryActorSheetMode) return rollVisualDice(quantity, sides);
-  const result = await requestFoundrySheet("sheet-roll", { quantity, sides, title, target, damage });
+  const result = await requestFoundrySheet("sheet-roll", { quantity, sides, title, target, damage, ammunition });
+  if (ammunition && result.ammunitionSpent) actionRollSession = {...actionRollSession, ammunitionSpent:result.ammunitionSpent};
   if (result.hidden) {
     const error = new Error("Blind roll sent to Foundry chat. The GM can see its result.");
     error.rollSubmitted = true;
@@ -4146,6 +4177,8 @@ function capabilityActionRecords(inventoryItems) {
       const type = /full action/i.test(summary) ? "Full Action" : /half action/i.test(summary) ? "Half Action" : /free action/i.test(summary) ? "Free Action" : "Varies by use";
       return {
         id: `gear-${item.id}`,
+        equipmentId: item.id,
+        equipmentName: item.name,
         name: `Use ${item.name}`,
         group: "Utility",
         type,
@@ -4357,11 +4390,61 @@ function renderStartingTalentComparison(choice) {
   return `<section class="starting-talent-comparison" aria-label="Compare talent choices">
     <p><strong>Choose one free starting talent.</strong> Compare what each option lets your Acolyte do before making the selection above.</p>
     <div class="starting-talent-options">
-      ${talents.map(({ option, talent }) => `<article class="starting-talent-option ${selected === option ? "selected" : ""}" ${selected === option ? 'aria-current="true"' : ""}>
+      ${talents.map(({ option, talent }) => `<button type="button" class="starting-talent-option ${selected === option ? "selected" : ""}" data-grant-choice-option="${escapeHtmlAttribute(option)}" data-choice-id="${choice.id}" ${selected === option ? 'aria-pressed="true"' : 'aria-pressed="false"'}>
         <header><strong>${escapeHtmlAttribute(option)}</strong><span>${selected === option ? "Selected" : `Tier ${talent.tier}`}</span></header>
         <p>${escapeHtmlAttribute(cleanRulesSummary(talent.benefit) || "No mechanical summary is recorded.")}</p>
         <footer><span>${talent.aptitudes.join(" · ") || "No aptitudes recorded"}</span><small>${talent.source || "Source not recorded"}</small></footer>
-      </article>`).join("")}
+      </button>`).join("")}
+    </div>
+  </section>`;
+}
+
+function renderStartingSkillComparison(choice) {
+  if (choice.sourceId !== "background-skills") return "";
+  const skillsToCompare = choice.options.map((option) => ({ option, skill: skillForGrant(option) }));
+  if (!skillsToCompare.every((entry) => entry.skill)) return "";
+  const selected = character.grantChoices[choice.id] || "";
+  return `<section class="starting-skill-comparison" aria-label="Compare skill choices">
+    <div class="starting-skill-options">
+      ${skillsToCompare.map(({ option, skill }) => {
+        const rule = ruleTermsById[`skill-${skill.id}`];
+        return `<button type="button" class="starting-skill-option ${selected === option ? "selected" : ""}" data-grant-choice-option="${escapeHtmlAttribute(option)}" data-choice-id="${choice.id}" aria-pressed="${selected === option}">
+          <header><strong>${escapeHtmlAttribute(option)}</strong><span>${selected === option ? "Selected" : "Skill"}</span></header>
+          <p>${escapeHtmlAttribute(cleanRulesSummary(rule?.summary) || `Use ${option} to attempt an appropriate task.`)}</p>
+          <footer><span>${escapeHtmlAttribute(rule ? `${rule.book}, p. ${rule.page}` : "Core skill")}</span><small>Choose this</small></footer>
+        </button>`;
+      }).join("")}
+    </div>
+  </section>`;
+}
+
+function renderStartingChoiceButtons(choice) {
+  if (choice.options.length > 8) return "";
+  const selected = character.grantChoices[choice.id] || "";
+  return `<div class="starting-simple-options" role="group" aria-label="${escapeHtmlAttribute(choice.label)} choices">
+    ${choice.options.map((option) => `<button type="button" class="starting-simple-option ${selected === option ? "selected" : ""}" data-grant-choice-option="${escapeHtmlAttribute(option)}" data-choice-id="${choice.id}" aria-pressed="${selected === option}"><strong>${escapeHtmlAttribute(option)}</strong><small>${selected === option ? "Selected" : "Choose this"}</small></button>`).join("")}
+  </div>`;
+}
+
+function renderStartingEquipmentComparison(choice) {
+  if (choice.sourceId !== "background-equipment") return "";
+  const selected = character.grantChoices[choice.id] || "";
+  return `<section class="starting-equipment-comparison" aria-label="Compare equipment choices">
+    <p><strong>Choose one starting item.</strong> The most useful rules are shown here so you can compare without leaving this step.</p>
+    <div class="starting-equipment-options">
+      ${choice.options.map((option) => {
+        const item = armouryItemWithExactName(option) || findLegacyArmouryItem(option);
+        const allRows = item ? itemProfileRows(item).filter(([, value]) => value !== undefined && value !== null && String(value).trim() && value !== "—") : [];
+        const priorities = item?.category === "Weapons" ? ["Damage", "Penetration", "Range", "Clip"] : item?.category === "Armour" ? ["Armour Points", "Maximum Agility", "Type"] : [];
+        const rows = priorities.length ? priorities.map((label) => allRows.find(([candidate]) => candidate === label)).filter(Boolean) : allRows.slice(0, 4);
+        const summary = item ? cleanRulesSummary(item.description || item.profile?.description || "") : "No linked Armoury profile is recorded for this option.";
+        return `<button type="button" class="starting-equipment-option ${selected === option ? "selected" : ""}" data-grant-choice-option="${escapeHtmlAttribute(option)}" data-choice-id="${choice.id}" aria-pressed="${selected === option}">
+          <header><strong>${escapeHtmlAttribute(option)}</strong><span>${selected === option ? "Selected" : escapeHtmlAttribute(item?.category || "Equipment")}</span></header>
+          ${summary ? `<p>${escapeHtmlAttribute(summary)}</p>` : ""}
+          <dl>${rows.map(([label, value]) => `<div><dt>${escapeHtmlAttribute(label)}</dt><dd>${escapeHtmlAttribute(String(value))}</dd></div>`).join("")}</dl>
+          <footer><span>${escapeHtmlAttribute(item ? `${effectiveAvailability(item)} availability · ${displayWeight(item)}` : "Listed starting equipment")}</span><small>Choose this</small></footer>
+        </button>`;
+      }).join("")}
     </div>
   </section>`;
 }
@@ -4440,48 +4523,51 @@ function renderGrantedTraitEntry(entry) {
 }
 
 function renderGrants() {
-  const backgroundRows = mechanicsByChoice[character.background] || [];
-  const roleRows = mechanicsByChoice[character.role] || [];
-  const homeRows = mechanicsByChoice[character.homeWorld] || [];
   const freeSkills = Object.values(resolvedGrantedSkills());
   const freeTalents = Object.values(resolvedGrantedTalents());
-  const freeTraits = automaticTraits();
   const groups = [
     ["Initial Skills", freeSkills.map(renderGrantedSkillEntry)],
     ["Initial Talents", freeTalents.map(renderGrantedTalentEntry)],
-    ["Initial Traits", freeTraits.map(renderGrantedTraitEntry)],
-    ["Home World Bonus", [homeRows.find(([label]) => label === "Home World Bonus")?.[1]].filter(Boolean)],
-    ["Background Bonus", [backgroundRows.find(([label]) => label === "Background Bonus")?.[1]].filter(Boolean)],
-    ["Role Talent", [roleRows.find(([label]) => label === "Talent Choice")?.[1]].filter(Boolean)],
-    ["Role Bonus", [roleRows.find(([label]) => label === "Role Bonus")?.[1]].filter(Boolean)],
   ];
+  const alternatives = grantAlternatives();
+  const remaining = alternatives.filter((choice) => !character.grantChoices[choice.id]).length;
+  const resultGroups = groups;
   return `
-    <div class="management-shell grants-grid">
-      ${groups.map(([title, entries]) => `
-        <section class="grant-panel" data-grant-group="${title.toLowerCase().replace(/\s+/g, "-")}">
-          <h2>${title}</h2>
-          ${entries.map((entry) => String(entry).trimStart().startsWith("<details") ? entry : `<div class="grant-entry">${entry}</div>`).join("") || "<p>None recorded.</p>"}
-        </section>`).join("")}
-      <section class="grant-panel choice-resolution" data-grant-group="granted-choices">
-        <h2>Granted Choices</h2>
-        <p>Select each alternative granted by the character's Home World, Background, or Role.</p>
+    <div class="management-shell grants-grid starting-abilities-layout">
+      <section class="grant-panel choice-resolution starting-decisions" data-grant-group="granted-choices">
+        <header class="starting-column-heading"><div><p class="choice-source">Decide first</p><h2>Your Starting Choices</h2></div><strong>${remaining} remaining</strong></header>
+        <p>Select an option below. Comparison cards can be clicked directly; the dropdown remains available for keyboard and screen-reader users.</p>
         <div class="grant-choice-list">
-          ${grantAlternatives().map((choice) => {
+          ${alternatives.map((choice) => {
             const talentComparison = renderStartingTalentComparison(choice);
+            const skillComparison = renderStartingSkillComparison(choice);
+            const equipmentComparison = renderStartingEquipmentComparison(choice);
+            const simpleComparison = talentComparison || skillComparison || equipmentComparison ? "" : renderStartingChoiceButtons(choice);
+            const comparison = talentComparison || skillComparison || equipmentComparison || simpleComparison;
+            const unresolved = !character.grantChoices[choice.id];
             return `
-              <div class="grant-choice-item ${talentComparison ? "has-talent-comparison" : ""}">
-                <label>
-                  <span>${choice.label}<small>${choice.source}</small></span>
-                  <select data-grant-choice="${choice.id}">
+              <div class="grant-choice-item ${unresolved ? "needs-choice" : "choice-complete"} ${comparison ? "has-choice-comparison" : ""}">
+                ${unresolved ? '<span class="choice-needed-label">Changes needed</span>' : ""}
+                <div class="grant-choice-heading"><strong>${choice.label}</strong><small>${choice.source}</small></div>
+                ${comparison ? "" : `<label class="grant-choice-select"><span>Choose one option</span><select data-grant-choice="${choice.id}">
                     <option value="">Choose...</option>
                     ${choice.options.map((option) => `<option value="${option}" ${character.grantChoices[choice.id] === option ? "selected" : ""}>${option}</option>`).join("")}
-                  </select>
-                </label>
+                  </select></label>`}
                 ${talentComparison}
+                ${skillComparison}
+                ${equipmentComparison}
+                ${simpleComparison}
               </div>`;
           }).join("") || "<p>No unresolved alternatives were detected.</p>"}
         </div>
       </section>
+      <aside class="starting-reference" aria-label="Starting abilities reference">
+        <header class="starting-column-heading"><div><p class="choice-source">No action needed</p><h2>Already Added</h2></div></header>
+        <p class="starting-reference-intro">These are recorded automatically. Open an entry only when you want its rules summary.</p>
+        <div class="starting-result-groups">
+          ${resultGroups.map(([title, entries]) => `<section class="grant-panel" data-grant-group="${title.toLowerCase().replace(/\s+/g, "-")}"><h2>${title}</h2>${entries.map((entry) => String(entry).trimStart().startsWith("<details") ? entry : `<div class="grant-entry">${entry}</div>`).join("") || "<p>None recorded.</p>"}</section>`).join("")}
+        </div>
+      </aside>
       ${renderStartingConsequences()}
     </div>`;
 }
@@ -4622,7 +4708,7 @@ function renderEquipment() {
           <section class="inventory-record unified-equipment-record" aria-labelledby="inventory-record-title">
             <div class="inventory-record-heading">
               <strong id="inventory-record-title">Your Inventory</strong>
-              <span>Every owned item appears once. Ready weapons, wear compatible armour, install modifications, or mark carried gear in use.</span>
+              <span>Every owned item appears once and is ready to use. Compatible armour and gear are applied automatically; weapon modifications show their assigned weapon.</span>
             </div>
             <div class="carried-equipment-list unified-equipment-list">${inventoryItems.map((item) => {
               const source = equipmentProvenance(item.id, grantedEquipment);
@@ -6077,6 +6163,7 @@ function createRosterCharacter(seed = {}, origin = "Created locally") {
     origin,
   };
   characterLibrary.unshift(record);
+  transientEmptyCharacter = false;
   activeCharacterId = id;
   activeRecord = record;
   character = prepareCharacter(record.character);
@@ -6172,18 +6259,31 @@ function vehicleStatBlock(entry) {
 }
 
 function reinforcementArtwork(entry) {
-  // The supplied vehicle records do not include vehicle artwork. Leave the
-  // art well neutral rather than showing an unrelated character illustration.
-  if (entry.type === "vehicle") return "";
-  const tags = (entry.tags || []).map((tag) => String(tag).toLowerCase());
-  const artId = tags.includes("assassin") ? "assassin"
-    : tags.includes("adeptus astartes") || tags.includes("grey knights") ? "crusader"
-      : tags.includes("ecclesiarchy") || tags.includes("adepta sororitas") ? "adepta-sororitas"
-        : tags.includes("daemonhost") || tags.includes("daemon") ? "daemon-world"
-          : tags.includes("eldar") ? "rogue-trader-fleet"
-            : tags.includes("ork") || tags.includes("kroot") ? "outcast"
-              : "review";
-  return artByChoice[artId] || stageArtById.review;
+  // Portraits are deliberately mapped profile-by-profile. Broad tag guesses
+  // previously showed the same generic Assassin, Crusader, or Outcast art for
+  // several unrelated records and made the archive look authoritative when it
+  // was not. Missing private sourcebook crops use an honest neutral fallback.
+  const verifiedArtwork = {
+    "rc-sister-of-battle-canoness": "sister-of-battle-canoness.jpg",
+    "rc-deathwatch-space-marine": "deathwatch-space-marine.jpg",
+    "rc-grey-knight-space-marine": "grey-knight-space-marine.jpg",
+    "rc-arco-flagellant": "arco-flagellant.jpg",
+    "rc-penitent-engine": "penitent-engine.jpg",
+    "rc-callidus-assassin": "callidus-assassin.jpg",
+    "rc-ork-freeboota": "ork-freeboota.jpg",
+    "rc-culexus-assassin": "culexus-assassin.jpg",
+    "vehicle-chimera": "chimera.jpg",
+    "vehicle-aelurus-trike": "aelurus-heavy-trike.jpg",
+    "vehicle-aquila-lander": "aquila-lander.jpg",
+    "vehicle-arvus-lighter": "arvus-lighter.jpg",
+    "vehicle-sentinel-walker": "sentinel-walker.jpg",
+    "vehicle-reaver-jetbike": "reaver-jetbike.jpg",
+  };
+  const filename = verifiedArtwork[entry.id];
+  if (filename) return `../public/assets/reinforcements/${filename}?v=0.9.0`;
+  return entry.type === "vehicle"
+    ? "../public/assets/ui/vehicle-silhouette.svg?v=0.9.0"
+    : "../public/assets/ui/npc-silhouette.svg?v=0.9.0";
 }
 
 function reinforcementListEntries(entries, selectedId) {
@@ -6746,6 +6846,34 @@ function comparePlayableActions(a, b, weaponIds = []) {
   return weaponRank(a) - weaponRank(b) || String(a.name).localeCompare(String(b.name));
 }
 
+function groupedActionSections(actions, weaponIds = []) {
+  const sections = [];
+  for (const definition of [...actionSectionDefinitions].sort((a, b) => a.order - b.order)) {
+    const members = actions.filter((action) => actionSectionPresentation(action).key === definition.key);
+    const groups = new Map();
+    for (const action of members) {
+      const itemId = action.test?.weaponId || action.equipmentId;
+      const key = itemId ? `${definition.key}-${itemId}` : definition.key;
+      if (!groups.has(key)) groups.set(key, {
+        ...definition, key, itemId,
+        title: itemId ? action.test?.weaponName || action.equipmentName || definition.title : definition.title,
+        source: itemId ? "" : definition.source,
+        actions: [],
+      });
+      groups.get(key).actions.push(action);
+    }
+    const rank = (group) => {
+      const index = weaponIds.indexOf(group.itemId);
+      return index < 0 ? weaponIds.length : index;
+    };
+    sections.push(...[...groups.values()].sort((a, b) =>
+      Number(!a.actions.some((action) => action.available)) - Number(!b.actions.some((action) => action.available))
+      || rank(a) - rank(b) || a.title.localeCompare(b.title)
+    ).map((group) => ({ ...group, actions: group.actions.sort((a, b) => comparePlayableActions(a, b, weaponIds)) })));
+  }
+  return sections;
+}
+
 function renderActionIndex(actions) {
   if (!actionGroups.includes(actionIndexState.group)) actionIndexState.group = "All";
   const query = actionIndexState.query.trim().toLowerCase();
@@ -6780,14 +6908,13 @@ function renderActionIndex(actions) {
       </article>`;
   };
   const weaponIds = [character.equipment.equipped?.primary, ...character.equipment.readiedWeapons].filter(Boolean);
-  const actionSectionsMarkup = [...actionSectionDefinitions].sort((a, b) => a.order - b.order).map((definition) => {
-    const sectionActions = actions.filter((action) => actionSectionPresentation(action).key === definition.key)
-      .sort((a, b) => comparePlayableActions(a, b, weaponIds));
+  const actionSectionsMarkup = groupedActionSections(actions, weaponIds).map((definition) => {
+    const sectionActions = definition.actions;
     if (!sectionActions.length) return "";
     const sectionInitiallyVisible = sectionActions.some(initiallyVisible);
-    return `<section class="action-group-section" data-action-section="${definition.key}" aria-labelledby="action-section-${definition.key}" ${sectionInitiallyVisible ? "" : "hidden"}>
+    return `<section class="action-group-section" data-action-section="${escapeHtmlAttribute(definition.key)}" aria-labelledby="action-section-${escapeHtmlAttribute(definition.key)}" ${sectionInitiallyVisible ? "" : "hidden"}>
       <header class="action-section-heading">
-        <div><span class="action-section-icon">${actionGroupGlyph(definition.glyph)}</span><h4 id="action-section-${definition.key}">${definition.title}</h4></div>
+        <div><span class="action-section-icon">${actionGroupGlyph(definition.glyph)}</span><h4 id="action-section-${escapeHtmlAttribute(definition.key)}">${escapeHtmlAttribute(definition.title)}</h4></div>
         <span>${definition.source}</span>
       </header>
       <div class="action-card-grid">${sectionActions.map(renderActionCard).join("")}</div>
@@ -7205,7 +7332,6 @@ function render() {
         ${scene.eyebrow ? `<p class="eyebrow">${scene.eyebrow}</p>` : ""}
         ${scene.kicker ? `<p class="kicker">${scene.kicker}</p>` : ""}
         <h1 id="scene-title">${scene.title}</h1>
-        <p class="lede">${scene.copy}</p>
         ${scene.catalog ? `
           <div class="catalog-stage-layout">
             <div class="catalog-selection-column">${renderStageBody(scene, selected)}</div>
@@ -7288,13 +7414,12 @@ function render() {
       <p class="eyebrow" id="sheet-detail-kind">Character Record</p>
       <h2 id="sheet-detail-title">Record details</h2>
       <p id="sheet-detail-summary"></p>
-      ${foundryActorSheetMode ? `<button type="button" data-send-sheet-rules="sheet-detail">Send to Chat</button>` : ""}
       <dl class="sheet-detail-profile" id="sheet-detail-profile"></dl>
       <p class="source-note" id="sheet-detail-source"></p>
+      ${foundryActorSheetMode ? chatShareControl('sheet-detail') : ''}
     </dialog>
 
     <dialog id="action-dialog" class="action-dialog" aria-labelledby="action-dialog-title">
-      ${foundryActorSheetMode ? `<button type="button" data-send-sheet-rules="action-dialog">Send Rules to Chat</button>` : ""}
       <button class="dialog-close" aria-label="Close action">×</button>
       <p class="eyebrow" id="action-dialog-kind">Current Action</p>
       <div class="action-dialog-title-row" id="action-dialog-title-row">
@@ -7333,6 +7458,7 @@ function render() {
         <div class="action-roll-result" id="action-roll-result" role="status" aria-live="polite"></div>
       </div>
       <p class="source-note" id="action-dialog-source"></p>
+      ${foundryActorSheetMode ? chatShareControl('action-dialog') : ''}
     </dialog>`;
 
   wireEvents();
@@ -7348,6 +7474,9 @@ function render() {
   });
 }
 
+function chatShareControl(prefix) {
+  return `<div class="sheet-share-footer"><button type="button" class="sheet-chat-share" data-send-sheet-rules="${prefix}" aria-label="Send description to chat" title="Send this description to chat (no roll)"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false"><path d="M3 3h14v10H8l-5 4V3Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 7h8M6 10h5" stroke="currentColor" stroke-width="1.5"/></svg><span>Chat</span></button><span class="sheet-share-status" role="status"></span></div>`;
+}
 function filterReviewActionCards() {
   const query = actionIndexState.query.trim().toLowerCase();
   let visible = 0;
@@ -7469,7 +7598,7 @@ function actionRollResultMarkup(action, session) {
   const attack = action.test.weaponId || action.test.unarmed || action.test.hitMode;
   const effectiveDegrees = outcome.success ? outcome.degrees + (addedDegree ? 1 : 0) : outcome.degrees;
   const outcomeLabel = `${effectiveDegrees} Degree${effectiveDegrees === 1 ? "" : "s"} of ${outcome.success ? "Success" : "Failure"}${addedDegree ? " (includes +1 from Fate)" : ""}`;
-  const hitCount = attack && outcome.success ? attackHitCount(action.test, effectiveDegrees) : 0;
+  const hitCount = attack && outcome.success ? Math.min(attackHitCount(action.test, effectiveDegrees), session.ammunitionSpent || Infinity) : 0;
   const location = attack && outcome.success ? (action.test.calledShot ? "Declared location" : attackHitLocation(roll)) : "";
   const jamThreshold = ["semi", "full", "suppressing"].includes(action.test.hitMode) ? 94 : 96;
   const possibleJam = Boolean(action.test.weaponId && weaponIsRanged(equipmentItem(action.test.weaponId)) && roll >= jamThreshold);
@@ -7606,7 +7735,8 @@ async function executeCurrentActionRoll() {
       : null;
     const test = psychic ? { ...action.test, actionModifier: Number(action.test.actionModifier || 0) + psychic.modifier } : action.test;
     const resolved = resolvedActionTest(test, situation, plusTen ? 10 : 0);
-    const [roll] = await rollPlayableDice(1, 100, action.name, resolved.target);
+    const ammo = action.test.weaponId && weaponIsRanged(equipmentItem(action.test.weaponId)) ? {name:action.test.weaponName,mode:action.test.calledShot?'called':action.test.hitMode==='single'?'standard':action.test.hitMode} : null;
+    const [roll] = await rollPlayableDice(1, 100, action.name, resolved.target, null, ammo);
     const outcome = testOutcome(roll, resolved.target);
     actionRollSession = { ...actionRollSession, actionId: action.id, resolved, psychic, roll, originalRoll: roll, outcome };
     renderCurrentActionRollResult(action);
@@ -7644,6 +7774,12 @@ function addDegreeToCurrentActionWithFate() {
 }
 
 function wireEvents() {
+  document.querySelectorAll('[data-manage-ammo]').forEach(button => button.addEventListener('click',async()=>{
+    button.disabled=true;
+    try { await requestFoundrySheet('sheet-ammunition',{name:button.dataset.manageAmmo}); }
+    catch(error) { window.alert(error.message); }
+    finally { button.disabled=false; }
+  }));
   applyInventoryFilters();
   document.querySelector("#inventory-search")?.addEventListener("input", (event) => {
     inventoryIndexState.query = event.target.value; applyInventoryFilters();
@@ -7664,7 +7800,7 @@ function wireEvents() {
     const title = document.querySelector(`#${prefix}-title`)?.textContent || "Rules";
     const text = ["summary", "profile", "context", "source"].map((part) => document.querySelector(`#${prefix}-${part}`)?.textContent || "").filter(Boolean).join("\n\n");
     button.disabled = true;
-    try { await requestFoundrySheet("sheet-chat", { title, text }); }
+    try { await requestFoundrySheet("sheet-chat", { title, text }); button.parentElement.querySelector('.sheet-share-status').textContent='Sent to chat'; }
     catch (error) { window.alert(error.message); }
     finally { button.disabled = false; }
   }));
@@ -8135,6 +8271,15 @@ function wireEvents() {
       render();
     });
   });
+  document.querySelectorAll("[data-divination-choice-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      character.divination.statChoices ||= {};
+      character.divination.statChoices[button.dataset.divinationChoiceOption] = button.dataset.choiceValue;
+      playMechanicalLock();
+      save();
+      render();
+    });
+  });
   document.querySelector("[data-divination-talent-speciality]")?.addEventListener("change", (event) => {
     character.divination.resolutions ||= {};
     character.divination.resolutions.talentSpeciality = event.target.value;
@@ -8284,6 +8429,15 @@ function wireEvents() {
       render();
     });
   });
+  document.querySelectorAll("[data-aptitude-source-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      playMechanicalLock();
+      character.aptitudeSelections[button.dataset.aptitudeSourceOption] = button.dataset.choiceValue;
+      character.aptitudeReplacements = [];
+      save();
+      render();
+    });
+  });
   document.querySelectorAll("[data-grant-choice]").forEach((select) => {
     select.addEventListener("change", () => {
       playMechanicalLock();
@@ -8291,6 +8445,15 @@ function wireEvents() {
       character.grantChoices[choiceId] = select.value;
       save();
       rerenderGrantsPreservingScroll(`[data-grant-choice="${choiceId}"]`);
+    });
+  });
+  document.querySelectorAll("[data-grant-choice-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      playMechanicalLock();
+      const choiceId = button.dataset.choiceId;
+      character.grantChoices[choiceId] = button.dataset.grantChoiceOption;
+      save();
+      rerenderGrantsPreservingScroll(`[data-choice-id="${choiceId}"][aria-pressed="true"]`);
     });
   });
   const filterArmoury = () => {

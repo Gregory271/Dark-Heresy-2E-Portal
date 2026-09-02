@@ -33,7 +33,9 @@ for (let run = 0; run < 240; run++) {
   worlds.add(c.homeWorld); backgrounds.add(c.background); roles.add(c.role);
   assert.equal(c.name, 'QA');
   assert.equal(Object.keys(c.rolls).length, 10);
-  for (const result of Object.values(c.rolls)) {
+  assert.deepEqual(JSON.parse(JSON.stringify(c.rolls.influence)), { value: 30, dice: [], formula: 'Fixed 30', keep: 'fixed', source: 'fixed' });
+  for (const [id, result] of Object.entries(c.rolls)) {
+    if (id === 'influence') continue;
     assert(result.value >= 22 && result.value <= 40);
     assert.equal(result.kept.length, 2);
     assert.equal(result.value, result.kept.reduce((sum, die) => sum + die, 20));
@@ -76,6 +78,8 @@ vm.runInContext('let characteristicRollSequence = 0;', context);
 for (let index = 0; index < 20; index++) context.rollAllCharacteristics();
 assert.equal(saved, 20);
 assert.equal(Object.keys(context.character.rolls).length, 10);
+assert.equal(context.character.rolls.influence.value, 30);
+assert.equal(context.character.rolls.influence.source, 'fixed');
 assert.equal(context.character.characteristicReroll, null);
 context.step = 4;
 context.navigateCreationBack();

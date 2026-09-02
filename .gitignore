@@ -6,6 +6,8 @@ node_modules/
 tmp-server.*.log
 gcm-browser.*.log
 dist/
+gm-private/
+tmp/pdfs/
 
 # Private sourcebook extracts and locally supplied media are never committed to
 # the public player-edition repository. The hosted build uses redacted data and
@@ -15,7 +17,10 @@ src/talent-data.js
 public/data/
 public/assets/choices/
 public/assets/stages/
+public/assets/reinforcements/
+hosted/public/assets/reinforcements/
 public/assets/audio/
 public/assets/rhodin-iv.webp
 public/assets/imperial-guard.webp
 public/assets/assassin.webp
+.tmp-pdf/

@@ -150,6 +150,15 @@ const reinforcementPayload = {
 const validatedReinforcement = moduleRecord.api.validateReinforcementActorData(reinforcementPayload);
 assert.equal(validatedReinforcement.type, "npc");
 assert.equal(validatedReinforcement.img, "modules/dh2-portal/portal/public/assets/choices/adepta-sororitas.webp");
+const verifiedArtPayload = {
+  ...structuredClone(reinforcementPayload),
+  img: "../public/assets/reinforcements/sister-of-battle-canoness.jpg?v=0.9.0",
+};
+assert.equal(
+  moduleRecord.api.validateReinforcementActorData(verifiedArtPayload).img,
+  "modules/dh2-portal/portal/public/assets/reinforcements/sister-of-battle-canoness.jpg",
+  "Builder-relative private artwork resolves inside the installed module",
+);
 const reinforcementActor = await moduleRecord.api.importReinforcementActorData(reinforcementPayload, { openSheet: false, notify: false });
 assert.equal(reinforcementActor.type, "npc");
 assert.equal(createdRecords[2].folder, "folder-2");
@@ -278,3 +287,45 @@ game.user = users.get("player");
 await assert.rejects(moduleRecord.api.saveActorPortrait({ ...portraitActor, isOwner: false }, "denied.webp"), /own/);
 game.user = users.get("gm");
 console.log("Foundry module QA passed: imports, duplicate protection, portrait permissions, token isolation, and autosave preservation.");
+const ammoItem={id:'ammo-sync',type:'weapon',name:'Ammo sync fixture',system:{clip:{value:3,max:30}},flags:{dh2Ammo:{reserve:60}}};
+let ammoUpdates;
+await moduleRecord.api.updateActorFromPortal({...portraitActor,items:[ammoItem],updateEmbeddedDocuments:async(type,updates)=>{ammoUpdates=updates;}},{...payload,items:[{type:'weapon',name:ammoItem.name,system:{clip:{value:30,max:30}}}]});
+assert.equal(ammoUpdates[0].system.clip.value,3,'Autosave must not refill a weapon');
+assert.equal(ammoUpdates[0].flags.dh2Ammo.reserve,60,'Autosave must preserve ammo inventory');
+
+// Adventure imports are private, grouped, and idempotent. No book content in fixtures.
+const adventureFixtures = [1, 2, 3].map(part => ({
+  ...structuredClone(reinforcementPayload), name: `Adventure fixture ${part}`,
+  ownership: { default: 3, player: 3 },
+  flags: { dh2CharacterBuilder: {
+    reinforcementId: `qa-adventure-${part}`, reinforcement: { name: 'QA NPC', page: 1 },
+    adventure: { id: 'dark-pursuits', part, gmOnly: true }
+  } }
+}));
+const adventurePack = {format: 'dh2-reinforcement-actor-library', actors: adventureFixtures};
+const firstImport = await moduleRecord.api.importReinforcementActorLibrary(adventurePack);
+assert.equal(firstImport.created.length, 3);
+assert.equal(firstImport.failed.length, 0);
+const adventureRoot = game.folders.find(f => f.name === 'Dark Pursuits (GM)');
+for (const record of createdRecords.slice(-3)) {
+  assert.deepEqual(record.ownership, {default: 0});
+  assert.equal(record.prototypeToken.actorLink, false);
+  assert.equal(game.folders.find(f => f.id === record.folder).folder, adventureRoot.id);
+}
+const secondImport = await moduleRecord.api.importReinforcementActorLibrary(adventurePack);
+assert.equal(secondImport.created.length, 0);
+assert.equal(secondImport.skipped.length, 3);
+game.user = users.get('player');
+await assert.rejects(moduleRecord.api.importReinforcementActorLibrary(adventurePack), /Gamemaster/);
+game.user = users.get('gm');
+console.log('Adventure import QA passed: three folders, GM-only ownership, duplicate protection.');
+users.find = callback => [...users.values()].find(callback);
+game.actors.push({id:'native-npc',type:'npc',flags:{core:{sheetClass:'dark-heresy-2nd.OldSheet'}}});
+game.actors.push({id:'custom-vehicle',type:'vehicle',flags:{core:{sheetClass:'another-module.CustomSheet'}}});
+let sheetUpgrades=[];
+Actor.updateDocuments=async changes=>{sheetUpgrades=changes;};
+await hooks.once.get('ready')();
+assert.equal(sheetUpgrades.find(a=>a._id==='native-npc')['flags.core.sheetClass'],'dh2-portal.PortalReinforcementSheet');
+assert.equal(sheetUpgrades.find(a=>a._id==='native-npc')['flags.dh2CharacterBuilder.previousSheetClass'],'dark-heresy-2nd.OldSheet');
+assert.ok(!sheetUpgrades.some(a=>a._id==='custom-vehicle'));
+console.log('Sheet upgrade QA passed: native NPC migration preserves third-party overrides.');

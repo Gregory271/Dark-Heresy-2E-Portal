@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" role="img" aria-labelledby="title desc">
+  <title id="title">Unassigned NPC portrait</title>
+  <desc id="desc">A neutral human silhouette used until a verified portrait is selected.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#18201e"/><stop offset="1" stop-color="#050807"/>
+    </linearGradient>
+    <radialGradient id="halo"><stop offset="0" stop-color="#b68b48" stop-opacity=".24"/><stop offset="1" stop-color="#b68b48" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#bg)"/>
+  <circle cx="200" cy="205" r="170" fill="url(#halo)"/>
+  <path d="M200 82c-70 0-117 54-117 126 0 52 26 91 66 111-8 31-30 52-67 68C27 411 7 470 0 600h400c-7-130-27-189-82-213-37-16-59-37-67-68 40-20 66-59 66-111 0-72-47-126-117-126Z" fill="#0b0f0e" stroke="#8d7142" stroke-width="4"/>
+  <path d="M80 516h240M112 552h176" stroke="#8d7142" stroke-width="3" opacity=".45"/>
+</svg>

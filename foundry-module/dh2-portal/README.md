@@ -6,6 +6,30 @@ Existing Acolyte Actors load into the same review, actions, skills, inventory,
 features, background, and advancement interface. Changes made there are saved
 back to the Actor, including Portal-managed Items.
 
+Owned weapons, armour and general gear are available automatically; the Portal
+does not require a separate equipped checkbox. Multiple armour layers still use
+the highest AP at each body location rather than adding together. Weapon
+modifications are assigned to a compatible owned weapon and can be reassigned.
+
+NPCs and vehicles use Portal combat sheets with editable resources, conditions,
+ammunition, notes and roll modifiers. Click a name for rules; Roll and Damage
+use Portal dialogs and Foundry chat. Vehicle rolls require an explicit crew
+target. The system still calculates derived characteristics and tracks native
+conditions. Resolve defences, special effects and jams manually; these controls
+do not automatically apply attacks to targets.
+
+In Foundry, **Ammo / Reload** beside a ranged weapon tracks loaded ammunition
+and spare rounds/charges allocated to that weapon. Attack rolls automatically
+spend ammunition, including on misses; damage and Fate rerolls do not spend it
+again. Partial bursts are capped to the ammunition remaining. Reload transfers
+saved reserves; apply the weapon's reload time yourself. New reserves start at
+zero. Special ammunition, overcharge, discarded magazines and jam losses need
+manual adjustment. This first version is Foundry-only; standalone web tracking,
+shared ammo stacks and cross-client simultaneous firing are not implemented.
+
+On GM startup, built-in NPC/vehicle sheet selections are upgraded; third-party
+sheet overrides are preserved. No actor statistics or ownership are changed.
+
 ## Install for local testing
 
 1. From the project folder, run `npm.cmd run build:foundry` (or run

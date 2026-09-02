@@ -17,6 +17,8 @@ to Foundry VTT.
 - Searchable sourcebook compendium assembled in the user's browser.
 - Shared campaign characters through Supabase, without player accounts.
 - Builder JSON and Foundry Actor JSON exports.
+- Native live-play sheets for Acolytes, reinforcement NPCs, and vehicles,
+  including Foundry chat rolls and ammunition tracking.
 - Responsive layouts, text scaling, keyboard support, and reduced-motion modes.
 
 Sourcebook PDFs selected in the hosted portal remain on that device and are not
@@ -27,9 +29,17 @@ rights holders.
 To prepare the public GitHub Pages edition after making changes, run
 `npm.cmd run build:hosted`.
 
+For a complete local campaign backup suitable for moving to another computer,
+see [`docs/LAPTOP-MIGRATION.md`](docs/LAPTOP-MIGRATION.md). To regenerate the
+optional sourcebook portraits from PDFs you own, run
+`scripts/extract-reinforcement-art.ps1`; those private crops are deliberately
+excluded from Git and public releases.
+
 ## Roadmap
 
-- Mobile accessibility audit: use remembered, single-level accordions for the
+- Rehearse player permissions and the laptop restore process before campaign
+  night.
+- Add a GM investigation workspace for clues, connections, conclusions, and
+  encounter objectives.
+- Mobile accessibility pass: use remembered, single-level accordions for the
   largest sheet sections without introducing nested scroll traps.
-- Foundry bridge first milestone: open the portal in Foundry and create native
-  Acolyte Actors; a native sheet and two-way Actor sync remain next.

@@ -470,7 +470,7 @@ h1 { max-width: 820px; margin: 8px 0 20px; font-size: clamp(52px, 7.2vw, 112px);
 .management-content > .kicker { grid-row: 2; }
 .management-content > h1 { grid-row: 3; }
 .management-content > .lede { grid-row: 4; }
-.management-content > .management-shell { grid-row: 5; }
+.management-content > .management-shell { grid-row:5; }
 .management-content .kicker { margin-top: 7px; font-size: 16px; }
 .management-content h1 { margin: 4px 0 8px; font-size: clamp(35px,4vw,58px); line-height: .94; }
 .management-content .lede { max-width: 900px; font-size: 14px; line-height: 1.5; }
@@ -480,6 +480,8 @@ h1 { max-width: 820px; margin: 8px 0 20px; font-size: clamp(52px, 7.2vw, 112px);
 .characteristic-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
 .characteristic-entry { display: grid; grid-template-columns: minmax(130px,1fr) 72px minmax(160px,1.1fr); align-items: center; gap: 10px; min-height: 82px; padding: 9px 12px; border-right: 1px solid rgba(255,255,255,.1); border-bottom: 1px solid rgba(255,255,255,.1); }
 .characteristic-entry.complete { background: linear-gradient(90deg,rgba(122,91,42,.13),transparent); }
+.fixed-characteristic { border-left:2px solid rgba(198,154,75,.55); }
+.fixed-characteristic > p { margin:0; max-width:270px; color:#b8b1a5; font:11px/1.4 Arial,sans-serif; }
 .characteristic-name { display: grid; grid-template-columns: 31px 1fr; align-items: center; }
 .characteristic-name > span { grid-row: 1 / 3; color: var(--accent-hot); font: 600 20px "Barlow Condensed",sans-serif; }
 .characteristic-name strong { font: 600 16px "Barlow Condensed",sans-serif; text-transform: uppercase; letter-spacing: .05em; }
@@ -497,6 +499,15 @@ h1 { max-width: 820px; margin: 8px 0 20px; font-size: clamp(52px, 7.2vw, 112px);
 .ceremony-card > p:not(.choice-source) { max-width: 440px; color: #c8c3b8; line-height: 1.55; }
 .ceremony-result { margin: 25px 0; color: #fff0cf; font: 600 54px "Barlow Condensed",sans-serif; }
 .ceremony-result span { display: block; color: #bdb7ac; font: 500 13px Inter,sans-serif; }
+.scene-characteristics .management-content > .lede,
+.scene-fateWounds .management-content > .lede,
+.scene-divination .management-content > .lede { display:none; }
+.scene-fateWounds .management-content { grid-template-rows:auto auto auto auto minmax(0,1fr); }
+.scene-fateWounds .ceremony-grid { align-self:start; align-content:start; }
+.scene-fateWounds .ceremony-card { min-height:0; padding:18px 22px 20px; }
+.scene-fateWounds .ceremony-card h2 { margin:0 0 4px; font-size:25px; }
+.scene-fateWounds .ceremony-card > p { margin:0; font-size:11px; }
+.scene-fateWounds .ceremony-result { margin:14px 0; font-size:42px; }
 .divination-layout { display: grid; grid-template-columns: minmax(0,1.25fr) minmax(280px,.75fr); }
 .divination-card,.divination-reference { min-height: 315px; padding: 24px; }
 .divination-card { border-right: 1px solid var(--line); }
@@ -4314,7 +4325,7 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
 .reinforcement-record { max-width: 1000px; margin: 0 auto; }
 .reinforcement-record-header { display: grid; grid-template-columns: 104px minmax(0,1fr) auto; align-items: start; gap: 17px; border-bottom: 1px solid rgba(225,187,118,.28); padding-bottom: 16px; }
 .reinforcement-record-art { min-height: 112px; border: 1px solid rgba(225,187,118,.28); background: linear-gradient(150deg, rgba(3,6,6,.24), rgba(3,6,6,.72)), var(--record-image) center / cover no-repeat; filter: saturate(.72) contrast(1.08); }
-.vehicle-record .reinforcement-record-art { background: linear-gradient(150deg, rgba(103,75,31,.22), rgba(3,7,7,.92)), repeating-linear-gradient(135deg, rgba(225,187,118,.09) 0 1px, transparent 1px 12px); filter: none; }
+.vehicle-record .reinforcement-record-art { background: linear-gradient(150deg, rgba(103,75,31,.12), rgba(3,7,7,.5)), var(--record-image) center / cover no-repeat; filter: saturate(.72) contrast(1.08); }
 .reinforcement-record-header h2 { margin: 3px 0 7px; color: #fff0d1; font: 400 clamp(30px,4vw,52px)/1 "Barlow Condensed", sans-serif; letter-spacing: .02em; }
 .reinforcement-record-header p:not(.eyebrow) { max-width: 75ch; margin: 0; color: #d4cec1; font-size: 15px; line-height: 1.5; }
 .reinforcement-record-mark { flex: 0 0 auto; color: #e0b870; font-size: 36px; line-height: 1; opacity: .82; }
@@ -4641,3 +4652,69 @@ html[data-foundry-actor-sheet="true"] .action-index-heading p { display: none; }
   .inventory-toolbar .action-filter-list { display: flex; flex-wrap: wrap; }
 }
 .action-result-count { margin: 10px 0 0; color: #bcb4a5; font-size: 12px; }
+.sheet-share-footer { display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:12px; }
+.sheet-share-footer .sheet-chat-share { order:2; display:inline-flex; align-items:center; gap:5px; width:auto; min-height:30px; min-width:60px; padding:4px 6px; background:transparent; color:#d5c5a5; border:1px solid transparent; border-radius:3px; font:400 12px/1.4 Arial,sans-serif; cursor:pointer; }
+.sheet-share-footer .sheet-chat-share:hover { color:#fff0ce; background:#302918; border-color:#8f7842; }
+.sheet-chat-share:focus-visible { outline:2px solid #ffe39b; outline-offset:2px; }
+.sheet-chat-share svg { flex:none; }
+.sheet-share-status { color:#c4c0b5; font:12px/1.4 Arial,sans-serif; }
+.scene-grants .grant-choice-item.needs-choice,
+.scene-divination .divination-choice.needs-choice,
+.scene-aptitudes .replacement-grid.needs-choice { position:relative; border:2px solid #b6413f; box-shadow:0 0 0 2px rgba(182,65,63,.12),0 0 18px rgba(182,65,63,.14); padding:14px 10px 10px; background:linear-gradient(145deg,rgba(92,22,22,.18),rgba(4,8,7,.66)); }
+.scene-grants .grant-choice-item.choice-complete { border:0; border-bottom:1px solid rgba(198,154,75,.22); padding:8px 0 12px; }
+.choice-needed-label { position:absolute; z-index:1; top:-9px; left:9px; display:inline-flex; padding:1px 7px; border:1px solid #b6413f; background:#160b0a; color:#ffaaa2; font:700 9px/1.5 "Barlow Condensed",sans-serif; letter-spacing:.1em; text-transform:uppercase; }
+
+/* Starting abilities: decisions first, automatic grants as a compact reference. */
+.scene-grants .starting-abilities-layout { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr); gap:0; }
+.scene-grants .starting-decisions { grid-column:1; display:block; min-width:0; border-right:1px solid var(--line); }
+.scene-grants .starting-reference { grid-column:2; min-width:0; padding:13px; border-bottom:1px solid var(--line); }
+.scene-grants .starting-column-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:8px; }
+.scene-grants .starting-column-heading h2 { margin:2px 0 0; }
+.scene-grants .starting-column-heading > strong { color:#f1cc88; font:700 13px "Barlow Condensed",sans-serif; text-transform:uppercase; }
+.scene-grants .starting-decisions > p,.scene-grants .starting-reference-intro { margin:0 0 12px; }
+.scene-grants .starting-decisions .grant-choice-list { display:grid; grid-column:auto; grid-row:auto; grid-template-columns:1fr; margin:0; }
+.scene-grants .grant-choice-item.has-choice-comparison { grid-column:auto; }
+.grant-choice-heading { display:grid; gap:2px; min-width:0; }
+.grant-choice-heading strong { color:#f2dfbd; font:600 15px/1.25 "Barlow Condensed",sans-serif; text-transform:uppercase; }
+.grant-choice-heading small { color:#99958c; font:10px/1.35 Arial,sans-serif; white-space:normal; }
+.grant-choice-select { display:grid !important; grid-template-columns:minmax(0,1fr) minmax(180px,.8fr) !important; }
+.scene-grants .starting-result-groups { display:grid; gap:8px; }
+.scene-grants .starting-result-groups .grant-panel { min-height:0; padding:10px 0; border-right:0; }
+.scene-grants .starting-result-groups .grant-panel h2 { font-size:20px; margin:0 0 5px; }
+.scene-grants .starting-result-groups .grant-entry { display:block; margin:0 0 4px; }
+.starting-equipment-comparison,.starting-skill-comparison,.starting-talent-comparison { display:grid; gap:8px; margin-top:2px; border:0; border-top:1px solid rgba(225,187,118,.18); padding:8px 0 0; background:transparent; }
+.starting-equipment-comparison > p { margin:0; color:#c7c1b5; font-size:10px; line-height:1.45; }
+.starting-equipment-options,.starting-skill-options,.starting-talent-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+.starting-equipment-option,.starting-skill-option,.starting-talent-option { appearance:none; width:100%; display:grid; align-content:start; gap:6px; min-width:0; border:1px solid rgba(225,187,118,.18); padding:10px; background:rgba(255,255,255,.018); color:inherit; text-align:left; cursor:pointer; }
+.starting-equipment-option:hover,.starting-skill-option:hover,.starting-talent-option:hover,.starting-equipment-option:focus-visible,.starting-skill-option:focus-visible,.starting-talent-option:focus-visible { border-color:#dfb36c; background:rgba(117,78,30,.16); outline:none; }
+.starting-equipment-option.selected,.starting-skill-option.selected,.starting-talent-option.selected { border-color:#dfb36c; background:linear-gradient(145deg,rgba(151,100,37,.25),rgba(8,12,11,.82)); box-shadow:inset 2px 0 #dfb36c; }
+.starting-equipment-option header,.starting-equipment-option footer,.starting-skill-option header,.starting-skill-option footer { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.starting-equipment-option header strong,.starting-skill-option header strong { color:#fff0d5; font:600 14px/1.2 "Barlow Condensed",sans-serif; text-transform:uppercase; }
+.starting-equipment-option header span,.starting-equipment-option footer small,.starting-skill-option header span,.starting-skill-option footer small { color:#d9b778; font:700 8px/1.2 "Barlow Condensed",sans-serif; letter-spacing:.08em; text-transform:uppercase; }
+.starting-equipment-option p,.starting-skill-option p { margin:0; color:#ddd8ce; font:10px/1.5 Arial,sans-serif; }
+.starting-equipment-option dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 8px; margin:0; }
+.starting-equipment-option dl div { min-width:0; }
+.starting-equipment-option dt { color:#8f8a81; font:8px Arial,sans-serif; text-transform:uppercase; }
+.starting-equipment-option dd { margin:1px 0 0; color:#d8d2c7; font:9px/1.3 Arial,sans-serif; overflow-wrap:anywhere; }
+.starting-equipment-option footer,.starting-skill-option footer { border-top:1px solid rgba(255,255,255,.08); padding-top:6px; color:#b7b1a6; font-size:8px; }
+.starting-simple-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:7px; margin-top:2px; padding-top:8px; border-top:1px solid rgba(225,187,118,.18); }
+.starting-simple-option { appearance:none; display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:46px; border:1px solid rgba(225,187,118,.18); padding:9px 11px; background:rgba(255,255,255,.018); color:#e4ddd0; text-align:left; cursor:pointer; }
+.starting-simple-option strong { font:600 14px/1.2 "Barlow Condensed",sans-serif; text-transform:uppercase; }
+.starting-simple-option small { color:#b69255; font:700 8px/1.2 "Barlow Condensed",sans-serif; letter-spacing:.08em; text-transform:uppercase; }
+.starting-simple-option:hover,.starting-simple-option:focus-visible { border-color:#dfb36c; background:rgba(117,78,30,.16); outline:none; }
+.starting-simple-option.selected { border-color:#dfb36c; background:linear-gradient(145deg,rgba(151,100,37,.25),rgba(8,12,11,.82)); box-shadow:inset 2px 0 #dfb36c; }
+.inline-choice-buttons { display:flex; flex-wrap:wrap; gap:7px; }
+.inline-choice-buttons button { appearance:none; min-height:38px; border:1px solid rgba(225,187,118,.24); padding:7px 11px; background:rgba(255,255,255,.02); color:#ddd6c9; font:600 12px/1.2 "Barlow Condensed",sans-serif; text-transform:uppercase; cursor:pointer; }
+.inline-choice-buttons button:hover,.inline-choice-buttons button:focus-visible { border-color:#dfb36c; background:rgba(117,78,30,.16); outline:none; }
+.inline-choice-buttons button.selected { border-color:#dfb36c; background:rgba(151,100,37,.25); color:#fff0d5; box-shadow:inset 2px 0 #dfb36c; }
+.divination-choice > strong,.aptitude-choice-group > strong { display:block; margin-bottom:7px; color:#e6d7bb; font:600 13px/1.3 "Barlow Condensed",sans-serif; text-transform:uppercase; }
+.aptitude-source-choices { padding:0; border:0; box-shadow:none; background:transparent; }
+@media (max-width:900px) {
+  .scene-grants .starting-abilities-layout { grid-template-columns:1fr; }
+  .scene-grants .starting-decisions,.scene-grants .starting-reference { grid-column:1; }
+  .scene-grants .starting-reference { border-top:1px solid var(--line); }
+}
+@media (max-width:600px) {
+  .starting-equipment-options,.starting-skill-options,.starting-talent-options { grid-template-columns:1fr; }
+}
+.inventory-auto-state { color:#b9c5ad; font:12px/1.4 Arial,sans-serif; }
