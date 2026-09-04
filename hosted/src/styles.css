@@ -1113,7 +1113,6 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 .review-skill-group-title span { color: #969188; }
 .review-skill-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; }
 .review-skill-actions em { min-width: 0; }
-.review-skill-actions b { color: #9de0b6; font: 700 8px/1 "Barlow Condensed",sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .review-skill-test {
   box-sizing: border-box;
   width: 100%;

@@ -14,6 +14,7 @@ assert.ok(portal.includes("is a Specialist skill and cannot be attempted untrain
 assert.ok(portal.includes('data-skill-disclosure="untrained"'), "Acolyte Skills tab needs a collapsed untrained section.");
 assert.ok(portal.includes('id="skill-search"'), "Acolyte Skills tab needs search across trained and untrained entries.");
 assert.ok(portal.includes('class="review-skill-test"') && portal.includes('data-roll-review-skill="${skill.id}"'), "Acolyte skill rows must be the test controls instead of using separate Roll buttons.");
+assert.ok(!portal.includes('<b>Test</b>'), "Clickable skill rows should not include a redundant visible Test label.");
 assert.ok(!portal.includes('class="compact-button review-skill-roll"'), "Acolyte skill rows must not duplicate each test with a separate Roll button.");
 
 assert.ok(npcTemplate.includes("data-roll-untrained-skill"), "NPC sheets need explicit untrained roll controls.");
