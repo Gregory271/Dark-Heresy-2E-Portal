@@ -13,9 +13,12 @@ assert.ok(portal.includes("target: characteristicValue(characteristics.find((ent
 assert.ok(portal.includes("is a Specialist skill and cannot be attempted untrained"), "Acolyte roll handler must block illegal Specialist tests.");
 assert.ok(portal.includes('data-skill-disclosure="untrained"'), "Acolyte Skills tab needs a collapsed untrained section.");
 assert.ok(portal.includes('id="skill-search"'), "Acolyte Skills tab needs search across trained and untrained entries.");
+assert.ok(portal.includes('class="review-skill-test"') && portal.includes('data-roll-review-skill="${skill.id}"'), "Acolyte skill rows must be the test controls instead of using separate Roll buttons.");
+assert.ok(!portal.includes('class="compact-button review-skill-roll"'), "Acolyte skill rows must not duplicate each test with a separate Roll button.");
 
 assert.ok(npcTemplate.includes("data-roll-untrained-skill"), "NPC sheets need explicit untrained roll controls.");
-assert.ok(npcTemplate.includes("These cannot be attempted untrained."), "NPC sheets must explain Specialist locks.");
+assert.ok(portal.includes('displayName: `${skill.name} specialities`'), "Acolyte sheet must identify Specialist entries as skill families rather than generic tests.");
+assert.ok(npcTemplate.includes("Each entry is a family of separate specialities, not a generic test."), "NPC sheets must explain Specialist families and their locks.");
 assert.ok(combat.includes("target:base-20"), "NPC untrained targets must apply -20 automatically.");
 assert.ok(combat.includes("Operate is a Specialist skill and cannot be attempted untrained"), "Vehicle crew dialog must enforce the Operate training rule.");
 

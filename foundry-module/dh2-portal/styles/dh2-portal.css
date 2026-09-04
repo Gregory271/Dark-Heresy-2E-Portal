@@ -295,6 +295,8 @@
 .dh2-rf-combat-bar span,.dh2-rf-state small { color: #c4beb3; font-size: 12px; }
 .dh2-rf-compact-list { list-style: none; padding: 0; }
 .dh2-rf-compact-list button { background: transparent; color: #e6ded0; text-align: left; border: 0; border-bottom: 1px solid #484033; width: 100%; height: auto; padding: 7px; font: 14px/1.5 Arial,sans-serif; }
+.dh2-rf-skills .dh2-rf-compact-list button { border: 1px solid rgba(120,207,154,.25); margin-bottom: 5px; background: rgba(8,18,14,.38); }
+.dh2-rf-skills .dh2-rf-compact-list button:hover,.dh2-rf-skills .dh2-rf-compact-list button:focus-visible { border-color: #78cf9a; background: rgba(72,154,105,.14); box-shadow: inset 3px 0 0 #78cf9a; outline: 0; }
 .dh2-rf-compact-list strong { color: #f0d6a3; float: right; padding-left: 8px; }
 .dh2-rf-skill-heading { align-items: end; display: flex; gap: 12px; justify-content: space-between; }
 .dh2-rf-skill-heading h2 { flex: 1; }

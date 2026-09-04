@@ -53,7 +53,7 @@ export function lockedSpecialistSkillRows(actor) {
     const specialities=Object.values(s.specialities || {});
     const locked=specialities.filter(entry=>!skillIsKnown(entry));
     if(specialities.length && !locked.length) continue;
-    rows.push({key,label:s.label||key,specialities:locked.map(entry=>entry.label).filter(Boolean).slice(0,3).join(', ')});
+    rows.push({key,label:`${s.label||key} specialities`,specialities:locked.map(entry=>entry.label).filter(Boolean).slice(0,3).join(', ')});
   }
   return rows.sort((a,b)=>a.label.localeCompare(b.label));
 }

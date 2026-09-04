@@ -8,7 +8,7 @@ assert.equal(characteristicValue(actor,'ballisticSkill'),55);
 assert.equal(skillRows(actor).length,2);
 assert.equal(skillRows(actor)[0].target,45);
 assert.deepEqual(untrainedSkillRows(actor),[{key:'acrobatics',label:'Acrobatics',characteristic:'Agility',target:15}],'Ordinary unknown skills use the governing characteristic at -20');
-assert.deepEqual(lockedSpecialistSkillRows(actor).map(row=>row.label),['Lore','Operate'],'Unknown Specialist skills are visible but never rollable');
+assert.deepEqual(lockedSpecialistSkillRows(actor).map(row=>row.label),['Lore specialities','Operate specialities'],'Unknown Specialist skill families are visible but never rollable');
 const protectionActor={system:{characteristics:{toughness:{total:35,bonus:5}},armour:{head:{total:12,value:4,toughnessBonus:5,traitBonus:3}}},items:[{type:'armour',system:{equipped:true,armourPoints:{body:4,leftArm:2}}},{type:'armour',system:{equipped:false,armourPoints:{body:9}}}]};
 const locations=armourLocations(protectionActor);
 assert.equal(locations.length,6);
