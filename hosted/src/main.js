@@ -2128,7 +2128,13 @@ function rollAllCharacteristics() {
 function navigateCreationBack() {
   if (step <= 0) return;
   // A live sheet's inventory/advancement editor returns to that sheet, not earlier creation.
-  step = foundryActorSheetMode ? scenes.findIndex((scene) => scene.id === "review") : step - 1;
+  if (foundryActorSheetMode) {
+    reviewTabState = scenes[step]?.id === "equipment" ? "inventory" : "advancement";
+    globalThis.localStorage?.setItem(reviewTabStorageKey, reviewTabState);
+    step = scenes.findIndex((scene) => scene.id === "review");
+  } else {
+    step -= 1;
+  }
   pendingFocusSelector = "#scene-content";
   save();
   render();
@@ -4599,16 +4605,19 @@ function renderGrants() {
 }
 
 function renderEquipment() {
+  const liveInventoryEditor = foundryActorSheetMode;
   const slots = Math.max(0, characteristicBonus("influence"));
   const grantedEquipment = resolvedGrantedEquipment();
   const grantedByItemId = new Map(grantedEquipment.entries.filter((entry) => entry.itemId).map((entry) => [entry.itemId, entry]));
   const categories = ["All", ...new Set(armoury.map((item) => item.category))];
   if (!categories.includes(armouryBrowserState.category)) armouryBrowserState.category = "All";
-  const availableNowIds = new Set([
-    ...character.equipment.inventory,
-    ...grantedByItemId.keys(),
-    ...armoury.filter(isStartingAcquisitionLegal).map((item) => item.id),
-  ]);
+  const availableNowIds = new Set(liveInventoryEditor
+    ? character.equipment.inventory
+    : [
+        ...character.equipment.inventory,
+        ...grantedByItemId.keys(),
+        ...armoury.filter(isStartingAcquisitionLegal).map((item) => item.id),
+      ]);
   const storedSelection = armoury.find((item) => item.id === character.equipment.selected);
   const selectionMatchesAvailability = storedSelection && (
     armouryBrowserState.availability === "all"
@@ -4644,8 +4653,8 @@ function renderEquipment() {
         : "Spend one starting acquisition slot and add this item to inventory.";
   const rows = itemProfileRows(selected);
   const availabilityFilters = [
-    ["available", "Available Now", availableNowIds.size, "Show choice grants, owned gear, and items obtainable during character creation."],
-    ["unavailable", "Unavailable", armoury.length - availableNowIds.size, "Show items that require an acquisition test or later access."],
+    ["available", liveInventoryEditor ? "In Inventory" : "Available Now", availableNowIds.size, liveInventoryEditor ? "Show items already recorded in this character's inventory." : "Show choice grants, owned gear, and items obtainable during character creation."],
+    ["unavailable", liveInventoryEditor ? "Not in Inventory" : "Unavailable", armoury.length - availableNowIds.size, liveInventoryEditor ? "Show Armoury items not currently in this character's inventory." : "Show items that require an acquisition test or later access."],
     ["all", "All Items", armoury.length, "Show every equipment entry in the Armoury."],
   ];
   const itemMatchesArmouryFilters = (item) => {
@@ -4671,7 +4680,7 @@ function renderEquipment() {
             <div role="group" aria-label="Filter equipment by current availability">
               ${availabilityFilters.map(([id, label, count, title]) => `<button type="button" data-equipment-availability="${id}" class="${armouryBrowserState.availability === id ? "active" : ""}" aria-pressed="${armouryBrowserState.availability === id}" title="${escapeHtmlAttribute(title)}">${label} <small>${count}</small></button>`).join("")}
             </div>
-            <small>Choice grants, owned gear, and items obtainable during creation.</small>
+            <small>${liveInventoryEditor ? "Browse owned gear or find an Armoury item to add after it is acquired." : "Choice grants, owned gear, and items obtainable during creation."}</small>
           </div>
           <div class="armoury-categories" aria-label="Filter equipment by category">${categories.map((category) => `<button type="button" data-equipment-category="${category}" class="${armouryBrowserState.category === category ? "active" : ""}" aria-pressed="${armouryBrowserState.category === category}">${category}</button>`).join("")}</div>
         </div>
@@ -4683,7 +4692,9 @@ function renderEquipment() {
               <strong class="item-name">${item.name}</strong>
               <span class="item-category">${item.category}</span>
               <span>${effectiveAvailability(item) || "Availability not recorded"}${effectiveAvailability(item) !== item.availability ? ` (base ${item.availability})` : ""} · ${displayWeight(item)}</span>
-              ${grantedByItemId.has(item.id)
+              ${liveInventoryEditor
+                ? `<em class="${character.equipment.inventory.includes(item.id) ? "granted" : "restricted"}">${character.equipment.inventory.includes(item.id) ? "In inventory" : "Not in inventory"}</em>`
+                : grantedByItemId.has(item.id)
                 ? `<em class="granted item-origin">Included · ${grantedByItemId.get(item.id).sourceName}</em>`
                 : isStartingAcquisitionLegal(item)
                   ? `<em>Eligible starting acquisition</em>`
@@ -4703,19 +4714,21 @@ function renderEquipment() {
               .map(([label, value]) => `<div><dt>${label}</dt><dd>${value ?? "—"}</dd></div>`).join("")}
           </dl>
           <div class="item-actions">
-            <button class="primary-button acquire-equipment" type="button" data-acquire-equipment="${selected.id}" title="${acquisitionTitle}" ${acquisitionDisabled ? "disabled" : ""}>${selectedGrant ? `Included by ${selectedGrant.sourceName}` : selectedAcquisition ? "Starting Acquisition Recorded" : "Use 1 Starting Acquisition"} <span>›</span></button>
-            <button class="compact-button add-equipment" type="button" data-add-equipment="${selected.id}" ${selectedGrant || (selectedInInventory && !selectedNoCostGrant) ? "disabled" : ""}>${selectedGrant ? "Granted Automatically" : selectedNoCostGrant ? "Remove GM Grant" : selectedInInventory ? "Already in Inventory" : "Add as GM Grant (No Cost)"}</button>
+            ${liveInventoryEditor ? "" : `<button class="primary-button acquire-equipment" type="button" data-acquire-equipment="${selected.id}" title="${acquisitionTitle}" ${acquisitionDisabled ? "disabled" : ""}>${selectedGrant ? `Included by ${selectedGrant.sourceName}` : selectedAcquisition ? "Starting Acquisition Recorded" : "Use 1 Starting Acquisition"} <span>›</span></button>`}
+            <button class="${liveInventoryEditor ? "primary-button" : "compact-button"} add-equipment" type="button" data-add-equipment="${selected.id}" ${selectedGrant || (selectedInInventory && !selectedNoCostGrant) ? "disabled" : ""}>${selectedGrant ? "Included by Character Creation" : selectedNoCostGrant ? (liveInventoryEditor ? "Remove from Inventory" : "Remove GM Grant") : selectedInInventory ? "Already in Inventory" : liveInventoryEditor ? "Add to Inventory" : "Add as GM Grant (No Cost)"}${liveInventoryEditor && !selectedInInventory ? " <span>›</span>" : ""}</button>
           </div>
-          ${selectedGrant
+          ${liveInventoryEditor
+            ? `<p class="item-cost-note"><strong>During play:</strong> Add an item after a successful Acquisition test or when the GM awards it. Items granted during character creation remain part of the character record.</p>`
+            : selectedGrant
             ? `<p class="item-cost-note included"><strong>Character-creation grant:</strong> ${selectedGrant.sourceType === "background-choice" ? "You selected this from" : "This is included by"} ${selectedGrant.sourceName}. It costs no XP, currency, or starting-acquisition slot.</p>`
             : `<p class="item-cost-note"><strong>GM grant:</strong> “Add as GM Grant” records that the item was awarded free. Use it only when the GM explicitly gives the character an item outside the normal starting-acquisition allowance.</p>`}
         </div>
         <aside class="loadout-panel">
           <div class="loadout-heading">
-            <span>Influence Bonus ${characteristicBonus("influence")}</span>
-            <strong>${character.acquisitions.filter(Boolean).length} / ${slots} starting acquisitions recorded</strong>
+            <span>${liveInventoryEditor ? "Current Inventory" : `Influence Bonus ${characteristicBonus("influence")}`}</span>
+            <strong>${liveInventoryEditor ? `${inventoryItems.length} item${inventoryItems.length === 1 ? "" : "s"} recorded` : `${character.acquisitions.filter(Boolean).length} / ${slots} starting acquisitions recorded`}</strong>
           </div>
-          <div class="acquisition-heading"><strong>Optional Starting Acquisitions</strong><span>Each recorded item spends 1 of ${slots} slots.</span></div>
+          ${liveInventoryEditor ? "" : `<div class="acquisition-heading"><strong>Optional Starting Acquisitions</strong><span>Each recorded item spends 1 of ${slots} slots.</span></div>
           <button class="compact-button" type="button" id="random-starting-acquisition" ${eligibleStartingAcquisitions().length ? "" : "disabled"} title="Add an eligible, unowned item using one remaining starting-acquisition slot">Random Acquisition · 1 slot</button>
           <p id="random-acquisition-status" class="item-cost-note" role="status" aria-live="polite"></p>
           <div class="acquisition-picks">
@@ -4723,7 +4736,7 @@ function renderEquipment() {
               const item = armoury.find((entry) => entry.id === id);
               return item ? `<button type="button" data-remove-acquisition="${id}" title="Remove acquisition">${item.name}<span>×</span></button>` : "";
             }).join("") || "<span>No starting acquisitions selected.</span>"}
-          </div>
+          </div>`}
           ${character.equipment.legacyAcquisitions?.length ? `<div class="legacy-warning"><strong>Review previous entries:</strong> ${character.equipment.legacyAcquisitions.join("; ")}. These older free-text entries were not counted because no unambiguous Armoury match was found.<button type="button" data-clear-legacy>Dismiss old entries</button></div>` : ""}
           <div class="carrying-summary">
             <span>Known carried weight</span>
@@ -5009,10 +5022,11 @@ function renderAdvances() {
   const owned = resolvedAptitudes().aptitudes;
   const spent = xpSpent();
   const unresolved = grantAlternatives().filter((choice) => !character.grantChoices[choice.id]);
+  const liveAdvancementEditor = foundryActorSheetMode;
   return `
     <div class="management-shell advance-layout">
       <aside class="xp-meter">
-        <span>Total XP</span><strong>${character.xp.starting}</strong>
+        <span>${liveAdvancementEditor ? "XP Earned" : "Total XP"}</span><strong>${character.xp.starting}</strong>
         <span>Spent</span><strong>${spent}</strong>
         <span>Remaining</span><strong class="${spent > character.xp.starting ? "invalid" : ""}">${character.xp.starting - spent}</strong>
       </aside>
@@ -7278,7 +7292,7 @@ function renderReview() {
                   </form>
                   <div class="advancement-manager-actions">
                     <button class="compact-button" type="button" data-manage-advances><strong>Purchase Advances</strong><span>Characteristics, skills, talents, psychic powers, and eligible elite advances.</span></button>
-                    <button class="compact-button" type="button" data-manage-inventory><strong>Manage Inventory</strong><span>Acquire, equip, ready, wear, or carry items through the existing Armoury.</span></button>
+                    <button class="compact-button" type="button" data-manage-inventory><strong>Manage Inventory</strong><span>Review owned gear or record equipment acquired during play.</span></button>
                   </div>
                 </div>
                 <div class="advancement-ledgers">
@@ -7350,6 +7364,10 @@ function render() {
   const scene = scenes[step];
   const isIdentity = scene.id === "identity";
   const actorSheetReview = foundryActorSheetMode && scene.id === "review";
+  const actorSheetEditor = foundryActorSheetMode && ["equipment", "advances"].includes(scene.id);
+  const actorSheetEditorCopy = scene.id === "equipment"
+    ? { kicker: "Live Character Inventory", title: "Manage Inventory" }
+    : { kicker: "Spend Earned XP", title: "Purchase Advances" };
   const unresolvedStageGrants = ["grants", "advances"].includes(scene.id) ? grantAlternatives().filter((choice) => !character.grantChoices[choice.id]) : [];
   const selected = selectedEntry(scene, character);
   const sceneArt = selected ? artByChoice[selected.id] : stageArtById[scene.id] || null;
@@ -7359,7 +7377,7 @@ function render() {
     : "";
   root.innerHTML = `
     <a class="skip-link" href="#scene-content">Skip to current step</a>
-    <main class="scene scene-${scene.id} theme-${scene.theme} ${selected ? "has-selection" : ""} ${!scene.catalog && !isIdentity ? "management-scene" : ""}" style="${imageStyle}">
+    <main class="scene scene-${scene.id} theme-${scene.theme} ${selected ? "has-selection" : ""} ${!scene.catalog && !isIdentity ? "management-scene" : ""} ${actorSheetEditor ? "live-sheet-editor" : ""}" style="${imageStyle}">
       <div class="scene-art" aria-hidden="true"></div>
       <div class="fog fog-one" aria-hidden="true"></div>
       <div class="grain" aria-hidden="true"></div>
@@ -7394,8 +7412,8 @@ function render() {
 
       <section class="content ${!scene.catalog && !isIdentity ? "management-content" : ""}" id="scene-content" tabindex="-1">
         ${scene.eyebrow ? `<p class="eyebrow">${scene.eyebrow}</p>` : ""}
-        ${scene.kicker ? `<p class="kicker">${scene.kicker}</p>` : ""}
-        <h1 id="scene-title">${scene.title}</h1>
+        ${(actorSheetEditor ? actorSheetEditorCopy.kicker : scene.kicker) ? `<p class="kicker">${actorSheetEditor ? actorSheetEditorCopy.kicker : scene.kicker}</p>` : ""}
+        <h1 id="scene-title">${actorSheetEditor ? actorSheetEditorCopy.title : scene.title}</h1>
         ${scene.catalog ? `
           <div class="catalog-stage-layout">
             <div class="catalog-selection-column">${renderStageBody(scene, selected)}</div>
@@ -7413,15 +7431,16 @@ function render() {
         <p>${step > 2 ? catalogs.roles.find(x => x.id === character.role)?.name : "Role not chosen"}</p>
       </aside>
 
-      <footer class="controls ${scene.id === "review" ? "completed-sheet-controls" : ""}" aria-label="${actorSheetReview ? "Foundry Actor sheet controls" : scene.id === "review" ? "Completed character controls" : "Character creation navigation"}">
-        ${actorSheetReview ? "" : `<button class="text-button" id="back" type="button" ${step === 0 ? "disabled" : ""}>${foundryActorSheetMode ? "Return to Sheet" : "Back"}</button>`}
-        ${scene.id === "review" ? "" : `<div class="progress" aria-label="Step ${step + 1} of ${scenes.length}">
+      <footer class="controls ${scene.id === "review" ? "completed-sheet-controls" : ""} ${actorSheetEditor ? "live-sheet-editor-controls" : ""}" aria-label="${actorSheetEditor ? `${actorSheetEditorCopy.title} controls` : actorSheetReview ? "Foundry Actor sheet controls" : scene.id === "review" ? "Completed character controls" : "Character creation navigation"}">
+        ${actorSheetReview || actorSheetEditor ? "" : `<button class="text-button" id="back" type="button" ${step === 0 ? "disabled" : ""}>Back</button>`}
+        ${scene.id === "review" || actorSheetEditor ? "" : `<div class="progress" aria-label="Step ${step + 1} of ${scenes.length}">
           ${scenes.map((entry, index) => `<i class="${index === step ? "active" : index < step ? "done" : ""}" ${index === step ? 'aria-current="step"' : ""}><span class="sr-only">${entry.title}${index === step ? ", current step" : index < step ? ", completed" : ""}</span></i>`).join("")}
         </div>`}
         <div class="actions">
           ${actorSheetReview ? `<span class="foundry-save-status" id="export-status" role="status" aria-live="polite">${foundrySaveMessage}</span>` : ""}
-          ${isIdentity ? "" : `<button class="text-button" id="details">Rules</button>`}
-          <button class="primary-button ${actorSheetReview ? "foundry-dirty-save" : ""}" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""} ${actorSheetReview && foundrySaveState === "saved" ? "hidden" : ""} ${actorSheetReview && foundrySaveState === "saving" ? "disabled" : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : actorSheetReview ? foundrySaveState === "saving" ? "Saving…" : foundrySaveState === "error" ? "Retry Save" : "Save Now" : scene.id === "review" ? "Save Acolyte & Return" : scene.action}<span>›</span></button>
+          ${actorSheetEditor ? `<button class="primary-button return-to-sheet" id="return-to-sheet" type="button">Return to Sheet <span>›</span></button>` : `
+            ${isIdentity ? "" : `<button class="text-button" id="details">Rules</button>`}
+            <button class="primary-button ${actorSheetReview ? "foundry-dirty-save" : ""}" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""} ${actorSheetReview && foundrySaveState === "saved" ? "hidden" : ""} ${actorSheetReview && foundrySaveState === "saving" ? "disabled" : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : actorSheetReview ? foundrySaveState === "saving" ? "Saving…" : foundrySaveState === "error" ? "Retry Save" : "Save Now" : scene.id === "review" ? "Save Acolyte & Return" : scene.action}<span>›</span></button>`}
         </div>
       </footer>
     </main>
@@ -8047,6 +8066,9 @@ function wireEvents() {
   });
   document.querySelector("[data-manage-inventory]")?.addEventListener("click", () => {
     playMechanicalLock();
+    armouryBrowserState.query = "";
+    armouryBrowserState.category = "All";
+    armouryBrowserState.availability = "available";
     step = scenes.findIndex((entry) => entry.id === "equipment");
     pendingFocusSelector = "#scene-content";
     save();
@@ -8223,13 +8245,14 @@ function wireEvents() {
   });
 
   document.querySelector("#back")?.addEventListener("click", navigateCreationBack);
+  document.querySelector("#return-to-sheet")?.addEventListener("click", navigateCreationBack);
   document.querySelector("#randomize-character")?.addEventListener("click", randomizeCharacterOrigins);
   document.querySelector("#roll-all-characteristics")?.addEventListener("click", rollAllCharacteristics);
   document.querySelector("#characteristic-roll-dialog")?.addEventListener("close", () => {
     document.querySelector("#roll-all-characteristics")?.focus({ preventScroll: true });
   });
 
-  document.querySelector("#continue").addEventListener("click", () => {
+  document.querySelector("#continue")?.addEventListener("click", () => {
     if (foundryActorSheetMode && step === scenes.length - 1) {
       playMechanicalLock();
       save({ markComplete: true });
@@ -9139,7 +9162,12 @@ function keyboardNavigation(event) {
     document.addEventListener("keydown", keyboardNavigation, { once: true });
     return;
   }
-  if (event.key === "ArrowLeft" && scenes[step].catalog) {
+  const actorSheetEditor = foundryActorSheetMode && ["equipment", "advances"].includes(scenes[step]?.id);
+  if (actorSheetEditor && event.key === "ArrowLeft") {
+    navigateCreationBack();
+  } else if (actorSheetEditor) {
+    document.addEventListener("keydown", keyboardNavigation, { once: true });
+  } else if (event.key === "ArrowLeft" && scenes[step].catalog) {
     cycleChoice(-1);
   } else if (event.key === "ArrowRight" && scenes[step].catalog) {
     cycleChoice(1);

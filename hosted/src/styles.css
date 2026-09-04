@@ -432,6 +432,8 @@ h1 { max-width: 820px; margin: 8px 0 20px; font-size: clamp(52px, 7.2vw, 112px);
 .mechanic-modifier { white-space: nowrap; }
 .controls { justify-content: space-between; gap: 24px; }
 .actions { display: flex; align-items: center; gap: 24px; }
+.live-sheet-editor-controls .actions { margin-left: auto; }
+.live-sheet-editor-controls .return-to-sheet { min-width: 190px; }
 .text-button { border: 0; padding: 12px 0; background: transparent; color: #d3cfc5; font: 700 13px "Barlow Condensed", sans-serif; letter-spacing: .16em; text-transform: uppercase; cursor: pointer; }
 .text-button:hover:not(:disabled) { color: #fff; }
 .text-button:disabled { opacity: .25; cursor: default; }
@@ -666,6 +668,10 @@ html[data-text-size="extra-large"] .starting-talent-option footer { align-items:
 .scene-equipment .management-content > .kicker { margin-top: 2px; }
 .scene-equipment .management-content > h1 { margin: 2px 0 5px; font-size: clamp(30px,3.4vw,50px); }
 .scene-equipment .management-content > .lede { margin: 0 0 7px; max-width: 1050px; line-height: 1.35; }
+.live-sheet-editor.management-scene .management-content > .kicker { margin-top: 0; }
+.live-sheet-editor.management-scene .management-content > h1 { margin-bottom: 8px; }
+.live-sheet-editor .management-shell { margin-top: 0; }
+.live-sheet-editor .loadout-heading { border-bottom: 1px solid var(--line); }
 .scene-equipment { padding-right: clamp(18px,3vw,48px); padding-left: clamp(18px,3vw,48px); }
 .scene-equipment .armoury-layout { height: 100%; margin-top: 0; }
 html[data-text-size="medium"] .scene-equipment .armoury-layout,

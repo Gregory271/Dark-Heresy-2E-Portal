@@ -53,4 +53,10 @@ assert.deepEqual(messages.map(m => m.actor.name), ['World Actor', 'Unlinked toke
 await parent.handlePortalMessage({source:frameA, origin:'https://untrusted.invalid', data:{source:'dh2-portal-frame', type:'actor-sheet-ready', requestId:'bad'}});
 assert.equal(messages.length, 2);
 assert(app.includes('if (foundryActorSheetMode) {\n  render();\n  requestFoundryActor();'));
-console.log('Actor routing passed: correct Actor/token, delayed handshake, missing data, duplicate load, roster isolation, and origin checks.');
+assert(app.includes('const actorSheetEditor = foundryActorSheetMode && ["equipment", "advances"].includes(scene.id);'), 'Live Inventory and Advancement must be recognized as sheet editors');
+assert(app.includes('id="return-to-sheet"'), 'Live editors need an explicit Return to Sheet action');
+assert(app.includes('scene.id === "review" || actorSheetEditor ? "" : `<div class="progress"'), 'Live editors must hide creation progress');
+assert(app.includes('document.querySelector("#continue")?.addEventListener'), 'Live editors render without a creation Continue control');
+assert(app.includes('reviewTabState = scenes[step]?.id === "equipment" ? "inventory" : "advancement";'), 'Returning from a live editor must restore its matching sheet tab');
+assert(app.includes('globalThis.localStorage?.setItem(reviewTabStorageKey, reviewTabState);'), 'Restoring the matching tab must remain safe in embedded contexts');
+console.log('Actor routing passed: correct Actor/token, delayed handshake, missing data, duplicate load, roster isolation, origin checks, and live-editor return flow.');
