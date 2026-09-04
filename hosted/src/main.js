@@ -1626,6 +1626,32 @@ function ownedSkillRecords() {
   return records.sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
+function untrainedSkillRecords() {
+  return skills
+    .filter((skill) => !isSpecialistSkill(skill.id) && skillRank(skill.id) === 0)
+    .map((skill) => ({
+      key: skill.id,
+      skill,
+      speciality: "",
+      displayName: skill.name,
+      rank: 0,
+      target: characteristicValue(characteristics.find((entry) => entry.name === skill.characteristic)?.id) - 20,
+    }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
+function lockedSpecialistSkillRecords() {
+  return skills
+    .filter((skill) => isSpecialistSkill(skill.id))
+    .map((skill) => {
+      const lockedSpecialities = (skillSpecialities[skill.id] || [])
+        .filter((speciality) => skillRank(skill.id, speciality) === 0);
+      return { skill, displayName: skill.name, lockedSpecialities };
+    })
+    .filter((record) => record.lockedSpecialities.length)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
 function automaticEliteAdvances() {
   if (character.role !== "mystic") return [];
   const psyker = eliteAdvanceById("psyker");
@@ -6280,10 +6306,10 @@ function reinforcementArtwork(entry) {
     "vehicle-reaver-jetbike": "reaver-jetbike.jpg",
   };
   const filename = verifiedArtwork[entry.id];
-  if (filename) return `../public/assets/reinforcements/${filename}?v=0.9.1`;
+  if (filename) return `../public/assets/reinforcements/${filename}?v=0.9.2`;
   return entry.type === "vehicle"
-    ? "../public/assets/ui/vehicle-silhouette.svg?v=0.9.1"
-    : "../public/assets/ui/npc-silhouette.svg?v=0.9.1";
+    ? "../public/assets/ui/vehicle-silhouette.svg?v=0.9.2"
+    : "../public/assets/ui/npc-silhouette.svg?v=0.9.2";
 }
 
 function reinforcementListEntries(entries, selectedId) {
@@ -6971,6 +6997,8 @@ function renderReview() {
   const unresolvedGrantChoices = grantAlternatives().filter((choice) => !character.grantChoices[choice.id]);
   const divinationModifiers = divinationCharacteristicModifiers();
   const ownedSkills = ownedSkillRecords();
+  const untrainedSkills = untrainedSkillRecords();
+  const lockedSpecialistSkills = lockedSpecialistSkillRecords();
   const initialTalents = Object.values(resolvedGrantedTalents());
   const purchasedTalents = paidTalentAdvanceEntries().map((entry) => talentCatalogue.find((talent) => talent.id === entry.id)).filter(Boolean);
   const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
@@ -7043,15 +7071,35 @@ function renderReview() {
     ? `<div><strong>${label}</strong><span>${escapeHtmlAttribute(character.history[id])}</span></div>`
     : "").join("") || "<p>No personal-history prompts recorded.</p>"}</div>`;
   const aptitudeTags = `<div class="tag-list final">${resolvedAptitudes().aptitudes.map((aptitude) => `<span>${aptitude}</span>`).join("")}</div>`;
-  const skillRows = `<div class="dossier-list review-skills-list">${ownedSkills.map((record) => {
+  const renderKnownSkillRow = (record, interactive = false) => {
     const { skill, grant, displayName, speciality, rank } = record;
     const rule = ruleTermsById[`skill-${skill.id}`];
     const tooltip = rule ? `${rule.category}: ${rule.summary} Source: ${rule.book}, page ${rule.page}.` : "";
     const label = rule
       ? `<button type="button" class="review-skill-label rule-term lore-term lore-term-skill" data-rule-term="${rule.id}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${displayName}. ${tooltip}`)}">${escapeHtmlAttribute(displayName)}</button>`
       : `<strong>${escapeHtmlAttribute(displayName)}</strong>`;
-    return `<div>${label}<span>${rankNames[rank - 1]} · ${skill.characteristic} target ${skillTestTarget(skill, speciality)}</span><em>${grant ? `Initial · ${grant.source}` : `${skillXpCost(skill.id, speciality)} XP`}</em></div>`;
-  }).join("") || "<p>None recorded.</p>"}</div>`;
+    const source = grant ? `Initial · ${grant.source}` : `${skillXpCost(skill.id, speciality)} XP`;
+    return `<div ${interactive ? `data-skill-row data-skill-category="trained" data-skill-search="${escapeHtmlAttribute(`${displayName} ${skill.characteristic} ${rankNames[rank - 1]}`.toLowerCase())}"` : ""}>${label}<span>${rankNames[rank - 1]} · ${skill.characteristic} target ${skillTestTarget(skill, speciality)}</span>${interactive ? `<span class="review-skill-actions"><em>${escapeHtmlAttribute(source)}</em><button type="button" class="compact-button review-skill-roll" data-roll-review-skill="${skill.id}" data-skill-speciality="${escapeHtmlAttribute(speciality)}" aria-label="${escapeHtmlAttribute(`Roll ${displayName}, target ${skillTestTarget(skill, speciality)}`)}">Roll</button></span>` : `<em>${escapeHtmlAttribute(source)}</em>`}</div>`;
+  };
+  const skillSummaryRows = `<div class="dossier-list review-skills-list">${ownedSkills.map((record) => renderKnownSkillRow(record)).join("") || "<p>None recorded.</p>"}</div>`;
+  const trainedSkillRows = `<div class="dossier-list review-skills-list review-playable-skills">${ownedSkills.map((record) => renderKnownSkillRow(record, true)).join("") || "<p>No trained skills recorded.</p>"}</div>`;
+  const untrainedSkillRows = `<div class="dossier-list review-skills-list review-playable-skills">${untrainedSkills.map(({ skill, displayName, target }) => {
+    const rule = ruleTermsById[`skill-${skill.id}`];
+    const tooltip = rule ? `${rule.category}: ${rule.summary} Source: ${rule.book}, page ${rule.page}.` : "";
+    const label = rule
+      ? `<button type="button" class="review-skill-label rule-term lore-term lore-term-skill" data-rule-term="${rule.id}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${displayName}. ${tooltip}`)}">${escapeHtmlAttribute(displayName)}</button>`
+      : `<strong>${escapeHtmlAttribute(displayName)}</strong>`;
+    return `<div class="untrained-skill-row" data-skill-row data-skill-category="untrained" data-skill-search="${escapeHtmlAttribute(`${displayName} ${skill.characteristic} untrained`.toLowerCase())}">${label}<span>Untrained −20 · ${skill.characteristic} target ${target}</span><span class="review-skill-actions"><em>Core Rulebook, p. 95</em><button type="button" class="compact-button review-skill-roll" data-roll-review-skill="${skill.id}" aria-label="${escapeHtmlAttribute(`Roll untrained ${displayName}, target ${target}`)}">Roll</button></span></div>`;
+  }).join("")}</div>`;
+  const lockedSpecialistRows = `<div class="dossier-list review-skills-list review-locked-skills">${lockedSpecialistSkills.map(({ skill, displayName, lockedSpecialities }) => {
+    const rule = ruleTermsById[`skill-${skill.id}`];
+    const tooltip = rule ? `${rule.category}: ${rule.summary} Source: ${rule.book}, page ${rule.page}.` : "";
+    const label = rule
+      ? `<button type="button" class="review-skill-label rule-term lore-term lore-term-skill" data-rule-term="${rule.id}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${displayName}. ${tooltip}`)}">${escapeHtmlAttribute(displayName)}</button>`
+      : `<strong>${escapeHtmlAttribute(displayName)}</strong>`;
+    const examples = `${lockedSpecialities.slice(0, 3).join(", ")}${lockedSpecialities.length > 3 ? ` · +${lockedSpecialities.length - 3} more` : ""}`;
+    return `<div class="locked-skill-row" data-skill-row data-skill-category="specialist" data-skill-search="${escapeHtmlAttribute(`${displayName} ${lockedSpecialities.join(" ")} specialist training required`.toLowerCase())}">${label}<span>${escapeHtmlAttribute(examples)}</span><span class="review-skill-lock"><b aria-hidden="true">◆</b><em>Training required</em></span></div>`;
+  }).join("")}</div>`;
   const talentRows = [
     ...initialTalents.map((talent) => renderSheetEntry({
       kind: "Talent",
@@ -7189,7 +7237,7 @@ function renderReview() {
         <div class="review-sheet-body">
           <aside class="review-summary-rail" aria-label="Character summary">
             <section class="review-summary-card"><div class="review-summary-card-body">${identitySummaryRows}</div><h3>Identity</h3></section>
-            <section class="review-summary-card review-summary-skills"><div class="review-summary-card-body">${skillRows}</div><h3>Skills</h3></section>
+            <section class="review-summary-card review-summary-skills"><div class="review-summary-card-body">${skillSummaryRows}</div><h3>Skills</h3></section>
           </aside>
           <section class="review-workspace" aria-label="Character details">
             <nav class="review-workspace-tabs" role="tablist" aria-label="Character sheet sections">
@@ -7198,7 +7246,14 @@ function renderReview() {
             <label class="review-tab-select"><span>Character sheet section</span><select id="review-tab-select">${reviewTabs.map(([id, label]) => `<option value="${id}" ${reviewTabState === id ? "selected" : ""}>${label}</option>`).join("")}</select></label>
             <div class="review-tab-panels review-sections">
               <div class="review-tab-panel" id="review-panel-actions" role="tabpanel" aria-labelledby="review-tab-actions" data-review-panel="actions" ${reviewTabState === "actions" ? "" : "hidden"}>${renderActionIndex(currentActions)}</div>
-              <div class="review-tab-panel" id="review-panel-skills" role="tabpanel" aria-labelledby="review-tab-skills" data-review-panel="skills" ${reviewTabState === "skills" ? "" : "hidden"}><section class="review-skills-section"><h3>Skills</h3>${skillRows}</section></div>
+              <div class="review-tab-panel" id="review-panel-skills" role="tabpanel" aria-labelledby="review-tab-skills" data-review-panel="skills" ${reviewTabState === "skills" ? "" : "hidden"}><section class="review-skills-section">
+                <div class="review-skill-heading"><div><h3>Skills</h3><p>Known skills use their recorded rank. Other non-specialist skills can be tested at −20.</p></div><label><span>Search skills</span><input id="skill-search" type="search" autocomplete="off" placeholder="Operate, Awareness…" /></label></div>
+                <h4 class="review-skill-group-title">Known & trained <span>${ownedSkills.length}</span></h4>
+                ${trainedSkillRows}
+                ${untrainedSkills.length ? `<details class="review-skill-disclosure" data-skill-disclosure="untrained"><summary><span>Untrained skills</span><strong>${untrainedSkills.length} · −20</strong></summary>${untrainedSkillRows}</details>` : ""}
+                ${lockedSpecialistSkills.length ? `<details class="review-skill-disclosure specialist-skill-disclosure" data-skill-disclosure="specialist"><summary><span>Specialist skills</span><strong>Training required</strong></summary><p>These skills cannot be attempted untrained. Learn the required speciality before making a test.</p>${lockedSpecialistRows}</details>` : ""}
+                <p class="skill-search-empty" id="skill-search-empty" hidden>No skills match this search.</p>
+              </section></div>
               ${hasPsychicWorkspace ? `<div class="review-tab-panel" id="review-panel-psychic" role="tabpanel" aria-labelledby="review-tab-psychic" data-review-panel="psychic" ${reviewTabState === "psychic" ? "" : "hidden"}><section><div class="review-section-heading"><div><h3>Psychic Powers</h3><p>Psy Rating ${foundryPsyRating()} · powers and Warp-active abilities available to this Acolyte.</p></div></div><div class="dossier-list">${psychicRows}</div></section></div>` : ""}
               <div class="review-tab-panel" id="review-panel-inventory" role="tabpanel" aria-labelledby="review-tab-inventory" data-review-panel="inventory" ${reviewTabState === "inventory" ? "" : "hidden"}><section class="review-inventory-section">
                 <div class="review-section-heading"><div><h3>Inventory</h3><p>All owned weapons, armour, modifications, and carried gear. Change an item's current state here at any time.</p></div><div class="inventory-totals" aria-label="Inventory totals"><span>${inventoryItems.length + unlinkedGrantedEquipment.length} items</span><strong>${equipmentState.carryingStatsRecorded ? `${equipmentState.knownWeight.toFixed(1)} / ${equipmentState.carryingCapacity} kg` : `${equipmentState.knownWeight.toFixed(1)} kg`}</strong></div></div>
@@ -7507,6 +7562,24 @@ function filterReviewActionCards() {
   if (count) count.textContent = `${visible} actions`;
 }
 
+function filterReviewSkillRows() {
+  const input = document.querySelector("#skill-search");
+  const query = String(input?.value || "").trim().toLowerCase();
+  let visible = 0;
+  document.querySelectorAll("[data-skill-row]").forEach((row) => {
+    const matches = !query || String(row.dataset.skillSearch || "").includes(query);
+    row.hidden = !matches;
+    if (matches) visible += 1;
+  });
+  document.querySelectorAll("[data-skill-disclosure]").forEach((details) => {
+    const hasMatch = Boolean(details.querySelector("[data-skill-row]:not([hidden])"));
+    details.hidden = Boolean(query && !hasMatch);
+    if (query && hasMatch) details.open = true;
+  });
+  const empty = document.querySelector("#skill-search-empty");
+  if (empty) empty.hidden = visible > 0;
+}
+
 function activateReviewTab(tabId, { focus = false } = {}) {
   const button = document.querySelector(`[data-review-tab="${tabId}"]`);
   const panel = document.querySelector(`[data-review-panel="${tabId}"]`);
@@ -7704,6 +7777,41 @@ function openActionDialog(actionId) {
   dialog.showModal();
 }
 
+function openSkillTest(skillId, speciality = "") {
+  const skill = skills.find((entry) => entry.id === skillId);
+  if (!skill) return;
+  const normalizedSpeciality = normaliseSpeciality(speciality);
+  const rank = skillRank(skill.id, normalizedSpeciality);
+  const displayName = normalizedSpeciality ? `${skill.name} (${normalizedSpeciality})` : skill.name;
+  if (isSpecialistSkill(skill.id) && rank === 0) {
+    window.alert(`${displayName} is a Specialist skill and cannot be attempted untrained. A character must first learn that speciality.`);
+    return;
+  }
+  const test = skillActionTest(skill, normalizedSpeciality);
+  const rule = ruleTermsById[`skill-${skill.id}`];
+  const target = test.baseTarget + test.actionModifier;
+  const actionId = `sheet-skill-test-${skillRecordKey(skill.id, normalizedSpeciality)}`;
+  currentActionRecords.set(actionId, {
+    id: actionId,
+    name: `${displayName} Test`,
+    group: "Skill Test",
+    type: "Test",
+    subtypes: [rank ? rankNames[rank - 1] : "Untrained"],
+    summary: rule?.summary || `Use ${displayName} to attempt an appropriate task.`,
+    context: rank
+      ? `${rankNames[rank - 1]} · current target ${target}`
+      : `Untrained −20 · current target ${target}`,
+    source: rule ? `${rule.book}, p. ${rule.page}` : "Core Rulebook, pp. 94–95",
+    available: Boolean(test.baseTarget),
+    unavailableReason: test.baseTarget ? "" : `${skill.characteristic} has not been determined.`,
+    usesFate: false,
+    spendsFate: false,
+    burnsFate: false,
+    test,
+  });
+  openActionDialog(actionId);
+}
+
 function openCharacteristicTest(characteristicId) {
   const characteristic = characteristics.find((entry) => entry.id === characteristicId);
   const baseTarget = characteristicValue(characteristicId);
@@ -7807,6 +7915,10 @@ function addDegreeToCurrentActionWithFate() {
 }
 
 function wireEvents() {
+  document.querySelectorAll("[data-roll-review-skill]").forEach((button) => button.addEventListener("click", () => {
+    openSkillTest(button.dataset.rollReviewSkill, button.dataset.skillSpeciality || "");
+  }));
+  document.querySelector("#skill-search")?.addEventListener("input", filterReviewSkillRows);
   document.querySelectorAll("[data-roll-review-characteristic]").forEach((cell) => {
     const open = () => openCharacteristicTest(cell.dataset.rollReviewCharacteristic);
     cell.addEventListener("click", (event) => {

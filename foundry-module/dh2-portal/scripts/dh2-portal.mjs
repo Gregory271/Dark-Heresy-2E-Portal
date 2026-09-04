@@ -1,5 +1,5 @@
 import { rollSheetDice, sendSheetText } from "./sheet-chat.mjs";
-import {openTest, openItem, openDamage, openAmmunition, skillRows, characteristicValue, armourLocations, updateCombatField, chatControlMarkup} from "./portal-combat.mjs";
+import {openTest, openItem, openDamage, openAmmunition, skillRows, untrainedSkillRows, lockedSpecialistSkillRows, characteristicValue, armourLocations, updateCombatField, chatControlMarkup} from "./portal-combat.mjs";
 import {ammoLock} from './ammunition.mjs';
 const MODULE_ID = "dh2-portal";
 const SYSTEM_ID = "dark-heresy-2nd";
@@ -295,6 +295,8 @@ class PortalReinforcementSheet extends PortalSheetBase {
       isVehicle,
       editable: Boolean(this.actor.isOwner || game.user.isGM),
       skills: skillRows(this.actor),
+      untrainedSkills: isVehicle ? [] : untrainedSkillRows(this.actor),
+      lockedSpecialistSkills: isVehicle ? [] : lockedSpecialistSkillRows(this.actor),
       combatModifier: this.actor.flags?.[PORTAL_FLAG]?.combatModifier || 0,
       combatNotes: this.actor.flags?.[PORTAL_FLAG]?.combatNotes || "",
       statuses: (globalThis.CONFIG?.statusEffects || []).filter(s => s.id).map(s => ({id:s.id, label:game.i18n?.localize(s.name || s.label || s.id) || s.id, active:Boolean(this.actor.statuses?.has(s.id))})),
@@ -332,6 +334,23 @@ class PortalReinforcementSheet extends PortalSheetBase {
       const skill=skillRows(this.actor).find(s=>s.key===button.dataset.rollSkill && s.speciality===button.dataset.speciality);
       if(skill) openTest(this.actor,{title:skill.label,target:skill.target});
     }));
+    root?.querySelectorAll?.("[data-roll-untrained-skill]").forEach(button => button.addEventListener("click", () => {
+      const skill=untrainedSkillRows(this.actor).find(s=>s.key===button.dataset.rollUntrainedSkill);
+      if(skill) openTest(this.actor,{title:`${skill.label} — Untrained`,target:skill.target});
+    }));
+    root?.querySelector("[data-skill-search]")?.addEventListener("input", event => {
+      const query=String(event.currentTarget.value||"").trim().toLowerCase();
+      let visible=0;
+      root.querySelectorAll("[data-skill-row]").forEach(row=>{
+        const matches=!query||String(row.dataset.skillName||"").toLowerCase().includes(query);
+        row.hidden=!matches;if(matches)visible+=1;
+      });
+      root.querySelectorAll("[data-skill-section]").forEach(section=>{
+        const hasMatch=Boolean(section.querySelector("[data-skill-row]:not([hidden])"));
+        section.hidden=Boolean(query&&!hasMatch);if(query&&hasMatch)section.open=true;
+      });
+      const empty=root.querySelector("[data-skill-empty]");if(empty)empty.hidden=visible>0;
+    });
     root?.querySelectorAll?.("[data-reinforcement-item]").forEach(button => {
       const item=this.actor.items?.get?.(button.dataset.reinforcementItem);
       button.addEventListener("click",()=>openItem(this.actor,item));
@@ -361,7 +380,7 @@ class PortalReinforcementSheet extends PortalSheetBase {
         }catch(error){ui.notifications.error(error.message);this.render(false);}
       });
     });
-    root?.querySelector("[data-crew-test]")?.addEventListener("click",()=>openTest(this.actor,{title:"Crew / Operate test",target:0}));
+    root?.querySelector("[data-crew-test]")?.addEventListener("click",()=>openTest(this.actor,{title:"Crew Test",target:0}));
     root?.querySelector("[data-initiative]")?.addEventListener("click",async()=>{
       if(!editable)return;
       try{await this.actor.rollInitiative({createCombatants:true});}catch(error){ui.notifications.error(error.message);}

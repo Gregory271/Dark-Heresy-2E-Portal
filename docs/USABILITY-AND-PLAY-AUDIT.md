@@ -24,6 +24,7 @@
 | Player opens token/Actor | Only that owned Actor opens; roster remains inaccessible | Automated actor-routing test passes |
 | Player starts combat | Primary equipped weapon and standard attack are first; roll reaches chat | Action grouping/order and chat tests pass |
 | Player makes a raw Characteristic test | Click a top-sheet Characteristic, adjust the situation, optionally spend Fate, and send the result to chat | Acolyte and NPC keyboard-accessible controls and shared roll workflow pass automated checks |
+| Player attempts an unknown skill | Ordinary untrained skills apply -20; Specialist skills cannot be attempted without a learned speciality | Searchable collapsed sections keep trained skills prominent and prevent illegal Specialist rolls |
 | Ammunition loop | Attack expends loaded ammunition; reload moves reserve to clip; empty weapon cannot fire silently | Automated ammunition and combat tests pass |
 | Live resource loop | Wounds, Fate, Fatigue, Influence and XP survive saves without resetting inventory or ammo | Focused sync/influence tests pass |
 | GM runs NPC | Characteristics, skills, weapons, initiative, conditions, armour, and rules-to-chat are usable on one sheet | Functional; visual/manual zoom test remains |

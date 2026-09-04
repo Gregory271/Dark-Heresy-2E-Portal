@@ -87,12 +87,15 @@
           {{/each}}
         </section>
       {{/if}}
-      {{#if skills.length}}
-        <section class="dh2-rf-panel">
-          <h2>Skills</h2>
-          <ul class="dh2-rf-compact-list">{{#each skills}}<li><button type="button" data-roll-skill="{{key}}" data-speciality="{{speciality}}" aria-label="Roll {{label}}, target {{target}}">{{label}} <strong>{{target}}</strong></button></li>{{/each}}</ul>
+      {{#unless isVehicle}}
+        <section class="dh2-rf-panel dh2-rf-skills">
+          <div class="dh2-rf-skill-heading"><h2>Skills</h2><input type="search" data-skill-search placeholder="Search skills" aria-label="Search NPC skills" /></div>
+          {{#if skills.length}}<h3>Known & trained</h3><ul class="dh2-rf-compact-list">{{#each skills}}<li data-skill-row data-skill-name="{{label}}"><button type="button" data-roll-skill="{{key}}" data-speciality="{{speciality}}" aria-label="Roll {{label}}, target {{target}}">{{label}} <strong>{{target}}</strong></button></li>{{/each}}</ul>{{else}}<p>No trained skills recorded.</p>{{/if}}
+          {{#if untrainedSkills.length}}<details class="dh2-rf-skill-disclosure" data-skill-section><summary>Untrained skills <strong>{{untrainedSkills.length}} · −20</strong></summary><ul class="dh2-rf-compact-list">{{#each untrainedSkills}}<li data-skill-row data-skill-name="{{label}} {{characteristic}} untrained"><button type="button" data-roll-untrained-skill="{{key}}" aria-label="Roll untrained {{label}}, target {{target}}"><span>{{label}} <small>Untrained −20</small></span><strong>{{target}}</strong></button></li>{{/each}}</ul></details>{{/if}}
+          {{#if lockedSpecialistSkills.length}}<details class="dh2-rf-skill-disclosure dh2-rf-specialist-locks" data-skill-section><summary>Specialist skills <strong>Training required</strong></summary><p>These cannot be attempted untrained.</p><ul class="dh2-rf-locked-list">{{#each lockedSpecialistSkills}}<li data-skill-row data-skill-name="{{label}} {{specialities}} specialist"><strong>{{label}}</strong><span>{{#if specialities}}{{specialities}}{{else}}Choose a speciality when trained{{/if}}</span><em>Locked</em></li>{{/each}}</ul></details>{{/if}}
+          <p data-skill-empty hidden>No skills match this search.</p>
         </section>
-      {{/if}}
+      {{/unless}}
       {{#if itemGroups.gear.length}}
         <section class="dh2-rf-panel">
           <h2>Armour & Gear</h2>

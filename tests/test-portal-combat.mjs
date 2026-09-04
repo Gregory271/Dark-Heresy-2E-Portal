@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
-import {characteristicValue,skillRows,weaponModes,damagePool,updateCombatField,armourLocations} from '../foundry-module/dh2-portal/scripts/portal-combat.mjs';
+import {characteristicValue,skillRows,untrainedSkillRows,lockedSpecialistSkillRows,weaponModes,damagePool,updateCombatField,armourLocations} from '../foundry-module/dh2-portal/scripts/portal-combat.mjs';
 globalThis.game={user:{isGM:false}};
 const changes=[];
-const actor={isOwner:true,system:{characteristics:{strength:{base:40,total:20,unnatural:2,short:'S'},ballisticSkill:{base:45,advance:1,modifier:5,short:'BS'},agility:{total:35,short:'Ag'}},skills:{dodge:{label:'Dodge',characteristic:'Ag',advance:2,current:45},lore:{label:'Lore',isSpecialist:true,characteristic:'Ag',specialities:{one:{label:'One',advance:1},two:{label:'Two',advance:0}}}}},update:async c=>changes.push(c)};
+const actor={isOwner:true,system:{characteristics:{strength:{base:40,total:20,unnatural:2,short:'S'},ballisticSkill:{base:45,advance:1,modifier:5,short:'BS'},agility:{label:'Agility',total:35,short:'Ag'}},skills:{acrobatics:{label:'Acrobatics',characteristic:'Ag',advance:0},dodge:{label:'Dodge',characteristic:'Ag',advance:2,current:45},lore:{label:'Lore',isSpecialist:true,characteristic:'Ag',specialities:{one:{label:'One',advance:1},two:{label:'Two',advance:0}}},operate:{label:'Operate',isSpecialist:true,characteristic:'Ag',specialities:{}}}},update:async c=>changes.push(c)};
 assert.equal(characteristicValue(actor,'strength'),20,'Use fatigue/effect-adjusted native total');
 assert.equal(characteristicValue(actor,'ballisticSkill'),55);
 assert.equal(skillRows(actor).length,2);
 assert.equal(skillRows(actor)[0].target,45);
+assert.deepEqual(untrainedSkillRows(actor),[{key:'acrobatics',label:'Acrobatics',characteristic:'Agility',target:15}],'Ordinary unknown skills use the governing characteristic at -20');
+assert.deepEqual(lockedSpecialistSkillRows(actor).map(row=>row.label),['Lore','Operate'],'Unknown Specialist skills are visible but never rollable');
 const protectionActor={system:{characteristics:{toughness:{total:35,bonus:5}},armour:{head:{total:12,value:4,toughnessBonus:5,traitBonus:3}}},items:[{type:'armour',system:{equipped:true,armourPoints:{body:4,leftArm:2}}},{type:'armour',system:{equipped:false,armourPoints:{body:9}}}]};
 const locations=armourLocations(protectionActor);
 assert.equal(locations.length,6);

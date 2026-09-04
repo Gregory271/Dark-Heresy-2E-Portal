@@ -12,6 +12,13 @@ situational modifiers, Fate +10, Degrees of Success or Failure, keyboard
 activation, and Foundry chat. NPC Characteristic buttons use the same play
 pattern.
 
+The Skills section keeps Known and trained skills first. Ordinary untrained
+skills are available in a collapsed, searchable section and automatically apply
+the Core Rulebook's -20 penalty. Specialist skills are displayed separately as
+requiring training and cannot be rolled untrained. Vehicle tests use a crew
+member's Ballistic Skill or trained Operate speciality; the vehicle does not
+gain skills of its own.
+
 Owned weapons, armour and general gear are available automatically; the Portal
 does not require a separate equipped checkbox. Multiple armour layers still use
 the highest AP at each body location rather than adding together. Weapon

@@ -8,6 +8,10 @@ export function characteristicValue(actor, key) {
   const c=actor.system?.characteristics?.[key];
   return c ? number(c.total, number(c.base)+5*number(c.advance)+number(c.modifier)) : 0;
 }
+function skillCharacteristic(actor, skill) {
+  return Object.entries(actor.system?.characteristics || {}).find(([key,characteristic])=>[key,characteristic.short].includes(skill?.characteristic));
+}
+function skillIsKnown(entry) { return Boolean(number(entry?.advance) || entry?.taken); }
 export function armourLocations(actor) {
   const tb = number(actor.system?.characteristics?.toughness?.bonus, Math.floor(characteristicValue(actor,'toughness')/10)+number(actor.system?.characteristics?.toughness?.unnatural));
   const items = Array.from(actor.items?.contents || actor.items || []);
@@ -23,12 +27,33 @@ export function armourLocations(actor) {
 export function skillRows(actor) {
   const rows=[];
   for(const [key,s] of Object.entries(actor.system?.skills || {})) {
-    const c=Object.entries(actor.system.characteristics || {}).find(([k,c])=>[k,c.short].includes(s.characteristic));
+    const c=skillCharacteristic(actor,s);
     const base=c?characteristicValue(actor,c[0]):0;
     for(const [speciality,entry] of s.isSpecialist?Object.entries(s.specialities || {}):[['',s]]) {
-      if(!number(entry.advance) && !entry.taken) continue;
+      if(!skillIsKnown(entry)) continue;
       rows.push({key,speciality,label:speciality?`${s.label} (${entry.label})`:s.label||key,target:number(entry.current,base+(number(entry.advance)?(number(entry.advance)-1)*10:-20))});
     }
+  }
+  return rows.sort((a,b)=>a.label.localeCompare(b.label));
+}
+export function untrainedSkillRows(actor) {
+  const rows=[];
+  for(const [key,s] of Object.entries(actor.system?.skills || {})) {
+    if(s.isSpecialist || skillIsKnown(s)) continue;
+    const c=skillCharacteristic(actor,s);
+    const base=c?characteristicValue(actor,c[0]):0;
+    rows.push({key,label:s.label||key,characteristic:c?.[1]?.label||c?.[1]?.short||s.characteristic||'Characteristic',target:base-20});
+  }
+  return rows.sort((a,b)=>a.label.localeCompare(b.label));
+}
+export function lockedSpecialistSkillRows(actor) {
+  const rows=[];
+  for(const [key,s] of Object.entries(actor.system?.skills || {})) {
+    if(!s.isSpecialist) continue;
+    const specialities=Object.values(s.specialities || {});
+    const locked=specialities.filter(entry=>!skillIsKnown(entry));
+    if(specialities.length && !locked.length) continue;
+    rows.push({key,label:s.label||key,specialities:locked.map(entry=>entry.label).filter(Boolean).slice(0,3).join(', ')});
   }
   return rows.sort((a,b)=>a.label.localeCompare(b.label));
 }
@@ -79,7 +104,7 @@ export function openTest(actor,{title,target,weapon=null,psychic=false}) {
   const modes=weapon?weaponModes(weapon):[];
   const crew=actor.type==='vehicle';
   const bonus=number(actor.flags?.dh2CharacterBuilder?.combatModifier);
-  const content=`<div class="dh2-combat-fields">${input(crew?'Crew test target (required)':'Base target','target',crew?'':target,'required')}${input('Situational modifier','modifier',0)}${input('Persistent sheet modifier','persistent',bonus)}${modes.length?`<label>Action<select name="mode">${modes.map(m=>`<option value="${m.id}">${escapeHTML(m.label)} (${m.bonus>=0?'+':''}${m.bonus})</option>`).join('')}</select></label><label>Aim<select name="aim"><option value="0">None</option><option value="10">Half action (+10)</option><option value="20">Full action (+20)</option></select></label>`:''}</div><p>${psychic?'Enter the final Focus Power target for your chosen psychic strength. Phenomena, Perils, opposed rolls and power effects are resolved separately.':crew?'Enter the gunner’s BS or driver’s Operate target, including their training. No player character is selected implicitly.':'Derived characteristics and skills include the system’s current adjustments. Add range, cover, wounds and other situational modifiers once.'}</p>${weapon?'<p>Hit counts are before evasion. Apply ammunition, jams, target defences and special qualities separately. Aim is only valid where the chosen action permits it.</p>':''}`;
+  const content=`<div class="dh2-combat-fields">${input(crew?'Crew skill target (required)':'Base target','target',crew?'':target,'required')}${input('Situational modifier','modifier',0)}${input('Persistent sheet modifier','persistent',bonus)}${modes.length?`<label>Action<select name="mode">${modes.map(m=>`<option value="${m.id}">${escapeHTML(m.label)} (${m.bonus>=0?'+':''}${m.bonus})</option>`).join('')}</select></label><label>Aim<select name="aim"><option value="0">None</option><option value="10">Half action (+10)</option><option value="20">Full action (+20)</option></select></label>`:''}</div><p>${psychic?'Enter the final Focus Power target for your chosen psychic strength. Phenomena, Perils, opposed rolls and power effects are resolved separately.':crew?'Enter the gunner’s Ballistic Skill or the driver’s trained Operate speciality target. Operate is a Specialist skill and cannot be attempted untrained. No crew Actor is selected implicitly.':'Derived characteristics and skills include the system’s current adjustments. Add range, cover, wounds and other situational modifiers once.'}</p>${weapon?'<p>Hit counts are before evasion. Apply ammunition, jams, target defences and special qualities separately. Aim is only valid where the chosen action permits it.</p>':''}`;
   modal(actor,title,content.replace('Apply ammunition, jams, target defences and special qualities separately.','Ammunition is spent automatically for weapons with a clip. Resolve jams, target defences and special qualities separately.'),[['Roll to Chat',async data=>{
     if(String(data.get('target')).trim()==='') throw Error('Enter the crew test target.');
     const values=['target','modifier','persistent'].map(k=>Number(data.get(k)));if(values.some(v=>!Number.isFinite(v)||Math.abs(v)>1000)) throw Error('Enter valid target and modifier values.');
