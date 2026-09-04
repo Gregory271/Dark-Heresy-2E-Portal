@@ -373,3 +373,70 @@
 .dh2-record-controls .dh2-chat-share:hover, .dh2-combat-dialog .dh2-chat-share:hover { color:#fff0ce; background:#302918; border-color:#8f7842; }
 .dh2-chat-share:focus-visible { outline:2px solid #ffe39b; outline-offset:2px; }
 .dh2-chat-share svg { flex:none; }
+
+/* Sheet rolls use a verdict-first hierarchy so percentile outcomes scan quickly in chat. */
+.dh2-roll-card {
+  --dh2-result: #d8b765;
+  background: linear-gradient(135deg, #111713, #090d0b);
+  border: 1px solid color-mix(in srgb, var(--dh2-result) 62%, #242a26);
+  border-left: 5px solid var(--dh2-result);
+  color: #eee8dc;
+  display: grid;
+  gap: 7px;
+  margin: 2px 0;
+  padding: 10px;
+}
+.dh2-roll-card--success { --dh2-result: #58d187; }
+.dh2-roll-card--failure { --dh2-result: #ef665f; }
+.dh2-roll-card--damage { --dh2-result: #e1ad55; }
+.dh2-roll-card h3 {
+  border: 0;
+  color: #bdb6aa;
+  font: 700 0.72rem/1.2 Arial, sans-serif;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+.dh2-roll-verdict {
+  display: grid;
+  gap: 2px;
+}
+.dh2-roll-verdict strong {
+  color: var(--dh2-result);
+  font: 900 1.55rem/1 "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
+  letter-spacing: 0.035em;
+}
+.dh2-roll-verdict span {
+  color: #f4eee3;
+  font: 800 0.78rem/1.25 Arial, sans-serif;
+  letter-spacing: 0.055em;
+}
+.dh2-roll-facts {
+  border-top: 1px solid color-mix(in srgb, var(--dh2-result) 30%, transparent);
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 1px 0 0;
+  padding: 7px 0 0;
+}
+.dh2-roll-facts div { min-width: 0; }
+.dh2-roll-facts dt {
+  color: #969087;
+  font: 700 0.62rem/1.2 Arial, sans-serif;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.dh2-roll-facts dd {
+  color: #fff7e8;
+  font: 800 1rem/1.25 Arial, sans-serif;
+  margin: 1px 0 0;
+  overflow-wrap: anywhere;
+}
+.dh2-roll-notes {
+  color: #aaa49a;
+  font: 0.72rem/1.35 Arial, sans-serif;
+}
+.dh2-roll-notes p { margin: 0; }
+
+/* The structured card already presents the dice and total; suppress Foundry's duplicate block. */
+.chat-message:has(.dh2-roll-card) .dice-roll { display: none; }

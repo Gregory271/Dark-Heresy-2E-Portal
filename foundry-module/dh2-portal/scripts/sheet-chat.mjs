@@ -1,5 +1,10 @@
 import {ammoLock, ammoWeapon, ammunitionCost, ammunitionState} from './ammunition.mjs';
 const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function rollCard({ title, tone = "neutral", verdict, summary, facts = [], notes = [] }) {
+  const factMarkup = facts.filter((fact) => fact?.value !== undefined && fact?.value !== "").map((fact) => `<div><dt>${escape(fact.label)}</dt><dd>${escape(fact.value)}</dd></div>`).join("");
+  const noteMarkup = notes.filter(Boolean).map((note) => `<p>${escape(note)}</p>`).join("");
+  return `<section class="dh2-roll-card dh2-roll-card--${escape(tone)}"><h3>${escape(title)}</h3><div class="dh2-roll-verdict"><strong>${escape(verdict)}</strong><span>${escape(summary)}</span></div>${factMarkup ? `<dl class="dh2-roll-facts">${factMarkup}</dl>` : ""}${noteMarkup ? `<div class="dh2-roll-notes">${noteMarkup}</div>` : ""}</section>`;
+}
 function permit(actor) {
   if (!actor || !(actor.isOwner || game.user.isGM)) throw new Error("You must own this Actor to use its chat controls.");
 }
@@ -33,18 +38,41 @@ async function performRoll(actor, payload) {
   (Chat.applyMode || Chat.applyRollMode).call(Chat, visibility);
   const roll = await new DiceRoll(`${quantity}d${sides}`).evaluate();
   const dice = roll.dice.flatMap((die) => die.results.map((result) => result.result));
-  let detail = "";
+  const title = String(payload.title || "Sheet roll").slice(0, 200);
+  let card = {
+    title,
+    verdict: "ROLL COMPLETE",
+    summary: `${dice.reduce((sum, value) => sum + value, 0)} total`,
+    facts: [
+      { label: "Dice", value: `${quantity}d${sides}` },
+      { label: "Results", value: dice.join(", ") },
+    ],
+    notes: [],
+  };
   if (target != null && quantity === 1 && sides === 100) {
     const value = dice[0];
     const success = value === 1 || (value !== 100 && value <= target);
     const degrees = Math.max(1, 1 + (success ? Math.floor(target / 10) - Math.floor(value / 10) : Math.floor(value / 10) - Math.floor(target / 10)));
-    detail = `Target ${target}: ${degrees} degree(s) of ${success ? "success" : "failure"}. Resolve situational effects and weapon jams on the sheet.`;
+    const outcome = success ? "SUCCESS" : "FAILURE";
+    card = {
+      title,
+      tone: success ? "success" : "failure",
+      verdict: outcome,
+      summary: `${degrees} ${degrees === 1 ? "DEGREE" : "DEGREES"} OF ${outcome}`,
+      facts: [
+        { label: "Rolled", value },
+        { label: "Target", value: target },
+      ],
+      notes: [],
+    };
     if (payload.attack && success) {
       const mode=payload.attack.mode;
       const hits=Math.min(payload.attack.maxHits, spent || Infinity, mode==='full'?degrees:mode==='semi'?1+Math.floor((degrees-1)/2):1);
       const locationNumber=Number(String(value).padStart(2,'0').split('').reverse().join('')) || 100;
       const location=locationNumber<=10?'Head':locationNumber<=20?'Right arm':locationNumber<=30?'Left arm':locationNumber<=70?'Body':locationNumber<=85?'Right leg':'Left leg';
-      detail+=` ${hits} potential hit(s) before evasion. ${mode==='called'?'Use the called location.':`First location: ${location} (${locationNumber}).`} Resolve additional hit locations, ammunition, jams and qualities separately.`;
+      card.facts.push({ label: "Potential hits", value: hits });
+      card.facts.push({ label: mode === "called" ? "Location" : "First location", value: mode === "called" ? "Called location" : `${location} (${locationNumber})` });
+      card.notes = ["Potential hits are before evasion. Resolve additional hit locations, jams, target defences, and weapon qualities separately."];
     }
   }
   if (payload.damage) {
@@ -52,15 +80,26 @@ async function performRoll(actor, payload) {
     if (!Number.isInteger(keep) || keep < 1 || keep > quantity || !Number.isFinite(primitive) || primitive < 0 || !Number.isFinite(modifier) || Math.abs(modifier) > 10000) throw new Error("Invalid damage request.");
     const kept = [...dice].sort((a, b) => b - a).slice(0, keep);
     const total = Math.max(0, kept.reduce((sum, value) => sum + (primitive ? Math.min(value, primitive) : value), 0) + modifier);
-    detail = `Raw damage: ${total} (keep ${keep}, modifier ${modifier}${primitive ? `, Primitive ${primitive}` : ""}). Before Armour and Toughness. Dice pool shown below.`;
+    card = {
+      title,
+      tone: "damage",
+      verdict: "DAMAGE",
+      summary: `${total} RAW DAMAGE`,
+      facts: [
+        { label: "Dice rolled", value: dice.join(", ") },
+        { label: "Dice kept", value: kept.join(", ") },
+        { label: "Modifier", value: modifier >= 0 ? `+${modifier}` : modifier },
+        ...(primitive ? [{ label: "Primitive", value: primitive }] : []),
+      ],
+      notes: ["Before Armour and Toughness."],
+    };
   }
   if (spent) {
     await weapon.update({'system.clip.value':loaded-spent}, {render:false});
-    detail = detail.replace('additional hit locations, ammunition, jams', 'additional hit locations, jams');
-    detail += ` Ammunition: ${spent} spent; ${loaded-spent} loaded.`;
+    card.facts.push({ label: "Ammunition", value: `${spent} spent · ${loaded-spent} loaded` });
   }
   try {
-    await roll.toMessage({ ...visibility, speaker: Chat.getSpeaker({ actor }), flavor: `<h3>${escape(String(payload.title || "Sheet roll").slice(0, 200))}</h3><p>${escape(detail)}</p>` });
+    await roll.toMessage({ ...visibility, speaker: Chat.getSpeaker({ actor }), flavor: rollCard(card) });
   } catch (error) {
     if (spent) await weapon.update({'system.clip.value':loaded}, {render:false});
     throw error;

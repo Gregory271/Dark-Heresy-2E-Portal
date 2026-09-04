@@ -16,7 +16,7 @@ die=99;await rollSheetDice(actor,shot);assert.equal(weapon.system.clip.value,28,
 await rollSheetDice(actor,{quantity:1,sides:100,target:80});assert.equal(weapon.system.clip.value,28,'Fate reroll does not spend again');
 await setAmmunition(actor,{id:'gun'},2,12);
 die=1;await rollSheetDice(actor,{...shot,ammunition:{id:'gun',mode:'full'},attack:{mode:'full',maxHits:10}});
-assert.equal(weapon.system.clip.value,0);assert.match(messages.at(-1).flavor,/2 potential hit/);
+assert.equal(weapon.system.clip.value,0);assert.match(messages.at(-1).flavor,/<dt>Potential hits<\/dt><dd>2<\/dd>/);
 await assert.rejects(rollSheetDice(actor,shot),/empty/);
 await reloadAmmunition(actor,{id:'gun'});assert.equal(weapon.system.clip.value,12);assert.equal(weapon.flags.dh2Ammo.reserve,0);
 await assert.rejects(reloadAmmunition(actor,{id:'gun'}),/No spare/);
