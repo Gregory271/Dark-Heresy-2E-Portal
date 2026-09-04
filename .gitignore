@@ -24,3 +24,8 @@ public/assets/rhodin-iv.webp
 public/assets/imperial-guard.webp
 public/assets/assassin.webp
 .tmp-pdf/
+
+# Locally generated campaign handouts/maps and their sourcebook-processing
+# helper stay on the GM's machine rather than in the public repository.
+output/
+scripts/build-player-reference.py

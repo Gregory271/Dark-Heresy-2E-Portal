@@ -6,6 +6,12 @@ Existing Acolyte Actors load into the same review, actions, skills, inventory,
 features, background, and advancement interface. Changes made there are saved
 back to the Actor, including Portal-managed Items.
 
+On a live Acolyte sheet, click any Characteristic at the top of the sheet to
+open the standard test dialog. It uses the Actor's current target and supports
+situational modifiers, Fate +10, Degrees of Success or Failure, keyboard
+activation, and Foundry chat. NPC Characteristic buttons use the same play
+pattern.
+
 Owned weapons, armour and general gear are available automatically; the Portal
 does not require a separate equipped checkbox. Multiple armour layers still use
 the highest AP at each body location rather than adding together. Weapon

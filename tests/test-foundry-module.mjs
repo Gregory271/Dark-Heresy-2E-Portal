@@ -152,7 +152,7 @@ assert.equal(validatedReinforcement.type, "npc");
 assert.equal(validatedReinforcement.img, "modules/dh2-portal/portal/public/assets/choices/adepta-sororitas.webp");
 const verifiedArtPayload = {
   ...structuredClone(reinforcementPayload),
-  img: "../public/assets/reinforcements/sister-of-battle-canoness.jpg?v=0.9.0",
+  img: "../public/assets/reinforcements/sister-of-battle-canoness.jpg?v=0.9.1",
 };
 assert.equal(
   moduleRecord.api.validateReinforcementActorData(verifiedArtPayload).img,

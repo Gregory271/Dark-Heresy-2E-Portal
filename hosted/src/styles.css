@@ -1050,6 +1050,30 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 }
 .review-characteristic-label:hover,
 .review-characteristic-label:focus-visible { background: rgba(194,132,53,.16); color: #fff1d2; }
+.review-characteristics .rollable-characteristic {
+  position: relative;
+  cursor: pointer;
+  transition: background-color .15s ease, box-shadow .15s ease;
+}
+.review-characteristics .rollable-characteristic:hover {
+  background: linear-gradient(180deg,rgba(214,173,98,.18),rgba(214,173,98,.04));
+  box-shadow: inset 0 -2px #d8ad68;
+}
+.review-characteristics .rollable-characteristic:focus-visible {
+  outline: 2px solid #f1cc88;
+  outline-offset: -3px;
+  background: rgba(214,173,98,.14);
+}
+.review-characteristics .rollable-characteristic .review-characteristic-label { cursor: pointer; }
+.review-characteristics .review-characteristic-roll-hint {
+  display: block;
+  min-height: 9px;
+  margin-top: 2px;
+  color: #d5aa64;
+  font: 700 7px/1 "Barlow Condensed",sans-serif;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
 .review-characteristics strong { color: #fff0cf; font: 600 25px "Barlow Condensed",sans-serif; }
 .review-characteristics small { display: block; min-height: 16px; margin-top: 2px; color: #e7c688; font-size: 7px; line-height: 1.15; }
 .calculation-note { margin-top: 9px; border-left: 2px solid #d8ad68; padding: 6px 9px; background: rgba(190,135,61,.08); color: #c9c2b6; font-size: 9px; line-height: 1.4; }
@@ -1282,6 +1306,7 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 .action-type-free .action-type-badge { --type-color: #79cbb8; }
 .action-type-extended .action-type-badge { --type-color: #c3a1e0; }
 .action-type-passive .action-type-badge { --type-color: #d6d0bf; }
+.action-type-test .action-type-badge { --type-color: #8bbb8f; }
 .action-type-variable .action-type-badge { --type-color: #d1ad73; }
 .action-card > p { margin: 0; color: #d9d3c8; font-size: 8px; line-height: 1.48; }
 .action-context { border-left: 2px solid rgba(var(--action-accent-rgb),.55); padding-left: 8px; color: #bad3c8; font-size: 7px; line-height: 1.4; overflow-wrap: anywhere; }

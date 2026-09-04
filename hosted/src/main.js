@@ -6280,10 +6280,10 @@ function reinforcementArtwork(entry) {
     "vehicle-reaver-jetbike": "reaver-jetbike.jpg",
   };
   const filename = verifiedArtwork[entry.id];
-  if (filename) return `../public/assets/reinforcements/${filename}?v=0.9.0`;
+  if (filename) return `../public/assets/reinforcements/${filename}?v=0.9.1`;
   return entry.type === "vehicle"
-    ? "../public/assets/ui/vehicle-silhouette.svg?v=0.9.0"
-    : "../public/assets/ui/npc-silhouette.svg?v=0.9.0";
+    ? "../public/assets/ui/vehicle-silhouette.svg?v=0.9.1"
+    : "../public/assets/ui/npc-silhouette.svg?v=0.9.1";
 }
 
 function reinforcementListEntries(entries, selectedId) {
@@ -6763,6 +6763,7 @@ function actionGroupKey(group = "") {
 
 function actionTypePresentation(type = "") {
   const value = String(type).toLowerCase();
+  if (value.includes("test")) return { key: "test", short: "Test" };
   if (value.includes("reaction")) return { key: "reaction", short: "React" };
   if (value.includes("extended")) return { key: "extended", short: "Extended" };
   if (value.includes("half") && value.includes("full")) return { key: "variable", short: "Half / Full" };
@@ -6775,6 +6776,7 @@ function actionTypePresentation(type = "") {
 
 function actionTypeGlyph(kind) {
   const common = 'viewBox="0 0 24 24" aria-hidden="true" focusable="false"';
+  if (kind === "test") return `<svg ${common}><circle class="glyph-ring" cx="12" cy="12" r="8.5"/><circle class="glyph-strong" cx="12" cy="12" r="3.2"/><path class="glyph-fine" d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>`;
   if (kind === "reaction") return `<svg ${common}><path class="glyph-ring" d="M19.7 8.7A8.5 8.5 0 1 0 20 14"/><path class="glyph-strong" d="m16.2 4.8 3.9 3.9-5.3 1.1"/><path class="glyph-fine" d="M7.3 12h9.4M12 7.3v9.4"/><circle class="glyph-core" cx="12" cy="12" r="2.1"/></svg>`;
   if (kind === "extended") return `<svg ${common}><path class="glyph-ring" d="M5 3h14M5 21h14"/><path class="glyph-strong" d="M7 4.5c0 4 5 4.2 5 7.5s-5 3.5-5 7.5M17 4.5c0 4-5 4.2-5 7.5s5 3.5 5 7.5"/><path class="glyph-fine" d="M9.2 8.2h5.6M9 17h6"/></svg>`;
   if (kind === "full") return `<svg ${common}><circle class="glyph-ring" cx="12" cy="12" r="8.5"/><path class="glyph-strong" d="m12 5 5 7-5 7-5-7z"/><path class="glyph-fine" d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`;
@@ -7140,9 +7142,17 @@ function renderReview() {
             breakdown.exceptional ? `Mutation/Malignancy ${breakdown.exceptional > 0 ? "+" : ""}${breakdown.exceptional}` : "",
             breakdown.elite ? `Elite Advance ${breakdown.elite > 0 ? "+" : ""}${breakdown.elite}` : "",
           ].filter(Boolean);
-          return `<div class="${breakdown.divination || breakdown.exceptional || breakdown.elite ? "modified" : ""}" title="${escapeHtmlAttribute(parts.join(" · "))}">
-            <button type="button" class="review-characteristic-label rule-term lore-term lore-term-stat" data-rule-term="${characteristicRuleId}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${entry.name}. ${tooltip}`)}">${entry.abbreviation}</button>
+          const rollable = foundryActorSheetMode && breakdown.total > 0;
+          const cellTitle = rollable
+            ? `Roll ${entry.name} test · Target ${breakdown.total}${parts.length ? ` · ${parts.join(" · ")}` : ""}`
+            : parts.join(" · ");
+          const label = foundryActorSheetMode
+            ? `<span class="review-characteristic-label" data-tooltip="${escapeHtmlAttribute(tooltip)}">${entry.abbreviation}</span>`
+            : `<button type="button" class="review-characteristic-label rule-term lore-term lore-term-stat" data-rule-term="${characteristicRuleId}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${entry.name}. ${tooltip}`)}">${entry.abbreviation}</button>`;
+          return `<div class="${breakdown.divination || breakdown.exceptional || breakdown.elite ? "modified" : ""} ${rollable ? "rollable-characteristic" : ""}" title="${escapeHtmlAttribute(cellTitle)}" ${rollable ? `data-roll-review-characteristic="${entry.id}" role="button" tabindex="0" aria-label="${escapeHtmlAttribute(`Roll ${entry.name} test, target ${breakdown.total}`)}"` : ""}>
+            ${label}
             <strong>${breakdown.total || (entry.id === "influence" ? "0" : "—")}${entry.id === "influence" ? `<button type="button" id="change-influence" class="change-influence sheet-edit-icon" aria-label="Change Influence" title="Change Influence">✎</button>` : ""}</strong>${parts.length > 1 ? `<small>${escapeHtmlAttribute(parts.slice(1).join(" · "))}</small>` : ""}
+            ${rollable ? `<span class="review-characteristic-roll-hint" aria-hidden="true">Roll test</span>` : ""}
           </div>`;
         }).join("")}</div>
         ${Object.keys(divinationModifiers).length || Object.keys(exceptionalCharacteristicModifiers()).length || currentDivination()?.fateChange || character.exceptional?.creationCorruptionApplied ? `<div class="calculation-note"><strong>Creation effects applied:</strong> ${[
@@ -7694,6 +7704,29 @@ function openActionDialog(actionId) {
   dialog.showModal();
 }
 
+function openCharacteristicTest(characteristicId) {
+  const characteristic = characteristics.find((entry) => entry.id === characteristicId);
+  const baseTarget = characteristicValue(characteristicId);
+  if (!characteristic || !baseTarget) return;
+  const actionId = `sheet-characteristic-test-${characteristicId}`;
+  currentActionRecords.set(actionId, {
+    id: actionId,
+    name: `${characteristic.name} Test`,
+    group: "Characteristic Test",
+    type: "Test",
+    subtypes: [],
+    summary: `Roll directly against ${characteristic.name} when no more specific Skill or action applies.`,
+    context: `Current base target ${baseTarget}. Apply only the situational modifier supplied by the GM.`,
+    source: "Core Rulebook, p. 23",
+    available: true,
+    usesFate: false,
+    spendsFate: false,
+    burnsFate: false,
+    test: actionTestRecord(characteristicId),
+  });
+  openActionDialog(actionId);
+}
+
 async function rollWeaponDamage(action, targetElement) {
   const weapon = equipmentItem(action.test?.weaponId);
   if (!weapon || !targetElement) return;
@@ -7774,6 +7807,18 @@ function addDegreeToCurrentActionWithFate() {
 }
 
 function wireEvents() {
+  document.querySelectorAll("[data-roll-review-characteristic]").forEach((cell) => {
+    const open = () => openCharacteristicTest(cell.dataset.rollReviewCharacteristic);
+    cell.addEventListener("click", (event) => {
+      if (event.target.closest(".sheet-edit-icon")) return;
+      open();
+    });
+    cell.addEventListener("keydown", (event) => {
+      if (event.target !== cell || !["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      open();
+    });
+  });
   document.querySelectorAll('[data-manage-ammo]').forEach(button => button.addEventListener('click',async()=>{
     button.disabled=true;
     try { await requestFoundrySheet('sheet-ammunition',{name:button.dataset.manageAmmo}); }
