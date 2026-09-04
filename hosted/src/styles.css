@@ -1111,8 +1111,6 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 .review-skill-heading input { width: 100%; min-height: 32px; border: 1px solid rgba(214,173,98,.34); padding: 6px 8px; background: rgba(4,8,8,.76); color: #eee4d2; }
 .review-skill-group-title { display: flex; justify-content: space-between; gap: 10px; margin: 10px 0 2px; color: #d6b575; font: 700 9px/1.2 "Barlow Condensed",sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .review-skill-group-title span { color: #969188; }
-.review-skill-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 0; }
-.review-skill-actions em { min-width: 0; }
 .review-skill-test {
   box-sizing: border-box;
   width: 100%;
@@ -1379,9 +1377,28 @@ html[data-text-size="extra-large"] .warp-exposure-controls .malefic-approval { g
 }
 .review-sections .dossier-list.review-skills-list > :is(div,.review-skill-test) {
   display: grid;
-  grid-template-columns: minmax(130px,.9fr) minmax(130px,1.1fr) minmax(105px,auto);
+  grid-template-columns: minmax(0,1.05fr) minmax(0,1.2fr) minmax(90px,.95fr);
   gap: 8px;
   align-items: center;
+}
+.review-sections .dossier-list.review-skills-list > .review-skill-test {
+  grid-template-columns: minmax(0,1fr) minmax(180px,1.15fr);
+}
+.review-sections .review-skills-list .review-skill-label {
+  color: #dfece3;
+  font: 800 10px/1.25 "Inter",sans-serif;
+}
+.review-sections .review-skills-list .review-skill-test:hover .review-skill-label,
+.review-sections .review-skills-list .review-skill-test:focus-visible .review-skill-label { color: #9ee1b6; }
+.review-sections .review-skills-list .review-skill-test > span:nth-child(2) {
+  color: #aaa69d;
+  font-size: 8px;
+  font-weight: 400;
+}
+.review-sections .review-skills-list .review-skill-test > span:nth-child(2) strong {
+  color: #e5dfd4;
+  font-size: 9px;
+  font-weight: 700;
 }
 .dossier-list { display: grid; gap: 5px; }
 .dossier-list > div { display: grid; grid-template-columns: minmax(78px,.62fr) minmax(100px,1.38fr) auto; gap: 6px; align-items: start; border-bottom: 1px solid rgba(255,255,255,.075); padding: 4px 0; }
@@ -4317,7 +4334,6 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
 @media (max-width: 520px) {
   .review-skill-heading { align-items: stretch; flex-direction: column; }
   .review-skill-heading label { flex-basis: auto; }
-  .review-skill-actions { justify-content: space-between; }
   .review-summary-rail { grid-template-columns: 1fr; }
   .review-profile-heading h2 { font-size: 26px; }
   .review-meta { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
@@ -4350,6 +4366,7 @@ html[data-text-size="extra-large"] .review-tab-panel .review-skills-list { grid-
   .review-tab-panel .dossier-list > div,
   .review-tab-panel .review-skills-list > :is(div,.review-skill-test),
   .review-tab-panel .inventory-list > .sheet-entry { grid-template-columns: 1fr; }
+  .review-sections .review-tab-panel .review-skills-list > .review-skill-test { grid-template-columns: 1fr; }
   .review-tab-panel .dossier-list .sheet-entry-meta { grid-column: 1; }
   .action-fate-control { align-items: stretch; flex-direction: column; }
   .action-fate-control > button { width: 100%; }

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const portal = readFileSync(join(root, "src", "main.js"), "utf8");
+const styles = readFileSync(join(root, "src", "styles.css"), "utf8");
 const npcTemplate = readFileSync(join(root, "foundry-module", "dh2-portal", "templates", "reinforcement-sheet.html"), "utf8");
 const combat = readFileSync(join(root, "foundry-module", "dh2-portal", "scripts", "portal-combat.mjs"), "utf8");
 
@@ -16,6 +17,10 @@ assert.ok(portal.includes('id="skill-search"'), "Acolyte Skills tab needs search
 assert.ok(portal.includes('class="review-skill-test"') && portal.includes('data-roll-review-skill="${skill.id}"'), "Acolyte skill rows must be the test controls instead of using separate Roll buttons.");
 assert.ok(!portal.includes('<b>Test</b>'), "Clickable skill rows should not include a redundant visible Test label.");
 assert.ok(!portal.includes('class="compact-button review-skill-roll"'), "Acolyte skill rows must not duplicate each test with a separate Roll button.");
+assert.ok(!portal.includes('<span class="review-skill-actions">'), "Live skill rows should not spend space on creation or XP source labels.");
+assert.match(styles, /\.review-sections \.review-skills-list \.review-skill-label\s*\{[^}]*font: 800 10px/s, "Skill names must have stronger hierarchy than their metadata.");
+assert.ok(styles.includes("grid-template-columns: minmax(0,1.05fr) minmax(0,1.2fr) minmax(90px,.95fr);"), "Skill rows must use consistent proportional columns rather than content-sized columns.");
+assert.ok(styles.includes("grid-template-columns: minmax(0,1fr) minmax(180px,1.15fr);"), "Playable skill rows must use stable name and test-information columns.");
 
 assert.ok(npcTemplate.includes("data-roll-untrained-skill"), "NPC sheets need explicit untrained roll controls.");
 assert.ok(portal.includes('displayName: `${skill.name} specialities`'), "Acolyte sheet must identify Specialist entries as skill families rather than generic tests.");
