@@ -35,11 +35,3 @@ optional sourcebook portraits from PDFs you own, run
 `scripts/extract-reinforcement-art.ps1`; those private crops are deliberately
 excluded from Git and public releases.
 
-## Roadmap
-
-- Rehearse player permissions and the laptop restore process before campaign
-  night.
-- Add a GM investigation workspace for clues, connections, conclusions, and
-  encounter objectives.
-- Mobile accessibility pass: use remembered, single-level accordions for the
-  largest sheet sections without introducing nested scroll traps.
