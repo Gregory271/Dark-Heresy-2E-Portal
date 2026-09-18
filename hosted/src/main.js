@@ -118,7 +118,7 @@ function isReadOnlyCharacter() {
   return !foundryActorSheetMode && characterLibrary.find(entry => entry.id === activeCharacterId)?.canEdit === false;
 }
 
-const sharedViewControls = '[data-review-tab],#review-tab-select,#inventory-search,#skill-search,#inventory-equipped-only,[data-inventory-group],.action-search input,[data-action-group],#open-roster,#open-compendium,#open-reinforcements,#text-size,[data-open-item-button],[data-open-action],[data-sheet-detail],[data-rule-term],.dialog-close,[data-close],.export-builder,.export-foundry,#load-shared-character';
+const sharedViewControls = '[data-review-tab],#toggle-review-save-panel,#review-tab-select,#inventory-search,#skill-search,#inventory-equipped-only,[data-inventory-group],.action-search input,[data-action-group],#open-roster,#open-compendium,#open-reinforcements,#text-size,[data-open-item-button],[data-open-action],[data-sheet-detail],[data-rule-term],.dialog-close,[data-close],.export-builder,.export-foundry,#load-shared-character';
 
 function applySharedViewMode() {
   if (!isReadOnlyCharacter()) return;
@@ -139,6 +139,7 @@ let actionIndexState = {
 };
 const reviewTabStorageKey = "dh2-review-tab";
 let reviewTabState = localStorage.getItem(reviewTabStorageKey) || "actions";
+let reviewSavePanelOpen = false;
 let armouryBrowserState = {
   query: "",
   category: "All",
@@ -7428,7 +7429,7 @@ function renderReview() {
   ];
   if (!reviewTabs.some(([id]) => id === reviewTabState)) reviewTabState = "actions";
   return `
-    <div class="management-shell review-layout">
+    <div class="management-shell review-layout${reviewSavePanelOpen ? " save-panel-open" : ""}">
       <section class="review-dossier">
         <header class="review-profile-heading">
           <div class="review-identity-with-portrait">${renderFoundryPortrait()}<div><div class="review-name-line"><h2 id="review-character-name">${escapeHtmlAttribute(character.name || "Unnamed Acolyte")}</h2>${!foundryActorSheetMode || foundryPortrait.canEdit ? `<button type="button" id="edit-character-name" class="sheet-edit-icon" aria-label="Edit character name" title="Edit character name">✎</button>` : ""}</div><p class="review-profile-details">${homeWorldName} · ${backgroundName} · ${roleName}</p>${!foundryActorSheetMode ? '<p id="player-save-status" role="status" aria-live="polite"></p>' : ''}</div></div>
@@ -7495,9 +7496,12 @@ function renderReview() {
             <section class="review-summary-card review-summary-skills"><div class="review-summary-card-body">${skillSummaryRows}</div><h3>Skills</h3></section>
           </aside>
           <section class="review-workspace" aria-label="Character details">
-            <nav class="review-workspace-tabs" role="tablist" aria-label="Character sheet sections">
-              ${reviewTabs.map(([id, label]) => `<button type="button" role="tab" id="review-tab-${id}" aria-controls="review-panel-${id}" aria-selected="${reviewTabState === id}" tabindex="${reviewTabState === id ? "0" : "-1"}" class="${reviewTabState === id ? "active" : ""}" data-review-tab="${id}">${label}</button>`).join("")}
-            </nav>
+            <div class="review-tab-header">
+              <nav class="review-workspace-tabs" role="tablist" aria-label="Character sheet sections">
+                ${reviewTabs.map(([id, label]) => `<button type="button" role="tab" id="review-tab-${id}" aria-controls="review-panel-${id}" aria-selected="${reviewTabState === id}" tabindex="${reviewTabState === id ? "0" : "-1"}" class="${reviewTabState === id ? "active" : ""}" data-review-tab="${id}">${label}</button>`).join("")}
+              </nav>
+              ${foundryActorSheetMode ? "" : `<button type="button" class="review-save-toggle" id="toggle-review-save-panel" aria-controls="review-save-panel" aria-expanded="${reviewSavePanelOpen}">${reviewSavePanelOpen ? "Hide save" : "Save & export"}</button>`}
+            </div>
             <label class="review-tab-select"><span>Character sheet section</span><select id="review-tab-select">${reviewTabs.map(([id, label]) => `<option value="${id}" ${reviewTabState === id ? "selected" : ""}>${label}</option>`).join("")}</select></label>
             <div class="review-tab-panels review-sections">
               ${!foundryActorSheetMode ? `<div class="review-tab-panel" id="review-panel-rolls" role="tabpanel" aria-labelledby="review-tab-rolls" data-review-panel="rolls" ${reviewTabState === 'rolls' ? '' : 'hidden'}>${renderBrowserRollHistory()}</div>` : ''}
@@ -7552,7 +7556,7 @@ function renderReview() {
           </section>
         </div>
       </section>
-      ${foundryActorSheetMode ? "" : `<aside class="validation-panel">
+      ${foundryActorSheetMode ? "" : `<aside class="validation-panel" id="review-save-panel" aria-label="Save and export options" ${reviewSavePanelOpen ? "" : "hidden"}>
         <button class="compact-button" id="retry-player-save" type="button" hidden>Retry online save</button>
         <button class="compact-button" id="load-shared-character" type="button" hidden>Load updated shared character</button>
         <h2>${foundryActorSheetMode ? "Save Changes" : "Save Your Acolyte"}</h2>
@@ -8201,6 +8205,15 @@ function addDegreeToCurrentActionWithFate() {
 function wireEvents() {
   updatePlayerSaveStatus();
   applySharedViewMode();
+  document.querySelector("#toggle-review-save-panel")?.addEventListener("click", (event) => {
+    reviewSavePanelOpen = !reviewSavePanelOpen;
+    const panel = document.querySelector("#review-save-panel");
+    const layout = document.querySelector(".review-layout");
+    panel.hidden = !reviewSavePanelOpen;
+    layout.classList.toggle("save-panel-open", reviewSavePanelOpen);
+    event.currentTarget.setAttribute("aria-expanded", String(reviewSavePanelOpen));
+    event.currentTarget.textContent = reviewSavePanelOpen ? "Hide save" : "Save & export";
+  });
   document.querySelector('#retry-player-save')?.addEventListener('click', () => {
     const record = characterLibrary.find(entry => entry.id === activeCharacterId);
     if (record) void persistCloudRecord(record);

@@ -4968,3 +4968,36 @@ html[data-text-size="extra-large"] .review-summary-rail { display: grid; }
 #player-save-status { font-size:13px; line-height:1.5; }
 .browser-roll-record { border-bottom:1px solid #776448; padding:10px 0; }
 .browser-roll-record > span { display:block; color:#b4ad9f; font-size:12px; }
+
+/* Keep validation and file exports available without reserving sheet space. */
+.scene-review .review-layout:not(.save-panel-open) { grid-template-columns:minmax(0,1fr) !important; }
+.scene-review .review-layout.save-panel-open { grid-template-columns:minmax(0,1fr) 250px; }
+.scene-review .validation-panel[hidden] { display:none !important; }
+.review-tab-header {
+  display:flex;
+  align-items:stretch;
+  min-width:0;
+  border-bottom:1px solid rgba(225,187,118,.27);
+}
+.review-workspace-tabs { flex:1 1 auto; border-bottom:0; }
+.review-tab-header .review-save-toggle {
+  flex:0 0 auto;
+  align-self:center;
+  min-height:28px;
+  margin:0 8px 0 4px;
+  border:1px solid rgba(225,187,118,.42);
+  border-bottom:1px solid rgba(225,187,118,.42);
+  padding:4px 9px;
+  background:#111612;
+  color:#e6c88f;
+  white-space:nowrap;
+}
+.review-tab-header .review-save-toggle:hover,
+.review-tab-header .review-save-toggle:focus-visible { background:#21190e; color:#fff0d1; }
+@media (max-width:1180px) {
+  .scene-review .review-layout.save-panel-open { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) auto; }
+}
+@media (max-width:800px) {
+  .scene-review .review-layout.save-panel-open { display:block; }
+  .scene-review .review-layout.save-panel-open .validation-panel { margin-top:8px; }
+}
