@@ -86,6 +86,11 @@ export async function listCloudCharacters() {
   const connection = savedCampaignConnection();
   if (!connection) return [];
   const supabase = await getClient();
+  const user = (await supabase.auth.getUser()).data.user;
+  const membership = await supabase.from('campaign_members').select('role,display_name,user_id').eq('campaign_id', connection.campaignId);
+  if (membership.error) throw membership.error;
+  const myMembership = membership.data.find(member => member.user_id === user.id);
+  if (!myMembership) throw new Error('This browser is no longer a member of the shared campaign.');
   const { data, error } = await supabase
     .from("characters")
     .select("id,owner_id,character_data,step,origin,created_at,updated_at")
@@ -95,6 +100,11 @@ export async function listCloudCharacters() {
   return (data || []).map((entry) => ({
     id: entry.id,
     ownerId: entry.owner_id,
+    ownerDisplayName: membership.data.find(member => member.user_id === entry.owner_id)?.display_name || 'Player',
+    campaignId: connection.campaignId,
+    cloudUpdatedAt: entry.updated_at,
+    cloudPending: false,
+    canEdit: entry.owner_id === user.id || myMembership.role === 'gm',
     character: entry.character_data,
     step: entry.step,
     origin: entry.origin || "Shared campaign",
@@ -106,23 +116,37 @@ export async function listCloudCharacters() {
 export async function saveCloudCharacter(record) {
   const connection = savedCampaignConnection();
   if (!connection) return { skipped: true };
+  if (record.canEdit === false) throw new Error('Only the character owner or GM can save this character.');
+  if (record.campaignId && record.campaignId !== connection.campaignId) throw new Error('This character belongs to a different campaign.');
   const supabase = await getClient();
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new Error("Anonymous player session is unavailable.");
   const existing = await supabase
     .from("characters")
-    .select("id")
+    .select("id,updated_at")
     .eq("id", record.id)
     .maybeSingle();
   if (existing.error) throw existing.error;
   if (existing.data) {
+    if (!record.cloudUpdatedAt || existing.data.updated_at !== record.cloudUpdatedAt) {
+      const conflict = new Error('This character changed on another device. Export your local copy, then load the shared version before editing again.');
+      conflict.code = 'CLOUD_CONFLICT';
+      throw conflict;
+    }
+    const nextUpdatedAt = new Date(Math.max(Date.now(), new Date(record.cloudUpdatedAt).getTime() + 1)).toISOString();
     const updated = await supabase.from("characters").update({
       character_data: record.character,
       step: record.step,
       origin: record.origin,
-      updated_at: record.updatedAt,
-    }).eq("id", record.id);
+      updated_at: nextUpdatedAt,
+    }).eq("id", record.id).eq('campaign_id', connection.campaignId).eq('updated_at', record.cloudUpdatedAt).select('updated_at');
     if (updated.error) throw updated.error;
+    if (!updated.data?.length) {
+      const conflict = new Error('The shared character changed or you no longer have permission to save it. Load the shared version before editing.');
+      conflict.code = 'CLOUD_CONFLICT';
+      throw conflict;
+    }
+    return { saved: true, cloudUpdatedAt: updated.data[0].updated_at, campaignId: connection.campaignId };
   } else {
     const inserted = await supabase.from("characters").insert({
       id: record.id,
@@ -133,10 +157,10 @@ export async function saveCloudCharacter(record) {
       origin: record.origin,
       created_at: record.createdAt,
       updated_at: record.updatedAt,
-    });
+    }).select('updated_at');
     if (inserted.error) throw inserted.error;
+    return { saved: true, cloudUpdatedAt: inserted.data[0].updated_at, campaignId: connection.campaignId };
   }
-  return { saved: true };
 }
 
 export async function deleteCloudCharacter(id) {

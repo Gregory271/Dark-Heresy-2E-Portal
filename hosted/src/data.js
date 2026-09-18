@@ -86,12 +86,12 @@ export const artByChoice = Object.fromEntries(
 
 export const stageArtById = {
   identity: "../public/assets/stages/grants.webp?v=0.6.2",
-  characteristics: "../public/assets/stages/characteristics.webp?v=0.6.2",
-  fateWounds: "../public/assets/stages/fate-wounds.webp?v=0.6.2",
-  divination: "../public/assets/stages/divination.webp?v=0.6.2",
-  aptitudes: "../public/assets/stages/aptitudes.webp?v=0.6.2",
+  characteristics: "../public/assets/stages/review.webp?v=0.6.2",
+  fateWounds: "../public/assets/stages/review.webp?v=0.6.2",
+  divination: "../public/assets/stages/review.webp?v=0.6.2",
+  aptitudes: "../public/assets/stages/advances.webp?v=0.6.2",
   grants: "../public/assets/stages/grants.webp?v=0.6.2",
-  equipment: "../public/assets/stages/equipment.webp?v=0.6.2",
+  equipment: "../public/assets/stages/advances.webp?v=0.6.2",
   advances: "../public/assets/stages/advances.webp?v=0.6.2",
   review: "../public/assets/stages/review.webp?v=0.6.2",
 };

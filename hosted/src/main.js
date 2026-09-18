@@ -1,4 +1,6 @@
-import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.11.0";
+import { itemQualityEntries, actionsForItem } from "./weapon-qualities.js?v=0.1.0";
+import { browserAmmoState, browserAmmoCost, setBrowserAmmo, reloadBrowserAmmo, appendBrowserRoll, importedPlayerCharacter } from "./player-sheet.js?v=0.1.0";
+import { artByChoice, artFramingByChoice, artPageByChoice, catalogs, defaultCharacter, divinations, loreByChoice, mechanicsByChoice, scenes, selectedEntry, stageArtById } from "./data.js?v=0.11.1";
 import { armoury } from "./armoury-data.js?v=0.8.1";
 import { actionGroups, actionSource, combatActionCatalogue } from "./action-data.js?v=0.1.0";
 import { talentCatalogue as baseTalentCatalogue } from "./talent-data.js?v=0.9.1";
@@ -92,6 +94,38 @@ const cloudSaveTimers = new Map();
 let repositoryStatus = "connecting";
 let cloudStatus = cloudIsConfigured() ? "disconnected" : "unconfigured";
 let cloudRefreshTimer = null;
+const cloudSaveChains = new Map();
+let cloudSaveError = '';
+let pendingRemoteCharacter = null;
+
+function updatePlayerSaveStatus() {
+  const record = characterLibrary.find(entry => entry.id === activeCharacterId);
+  const message = !savedCampaignConnection() ? 'Saved in this browser · Connect Campaign for shared saves'
+    : record?.canEdit === false ? 'Shared character · View only'
+    : record?.cloudConflict ? 'Save conflict · Export your copy, then load the shared version'
+    : record?.cloudPending ? (cloudStatus === 'offline' ? 'Saved in this browser · Online save pending' : 'Saving to shared campaign…')
+    : cloudStatus === 'connected' && record?.cloudUpdatedAt ? 'Saved to shared campaign'
+    : 'Saved in this browser · Shared connection unavailable';
+  const element = document.querySelector('#player-save-status');
+  if (element) { element.textContent = message; element.title = cloudSaveError; }
+  const load = document.querySelector('#load-shared-character');
+  if (load) load.hidden = !pendingRemoteCharacter;
+  const retry = document.querySelector('#retry-player-save');
+  if (retry) retry.hidden = !record?.cloudPending || Boolean(record?.cloudConflict);
+}
+
+function isReadOnlyCharacter() {
+  return !foundryActorSheetMode && characterLibrary.find(entry => entry.id === activeCharacterId)?.canEdit === false;
+}
+
+const sharedViewControls = '[data-review-tab],#review-tab-select,#inventory-search,#skill-search,#inventory-equipped-only,[data-inventory-group],.action-search input,[data-action-group],#open-roster,#open-compendium,#open-reinforcements,#text-size,[data-open-item-button],[data-open-action],[data-sheet-detail],[data-rule-term],.dialog-close,[data-close],.export-builder,.export-foundry,#load-shared-character';
+
+function applySharedViewMode() {
+  if (!isReadOnlyCharacter()) return;
+  document.querySelectorAll('#app button,#app input,#app select,#app textarea').forEach(control => {
+    if (!control.matches(sharedViewControls)) control.disabled = true;
+  });
+}
 const sheetDetailRecords = new Map();
 let sheetDetailCounter = 0;
 const currentActionRecords = new Map();
@@ -143,7 +177,9 @@ function prepareCharacter(input = {}) {
   prepared.acquisitions ||= [];
   prepared.equipment ||= {};
   prepared.equipment.inventory ||= [];
+  prepared.equipment.customItems = (Array.isArray(prepared.equipment.customItems) ? prepared.equipment.customItems : []).filter(item => item && typeof item.id === "string" && item.id.startsWith("custom-") && typeof item.name === "string").map(item => customInventoryRecord(item.id, item.name, item.description));
   prepared.equipment.characterCreationGrants ||= [];
+  prepared.equipment.removedCreationGrants = Array.isArray(prepared.equipment.removedCreationGrants) ? prepared.equipment.removedCreationGrants : [];
   prepared.equipment.unlinkedCharacterCreationGrants ||= [];
   if (!Array.isArray(prepared.equipment.noCostGrants)) {
     prepared.equipment.noCostGrants = prepared.equipment.inventory
@@ -153,7 +189,7 @@ function prepareCharacter(input = {}) {
     .filter((id) => prepared.equipment.inventory.includes(id) && !prepared.acquisitions.includes(id));
   const inventoryIds = new Set(prepared.equipment.inventory);
   const legacyEquipped = prepared.equipment.equipped || {};
-  const itemForId = (id) => armoury.find((item) => item.id === id);
+  const itemForId = (id) => armoury.find((item) => item.id === id) || prepared.equipment.customItems.find(item => item.id === id);
   const legacyReadied = [legacyEquipped.primary, legacyEquipped.secondary, legacyEquipped.melee].filter(Boolean);
   const legacyArmour = [legacyEquipped.armour].filter(Boolean);
   const legacyActiveGear = [legacyEquipped.utilityOne, legacyEquipped.utilityTwo]
@@ -359,11 +395,20 @@ function mergeCloudRecords(records = []) {
   const merged = new Map(characterLibrary.map((record) => [record.id, record]));
   for (const remote of records.filter((record)=>!untouchedPlaceholderRecord(record))) {
     const local = merged.get(remote.id);
-    if (!local || String(remote.updatedAt || "") >= String(local.updatedAt || "")) merged.set(remote.id, remote);
+    if (local?.cloudPending) {
+      if (remote.id === activeCharacterId && local.cloudConflict) pendingRemoteCharacter = remote;
+      continue;
+    }
+    if (remote.id === activeCharacterId && appView === 'builder' && local && remote.cloudUpdatedAt !== local.cloudUpdatedAt) {
+      pendingRemoteCharacter = remote;
+      continue;
+    }
+    merged.set(remote.id, remote);
   }
   characterLibrary = [...merged.values()];
   localStorage.setItem(libraryStorageKey, JSON.stringify(characterLibrary));
   if (appView === "roster") renderRoster();
+  updatePlayerSaveStatus();
 }
 
 async function refreshCloudRepository() {
@@ -375,8 +420,10 @@ async function refreshCloudRepository() {
       "The shared campaign did not respond within 10 seconds.",
     ));
     cloudStatus = "connected";
+    updatePlayerSaveStatus();
   } catch (error) {
     cloudStatus = "offline";
+    updatePlayerSaveStatus();
     console.warn("Shared campaign refresh failed; local copies remain available.", error);
   }
 }
@@ -417,17 +464,41 @@ async function persistRepositoryRecord(record) {
 }
 
 async function persistCloudRecord(record) {
+  const previous = cloudSaveChains.get(record.id) || Promise.resolve();
+  const pending = previous.catch(() => {}).then(async () => {
+  record = characterLibrary.find(entry => entry.id === record.id) || record;
+  if (!record.cloudPending || record.cloudConflict || record.canEdit === false) return;
   try {
-    await withTimeout(
+    const result = await withTimeout(
       saveCloudCharacter(record),
       12000,
       "The shared campaign did not respond while saving.",
     );
     cloudStatus = "connected";
+    cloudSaveError = '';
+    const current = characterLibrary.find(entry => entry.id === record.id);
+    if (current && result.saved) {
+      current.cloudUpdatedAt = result.cloudUpdatedAt;
+      current.campaignId = result.campaignId;
+      current.canEdit = true;
+      if (current.updatedAt === record.updatedAt) current.cloudPending = false;
+      localStorage.setItem(libraryStorageKey, JSON.stringify(characterLibrary));
+    }
   } catch (error) {
     cloudStatus = "offline";
+    cloudSaveError = error.message;
+    if (error.code === 'CLOUD_CONFLICT') {
+      const current = characterLibrary.find(entry => entry.id === record.id);
+      if (current) current.cloudConflict = true;
+      localStorage.setItem(libraryStorageKey, JSON.stringify(characterLibrary));
+      void refreshCloudRepository();
+    }
     console.warn("Shared save failed; local recovery copies remain current.", error);
   }
+  updatePlayerSaveStatus();
+  });
+  cloudSaveChains.set(record.id, pending);
+  try { await pending; } finally { if (cloudSaveChains.get(record.id) === pending) cloudSaveChains.delete(record.id); }
 }
 
 function queueRepositorySave(record) {
@@ -593,19 +664,31 @@ function applyInventoryFilters() {
   if (empty) empty.hidden = count > 0;
 }
 
+function renderItemQualities(item) {
+  const qualities = itemQualityEntries(item);
+  if (!qualities.length) return "";
+  return `<section class="item-quality-rules" aria-label="Special qualities"><h3>Special qualities</h3>${qualities.map((quality) => `<article><h4>${escapeHtmlAttribute(quality.name)}</h4><p>${escapeHtmlAttribute(quality.value === true ? quality.summary : quality.summary.replace(/\bX\b/g, String(quality.value)))}</p><small>${escapeHtmlAttribute(quality.source)}</small></article>`).join("")}<p class="item-quality-resolution">Tearing and Primitive damage dice are handled by the roller. Resolve other quality modifiers, extra hits, ammunition adjustments and target effects with the GM; they are not automatically applied.</p></section>`;
+}
+
+function renderItemActions(item) {
+  if (item.custom || !character.equipment.inventory.includes(item.id)) return "";
+  const actions = actionsForItem(derivedCharacterActions(), item.id).sort((a,b) => comparePlayableActions(a,b,[item.id]));
+  return `<section class="item-available-actions" aria-label="Item actions"><h3>Use this item</h3>${item.category === "Weapons" ? `<button class="compact-button item-damage-shortcut" type="button" data-item-damage="${escapeHtmlAttribute(item.id)}">Damage · ${escapeHtmlAttribute(item.profile?.damage || "—")}${weaponIsMelee(item) ? " + SB" : ""}</button>` : ""}${actions.length ? `<div>${actions.map((action) => `<article class="item-action-option"><button type="button" class="compact-button" data-item-action="${escapeHtmlAttribute(action.id)}" data-action-item="${escapeHtmlAttribute(item.id)}" ${action.available ? "" : "disabled"}><strong>${escapeHtmlAttribute(action.test?.mode || action.name)}</strong><span>${escapeHtmlAttribute(action.available ? action.type : action.unavailableReason)}</span></button><p>${escapeHtmlAttribute(action.summary)}</p></article>`).join("")}</div>` : `<p>No separate action is recorded for this item. Use its profile and rules below.</p>`}</section>`;
+}
+
+function openItemDetails(itemId) {
+  const item = equipmentItem(itemId);
+  if (!item) return;
+  openSheetDetailRecord({ kind: item.category, name: item.name, summary: cleanRulesSummary(item.description || item.profile?.description || ""), source: item.source, itemId,
+    rows: item.custom ? [] : [["Availability", effectiveAvailability(item)], ["Craftsmanship", item.craftsmanship], ["Weight", displayWeight(item)], ...itemProfileRows(item)].filter(([,value]) => value !== undefined && value !== null && value !== "") });
+}
+
 function renderInventorySheetEntry(item, provenance, ownedWeapons) {
-  const safeSummary = itemRulesSummary(item) || "No additional effect is recorded.";
-  const rows = [
-    ["Category", item.category],
-    ["Availability", effectiveAvailability(item)],
-    ["Craftsmanship", item.craftsmanship],
-    ["Weight", displayWeight(item)],
-    ...itemProfileRows(item),
-  ];
-  return `<div class="sheet-entry inventory-sheet-entry" data-inventory-row data-inventory-category="${inventoryGroup(item.category)}" data-inventory-equipped="${equipmentItemIsActive(item.id)}" data-inventory-search="${escapeHtmlAttribute([item.name, item.category, provenance.label, safeSummary].join(" "))}">
+  const safeSummary = item.custom ? item.description || "No description." : itemRulesSummary(item) || "No additional effect is recorded.";
+  return `<div class="sheet-entry inventory-sheet-entry" data-open-item="${escapeHtmlAttribute(item.id)}" role="button" tabindex="0" aria-label="Inspect ${escapeHtmlAttribute(item.name)} and its actions" data-inventory-row data-inventory-category="${inventoryGroup(item.category)}" data-inventory-equipped="${equipmentItemIsActive(item.id)}" data-inventory-search="${escapeHtmlAttribute([item.name, item.category, provenance.label, safeSummary].join(" "))}">
     <span class="inventory-item-identity"><strong>${escapeHtmlAttribute(item.name)}</strong><small>${escapeHtmlAttribute(item.category)}</small><em>${escapeHtmlAttribute(provenance.label)}</em></span>
     <span class="sheet-entry-summary">${escapeHtmlAttribute(visibleSheetSummary(safeSummary))}</span>
-    <span class="sheet-entry-meta">${reviewInventoryControl(item, ownedWeapons)}${foundryActorSheetMode && item.category === 'Weapons' && weaponIsRanged(item) ? `<button class="compact-button" type="button" data-manage-ammo="${escapeHtmlAttribute(item.name)}">Ammo / Reload</button>` : ''}${sheetDetailButton({ kind: item.category, name: item.name, summary: safeSummary, source: item.source, rows })}</span>
+    <span class="sheet-entry-meta">${reviewInventoryControl(item, ownedWeapons)}${item.category === 'Weapons' && weaponIsRanged(item) ? `<button class="compact-button" type="button" data-ammo-item="${escapeHtmlAttribute(item.id)}" data-manage-ammo="${escapeHtmlAttribute(item.name)}">Ammo / Reload</button>` : ''}</span>
   </div>`;
 }
 
@@ -742,6 +825,7 @@ function syncGrantedEquipment() {
   }
 
   for (const itemId of currentIds) {
+    if (character.equipment.removedCreationGrants?.includes(itemId)) continue;
     if (!character.equipment.inventory.includes(itemId)) character.equipment.inventory.push(itemId);
     character.acquisitions = character.acquisitions.filter((entry) => entry !== itemId);
     character.equipment.noCostGrants = character.equipment.noCostGrants.filter((entry) => entry !== itemId);
@@ -761,6 +845,7 @@ function syncGrantedEquipment() {
 }
 
 function equipmentProvenance(itemId, grants = resolvedGrantedEquipment()) {
+  if (equipmentItem(itemId)?.custom) return {type: "custom", label: "Custom item", detail: "Recorded during play"};
   const creationGrant = grants.entries.find((entry) => entry.itemId === itemId);
   if (creationGrant) {
     return {
@@ -1793,6 +1878,8 @@ function save({ markComplete = false } = {}) {
     }
     return;
   }
+  const sharedRecord = characterLibrary.find(entry => entry.id === activeCharacterId);
+  if (sharedRecord?.canEdit === false) return;
   syncCreationConsequences();
   syncGrantedEquipment();
   syncAutomaticEquipmentState();
@@ -1803,12 +1890,14 @@ function save({ markComplete = false } = {}) {
   const existingIndex = characterLibrary.findIndex((entry) => entry.id === activeCharacterId);
   const existing = characterLibrary[existingIndex];
   const record = {
+    ...existing,
     id: activeCharacterId,
     character: structuredClone(character),
     step,
     createdAt: existing?.createdAt || now,
     updatedAt: now,
     origin: existing?.origin || "Created locally",
+    cloudPending: Boolean(savedCampaignConnection()) || Boolean(existing?.cloudPending),
   };
   if (existingIndex >= 0) characterLibrary[existingIndex] = record;
   else characterLibrary.push(record);
@@ -1818,10 +1907,12 @@ function save({ markComplete = false } = {}) {
   sessionStorage.setItem("dh2-step", String(step));
   sessionStorage.setItem("dh2-app-view", appView);
   if (!foundryActorSheetMode) queueRepositorySave(record);
+  updatePlayerSaveStatus();
   if (foundryActorSheetMode && foundryActorSheetReady) queueFoundryActorSync();
 }
 
 function rerenderAdvancesPreservingScroll(focusSelector = "", anchorSelector = "#advance-talents") {
+  const nestedScroll = [".talent-list", ".talent-inspector", ".management-content"].map(selector => ({ selector, top: document.querySelector(selector)?.scrollTop || 0 }));
   const previousShop = document.querySelector(".advance-shop");
   const previousAnchor = document.querySelector(focusSelector || anchorSelector);
   const anchorViewportOffset = previousShop && previousAnchor
@@ -1839,13 +1930,17 @@ function rerenderAdvancesPreservingScroll(focusSelector = "", anchorSelector = "
         const nextOffset = anchor.getBoundingClientRect().top - shop.getBoundingClientRect().top;
         shop.scrollTop = Math.max(0, shop.scrollTop + nextOffset - anchorViewportOffset);
       }
+      for (const { selector, top } of nestedScroll) {
+        const panel = document.querySelector(selector);
+        if (panel) panel.scrollTop = top;
+      }
       if (focusSelector && anchor instanceof HTMLElement) anchor.focus({ preventScroll: true });
     });
   });
 }
 
 function rerenderEquipmentStatePreservingScroll(focusSelector = "") {
-  const scrollPositions = [".armoury-list", ".loadout-panel", ".management-content", ".item-inspector > div", ".review-tab-panel:not([hidden])", ".inventory-list"]
+  const scrollPositions = [".armoury-list", ".loadout-panel", ".management-content", ".item-inspector > div", ".review-tab-panel:not([hidden])", ".inventory-list", ".review-action-results", ".review-skill-results"]
     .map((selector) => ({ selector, top: document.querySelector(selector)?.scrollTop || 0 }));
   render();
   requestAnimationFrame(() => {
@@ -1884,14 +1979,14 @@ function refreshCharacteristicDisplay(characteristicId) {
     resultBox.innerHTML = `<strong>${result.value}</strong><small>Entered manually</small>`;
     if (rollButton) {
       rollButton.textContent = "Roll Again";
-      rollButton.disabled = false;
+      rollButton.disabled = !action.available;
     }
   } else {
     article.classList.remove("complete");
     resultBox.innerHTML = "<strong>—</strong><small>Awaiting result</small>";
     if (rollButton) {
       rollButton.textContent = "Roll for Characteristic";
-      rollButton.disabled = false;
+      rollButton.disabled = !action.available;
     }
   }
   const complete = characteristics.filter((entry) => character.rolls[entry.id]?.value).length;
@@ -2125,10 +2220,56 @@ function rollAllCharacteristics() {
   showCharacteristicRollResults();
 }
 
+function isLivePlayerSheet() {
+  return foundryActorSheetMode || Boolean(character.playMode || character.completedAt);
+}
+
+function openBrowserAmmunition(itemId) {
+  const weapon = equipmentItem(itemId);
+  if (!weapon) return;
+  document.querySelector('#browser-ammo-dialog')?.remove();
+  const dialog = document.createElement('dialog');
+  dialog.id = 'browser-ammo-dialog';
+  dialog.className = 'sheet-detail-dialog';
+  dialog.setAttribute('aria-labelledby', 'browser-ammo-title');
+  const state = browserAmmoState(character, weapon);
+  dialog.innerHTML = `<h2 id="browser-ammo-title">${escapeHtmlAttribute(weapon.name)} · Ammunition</h2><p>Capacity ${state.capacity} · Reload: ${escapeHtmlAttribute(weapon.profile?.reload || 'See weapon rules')}. Spare rounds are tracked for this weapon; record ammunition you actually carry.</p><form><label>Loaded rounds<input name="loaded" type="number" inputmode="numeric" min="0" max="${state.capacity}" value="${state.loaded}" required></label><label>Spare rounds<input name="reserve" type="number" inputmode="numeric" min="0" max="100000" value="${state.reserve}" required></label><p role="status"></p><button class="compact-button" type="submit">Save totals</button><button class="compact-button" type="button" data-reload>Reload from spare rounds</button><button class="compact-button" type="button" data-close>Close</button></form>`;
+  const form = dialog.querySelector('form');
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    try {
+      setBrowserAmmo(character, weapon, Number(form.elements.loaded.value), Number(form.elements.reserve.value));
+      save();
+      dialog.querySelector('[role=status]').textContent = 'Ammunition saved.';
+    } catch (error) { dialog.querySelector('[role=status]').textContent = error.message; }
+  });
+  dialog.querySelector('[data-reload]').addEventListener('click', () => {
+    try {
+      if (!form.reportValidity()) return;
+      setBrowserAmmo(character, weapon, Number(form.elements.loaded.value), Number(form.elements.reserve.value));
+      const transferred = reloadBrowserAmmo(character, weapon);
+      save();
+      const updated = browserAmmoState(character, weapon);
+      form.elements.loaded.value = updated.loaded;
+      form.elements.reserve.value = updated.reserve;
+      dialog.querySelector('[role=status]').textContent = `Reloaded ${transferred} rounds. Apply the weapon's reload action time.`;
+    } catch (error) { dialog.querySelector('[role=status]').textContent = error.message; }
+  });
+  dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+function renderBrowserRollHistory() {
+  const rolls = Array.isArray(character.combat.rollHistory) ? character.combat.rollHistory : [];
+  return `<section><h3>Recent rolls</h3><p>Last 100 website rolls, saved with this character. These are not sent to Foundry chat. Raw damage is before defences.</p>${rolls.map(roll => `<article class="browser-roll-record"><strong>${escapeHtmlAttribute(roll.title)}</strong><span>${escapeHtmlAttribute(new Date(roll.at).toLocaleString())}</span><p>${escapeHtmlAttribute(`${roll.dice.length}d${roll.sides}: ${roll.dice.join(', ')} · Total ${roll.total}${roll.target != null ? ` · Target ${roll.target} · ${testOutcome(roll.dice[0], roll.target).success ? 'Success' : 'Failure'}` : ''}`)}</p></article>`).join('') || '<p>No rolls yet.</p>'}</section>`;
+}
+
 function navigateCreationBack() {
   if (step <= 0) return;
   // A live sheet's inventory/advancement editor returns to that sheet, not earlier creation.
-  if (foundryActorSheetMode) {
+  if (isLivePlayerSheet()) {
     reviewTabState = scenes[step]?.id === "equipment" ? "inventory" : "advancement";
     globalThis.localStorage?.setItem(reviewTabStorageKey, reviewTabState);
     step = scenes.findIndex((scene) => scene.id === "review");
@@ -2479,7 +2620,7 @@ function renderAptitudes() {
             ${backgroundOptions.length > 1 ? `<div class="aptitude-choice-group"><strong>Background aptitude</strong><div class="inline-choice-buttons">${backgroundOptions.map((option) => `<button type="button" data-aptitude-source-option="background" data-choice-value="${escapeHtmlAttribute(option)}" class="${(character.aptitudeSelections.background || backgroundOptions[0]) === option ? "selected" : ""}" aria-pressed="${(character.aptitudeSelections.background || backgroundOptions[0]) === option}">${option}</button>`).join("")}</div></div>` : ""}
             ${roleOptions.length > 1 ? `<div class="aptitude-choice-group"><strong>Role aptitude</strong><div class="inline-choice-buttons">${roleOptions.map((option) => `<button type="button" data-aptitude-source-option="role" data-choice-value="${escapeHtmlAttribute(option)}" class="${(character.aptitudeSelections.role || roleOptions[0]) === option ? "selected" : ""}" aria-pressed="${(character.aptitudeSelections.role || roleOptions[0]) === option}">${option}</button>`).join("")}</div></div>` : ""}
           </div>
-          <div class="tag-list">${rawAptitudes().map((aptitude) => `<span>${aptitude}</span>`).join("")}</div>
+          <div class="tag-list">${rawAptitudes().map((aptitude) => plainRuleHint(aptitude, aptitudeExplanation(aptitude))).join("")}</div>
         </section>
         <section>
           <p class="choice-source">Duplicate replacements required: ${duplicateCount}</p>
@@ -2497,7 +2638,7 @@ function renderAptitudes() {
         </section>
         <section>
           <p class="choice-source">Final aptitudes</p>
-          <div class="tag-list final">${aptitudes.map((aptitude) => `<span>${aptitude}</span>`).join("")}</div>
+          <div class="tag-list final">${aptitudes.map((aptitude) => plainRuleHint(aptitude, aptitudeExplanation(aptitude))).join("")}</div>
         </section>
       </div>
     </div>`;
@@ -2540,7 +2681,7 @@ function addRandomStartingAcquisition() {
 
 function specialSummary(special = {}) {
   return Object.entries(special)
-    .filter(([, value]) => value !== false && value !== 0 && value !== null && value !== "")
+    .filter(([, value]) => value !== false && value !== undefined && value !== null && value !== "")
     .map(([name, value]) => `${name.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase())}${value === true ? "" : ` (${value})`}`)
     .join(", ");
 }
@@ -2587,8 +2728,22 @@ function itemRulesSummary(item) {
   return profile || `${item.category}; ${effectiveAvailability(item)} availability; ${displayWeight(item)}.`;
 }
 
+function customInventoryRecord(id, name, description = "") {
+  return {id, name: String(name).trim().slice(0,120), description: String(description || "").trim().slice(0,4000), custom: true, category: "Gear", documentType: "tool", profile: {}, weight: null, availability: "", craftsmanship: "", source: "Custom item"};
+}
+
+function addCustomInventoryItem(name, description = "") {
+  if (!String(name).trim()) return null;
+  const item = customInventoryRecord(`custom-${crypto.randomUUID()}`, name, description);
+  character.equipment.customItems ||= [];
+  character.equipment.customItems.push(item);
+  character.equipment.inventory.push(item.id);
+  character.equipment.noCostGrants.push(item.id);
+  return item;
+}
+
 function equipmentItem(itemId) {
-  return armoury.find((item) => item.id === itemId) || null;
+  return armoury.find((item) => item.id === itemId) || character.equipment.customItems?.find(item => item.id === itemId) || null;
 }
 
 function removeEquipmentState(itemId) {
@@ -2599,6 +2754,25 @@ function removeEquipmentState(itemId) {
   character.equipment.weaponModAssignments = Object.fromEntries(
     Object.entries(character.equipment.weaponModAssignments).filter(([, weaponId]) => weaponId !== itemId),
   );
+}
+
+function removeInventoryItem(itemId) {
+  if (!character.equipment.inventory.includes(itemId)) return false;
+  if (!equipmentItem(itemId)?.custom) character.equipment.removedCreationGrants = [...new Set([...(character.equipment.removedCreationGrants || []), itemId])];
+  character.equipment.customItems = (character.equipment.customItems || []).filter(item => item.id !== itemId);
+  character.equipment.inventory = character.equipment.inventory.filter(id => id !== itemId);
+  character.acquisitions = character.acquisitions.filter(id => id !== itemId);
+  character.equipment.noCostGrants = character.equipment.noCostGrants.filter(id => id !== itemId);
+  removeEquipmentState(itemId);
+  for (const [slot, id] of Object.entries(character.equipment.equipped || {})) {
+    if (id === itemId) character.equipment.equipped[slot] = "";
+  }
+  return true;
+}
+
+function renderItemRemoval(item) {
+  if (!character.equipment.inventory.includes(item.id)) return "";
+  return `<details class="item-removal"><summary>Remove from inventory</summary><p>Remove <strong>${escapeHtmlAttribute(item.name)}</strong> from this character's inventory? It will also be unequipped. ${item.custom ? "You can create it again as a custom item." : "You can add it again from equipment."}</p><div><button type="button" class="compact-button" data-cancel-item-removal>Cancel</button><button type="button" class="compact-button" data-confirm-item-removal="${escapeHtmlAttribute(item.id)}">Confirm removal</button></div></details>`;
 }
 
 function equipmentItemIsActive(itemId) {
@@ -2761,7 +2935,7 @@ function renderReviewArmour(wornArmour = []) {
   }).join("");
   const covered = protection.filter((location) => location.armourPoints > 0).length;
   return `<section class="review-armour-card" aria-labelledby="review-armour-heading">
-    <div class="review-vital-heading"><h3 id="review-armour-heading">Armour</h3><small>${covered}/6 locations have worn armour</small></div>
+    <div class="review-vital-heading"><h3 id="review-armour-heading">${plainRuleHint("Armour", ruleTermsById["armour"].summary)}</h3><small>${covered}/6 locations have worn armour</small></div>
     <div class="armour-diagram" aria-label="Normal damage reduction by hit location, including Armour Points and Toughness Bonus">
       <img src="./public/assets/ui/acolyte-silhouette.svg" alt="" aria-hidden="true" />
       ${tiles}
@@ -2791,7 +2965,7 @@ function fatigueStatus() {
 function renderReviewWounds() {
   const status = woundStatus();
   return `<section class="review-wounds-card" aria-labelledby="review-wounds-heading">
-    <div class="review-vital-heading"><h3 id="review-wounds-heading">Wounds</h3></div>
+    <div class="review-vital-heading"><h3 id="review-wounds-heading">${plainRuleHint("Wounds", ruleTermsById["wounds"].summary)}</h3></div>
     <div class="wounds-total"><strong data-wounds-remaining>${status.threshold ? status.remaining : "—"}</strong><span>/ <b data-wounds-threshold>${status.threshold || "—"}</b><small>Remaining / Threshold</small></span></div>
     <div class="wounds-track" role="img" aria-label="${status.threshold ? `${status.remaining} of ${status.threshold} Wounds remaining` : "Wounds not recorded"}"><i data-wounds-track style="--wounds-remaining:${status.percentRemaining}%"></i></div>
     <div class="wounds-controls">
@@ -2824,14 +2998,12 @@ function refreshReviewWounds() {
 
 function renderReviewFate() {
   const status = fateStatus();
-  const pips = Array.from({ length: status.threshold }, (_, index) => `<i class="${index < status.current ? "filled" : ""}"></i>`).join("");
-  return `<section class="review-fate-card" aria-labelledby="review-fate-heading">
-    <div class="review-vital-heading"><h3 id="review-fate-heading">Fate</h3><small>Spend, then restore next session</small></div>
+  return `<section class="review-fate-card review-resource-fate" aria-labelledby="review-fate-heading">
+    <div class="review-vital-heading"><h3 id="review-fate-heading">${plainRuleHint("Fate", ruleTermsById["fate-point"].summary)}</h3></div>
     <div class="fate-total"><strong data-fate-current-display>${status.threshold ? status.current : "—"}</strong><span>/ <b data-fate-threshold>${status.threshold || "—"}</b><small>Current / Threshold</small></span></div>
-    <div class="fate-pips" data-fate-pips role="img" aria-label="${status.threshold ? `${status.current} of ${status.threshold} Fate points available` : "Fate has not been determined"}">${pips}</div>
     <div class="fate-controls">
       <button class="fate-adjust restore" type="button" data-adjust-fate="1" ${!status.threshold || status.current >= status.threshold ? "disabled" : ""}>Restore</button>
-      <label><span>Current Fate</span><input type="number" min="0" max="${status.threshold}" step="1" inputmode="numeric" data-current-fate value="${status.current}" ${status.threshold ? "" : "disabled"} /></label>
+      <label><span class="sr-only">Current Fate</span><input type="number" min="0" max="${status.threshold}" step="1" inputmode="numeric" data-current-fate value="${status.current}" ${status.threshold ? "" : "disabled"} /></label>
       <button class="fate-adjust spend" type="button" data-adjust-fate="-1" ${status.current <= 0 ? "disabled" : ""}>Spend</button>
     </div>
     <button class="compact-button view-fate-actions" type="button" data-open-fate-actions ${status.threshold ? "" : "disabled"}>View Fate Actions</button>
@@ -3008,7 +3180,7 @@ function foundryEquipmentItem(item) {
     type: item.documentType,
     system: {
       ...item.profile,
-      description: item.description || item.profile?.description || "",
+      description: item.custom ? escapeHtmlAttribute(item.description) : item.description || item.profile?.description || "",
       availability: item.availability,
       craftsmanship: item.craftsmanship,
       weight: item.weight ?? 0,
@@ -3018,6 +3190,7 @@ function foundryEquipmentItem(item) {
     },
     flags: {
       dh2CharacterBuilder: {
+        ...(item.custom ? {customItemId: item.id} : {}),
         source: item.source,
         category: item.category,
         inventorySource: provenance.type,
@@ -3114,7 +3287,7 @@ function foundryActorPayload() {
         system: { description: "Granted during character creation." },
         flags: { dh2CharacterBuilder: { initial: true } },
       })),
-      ...character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean).map(foundryEquipmentItem),
+      ...character.equipment.inventory.map(equipmentItem).filter(Boolean).map(foundryEquipmentItem),
       ...foundryUnlinkedGrantedEquipment(),
       ...[
         ...Object.values(resolvedGrantedTalents()).map((talent) => ({ talent, initial: true })),
@@ -3617,7 +3790,21 @@ function requestFoundrySheet(type, payload) {
 }
 
 async function rollPlayableDice(quantity, sides, title, target = null, damage = null, ammunition = null) {
-  if (!foundryActorSheetMode) return rollVisualDice(quantity, sides);
+  if (isReadOnlyCharacter()) throw Error('This is a shared view. Only its owner or GM can roll or change this character.');
+  if (!foundryActorSheetMode) {
+    const rolledCharacter = character;
+    const weapon = ammunition ? equipmentItem(ammunition.builderId) : null;
+    const spent = weapon ? browserAmmoCost(rolledCharacter, weapon, ammunition.mode) : 0;
+    const dice = await rollVisualDice(quantity, sides);
+    if (weapon && spent) {
+      const state = browserAmmoState(rolledCharacter, weapon);
+      setBrowserAmmo(rolledCharacter, weapon, state.loaded - spent, state.reserve);
+      actionRollSession = { ...actionRollSession, ammunitionSpent: spent };
+    }
+    appendBrowserRoll(rolledCharacter, { title, dice, sides, target, damage });
+    if (character === rolledCharacter) save();
+    return dice;
+  }
   const result = await requestFoundrySheet("sheet-roll", { quantity, sides, title, target, damage, ammunition });
   if (ammunition && result.ammunitionSpent) actionRollSession = {...actionRollSession, ammunitionSpent:result.ammunitionSpent};
   if (result.hidden) {
@@ -4007,6 +4194,7 @@ function weaponAttackRecord(weapon, mode, options = {}) {
     type: options.type || "Half Action",
     subtypes: ["Attack", melee ? "Melee" : "Ranged"],
     summary: options.summary || `Attack with ${weapon.name}.`,
+    shortSummary: options.shortSummary || options.summary || `Attack with ${weapon.name}.`,
     source: `${actionSource}; ${weapon.source || "Armoury"}`,
     context: [
       `${melee ? "WS" : "BS"} ${baseTarget || "not set"}`,
@@ -4033,16 +4221,26 @@ function weaponActionRecords(inventoryItems) {
   inventoryItems.filter((item) => item.category === "Weapons").forEach((weapon) => {
     const profile = weapon.profile || {};
     const melee = weaponIsMelee(weapon);
+    if (!melee && profile.special?.spray) {
+      const base = weaponAttackRecord(weapon, "Spray", {});
+      records.push({ ...base, equipmentId: weapon.id, equipmentName: weapon.name,
+        name: `Spray — ${weapon.name}`, test: null,
+        summary: "Targets in the weapon’s 30° cone test Agility or take one Body hit. There is no Ballistic Skill attack roll and Called Shots are not allowed. Resolve target tests, damage, ammunition expenditure and jamming with the GM.",
+        source: "Core Rulebook, p. 149", context: `${profile.range}m cone · ${specialSummary(profile.special)}` });
+      return;
+    }
     const canSingle = melee || Number(profile.rateOfFire?.single || 0) > 0;
     if (canSingle) {
       records.push(weaponAttackRecord(weapon, "Standard Attack", {
         modifier: 10,
+        shortSummary: "One attack · +10",
         summary: `Make one ${melee ? "melee" : "ranged"} attack with ${weapon.name} at +10.`,
       }));
       records.push(weaponAttackRecord(weapon, "Called Shot", {
         type: "Full Action",
         modifier: -20,
         calledShot: true,
+        shortSummary: "Choose hit location · −20",
         summary: `Attack a declared hit location with ${weapon.name} at -20.`,
       }));
     }
@@ -4050,12 +4248,14 @@ function weaponActionRecords(inventoryItems) {
       records.push(weaponAttackRecord(weapon, "Semi-Auto Burst", {
         modifier: 0,
         hitMode: "semi",
-        summary: `Fire up to ${profile.rateOfFire.burst} rounds; additional Degrees of Success can score additional hits.`,
+        shortSummary: "Burst · +0 · extra hits per 2 DoS",
+        summary: `Fire a burst at +0 Ballistic Skill. A success hits once, plus one extra hit for every two Degrees of Success, up to ${profile.rateOfFire.burst} hits. Degrees of Success measure how well your test succeeds.`,
       }));
       records.push(weaponAttackRecord(weapon, "Suppressing Fire", {
         type: "Full Action",
         modifier: -20,
         hitMode: "suppressing",
+        shortSummary: "Cover an area · pin targets",
         summary: `Fill a firing arc with ${weapon.name}; targets test against Pinning and successful fire can strike random targets.`,
       }));
     }
@@ -4063,7 +4263,8 @@ function weaponActionRecords(inventoryItems) {
       records.push(weaponAttackRecord(weapon, "Full Auto Burst", {
         modifier: -10,
         hitMode: "full",
-        summary: `Fire up to ${profile.rateOfFire.full} rounds; each Degree of Success can score a hit.`,
+        shortSummary: "Burst · −10 · one hit per DoS",
+        summary: `Fire a burst at −10 Ballistic Skill. Score one hit per Degree of Success, up to ${profile.rateOfFire.full} hits. Degrees of Success measure how well your test succeeds.`,
       }));
     }
   });
@@ -4243,6 +4444,7 @@ function psychicActionRecords() {
 }
 
 function derivedCharacterActions(inventoryItems = character.equipment.inventory.map((id) => equipmentItem(id)).filter(Boolean)) {
+  inventoryItems = inventoryItems.filter(item => !item.custom);
   const readied = inventoryItems.filter((item) => character.equipment.readiedWeapons.includes(item.id));
   const context = {
     readied,
@@ -4605,7 +4807,7 @@ function renderGrants() {
 }
 
 function renderEquipment() {
-  const liveInventoryEditor = foundryActorSheetMode;
+  const liveInventoryEditor = isLivePlayerSheet();
   const slots = Math.max(0, characteristicBonus("influence"));
   const grantedEquipment = resolvedGrantedEquipment();
   const grantedByItemId = new Map(grantedEquipment.entries.filter((entry) => entry.itemId).map((entry) => [entry.itemId, entry]));
@@ -4631,8 +4833,8 @@ function renderEquipment() {
       || (armouryBrowserState.availability === "unavailable" && !availableNowIds.has(item.id)))
       || storedSelection
       || armoury[0];
-  const selectedGrant = grantedByItemId.get(selected.id);
-  const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
+  const selectedGrant = character.equipment.removedCreationGrants?.includes(selected.id) ? null : grantedByItemId.get(selected.id);
+  const inventoryItems = character.equipment.inventory.map(equipmentItem).filter(Boolean);
   const unlinkedGrantedItems = grantedEquipment.entries.filter((entry) => !entry.item);
   const ownedWeapons = inventoryItems.filter((item) => item.category === "Weapons");
   const rulesState = equipmentRulesState(inventoryItems);
@@ -4709,10 +4911,12 @@ function renderEquipment() {
           <p class="choice-source">${selected.category} · ${selected.source || "System Compendium"}</p>
           <h2>${selected.name}</h2>
           <p>${selected.description || "The compendium records the profile below. Extended rules text will be added during the four-book audit."}</p>
+          ${renderItemActions(selected)}
           <dl class="item-profile">
             ${[...rows, ["Availability", effectiveAvailability(selected) || "—"], ...(effectiveAvailability(selected) !== selected.availability ? [["Base Availability", selected.availability]] : []), ["Craftsmanship", selected.craftsmanship], ["Weight", displayWeight(selected)]]
               .map(([label, value]) => `<div><dt>${label}</dt><dd>${value ?? "—"}</dd></div>`).join("")}
           </dl>
+          ${renderItemQualities(selected)}
           <div class="item-actions">
             ${liveInventoryEditor ? "" : `<button class="primary-button acquire-equipment" type="button" data-acquire-equipment="${selected.id}" title="${acquisitionTitle}" ${acquisitionDisabled ? "disabled" : ""}>${selectedGrant ? `Included by ${selectedGrant.sourceName}` : selectedAcquisition ? "Starting Acquisition Recorded" : "Use 1 Starting Acquisition"} <span>›</span></button>`}
             <button class="${liveInventoryEditor ? "primary-button" : "compact-button"} add-equipment" type="button" data-add-equipment="${selected.id}" ${selectedGrant || (selectedInInventory && !selectedNoCostGrant) ? "disabled" : ""}>${selectedGrant ? "Included by Character Creation" : selectedNoCostGrant ? (liveInventoryEditor ? "Remove from Inventory" : "Remove GM Grant") : selectedInInventory ? "Already in Inventory" : liveInventoryEditor ? "Add to Inventory" : "Add as GM Grant (No Cost)"}${liveInventoryEditor && !selectedInInventory ? " <span>›</span>" : ""}</button>
@@ -4896,7 +5100,7 @@ function renderPsychicShop() {
     <div class="advance-section-heading psychic-heading">
       <div><p class="choice-source">Psyker access detected</p><h2>Psychic Powers and Psy Rating</h2><p>Choose powers from complete sourcebook catalogues. Power-tree paths, prerequisites, and XP are checked automatically.</p></div>
       <div class="psy-rating-control">
-        <span>Psy Rating</span><strong>${currentRating}</strong><small>Base ${baseRating} · ${psyRatingXpCost()} XP spent</small>
+        <span>${plainRuleHint("Psy Rating", ruleTermsById["psy-rating"].summary)}</span><strong>${currentRating}</strong><small>Base ${baseRating} · ${psyRatingXpCost()} XP spent</small>
         <label><span>Purchased increases</span><select data-psy-rating-advance>
           ${Array.from({ length: Math.max(1, 10 - baseRating + 1) }, (_, count) => {
             const finalRating = baseRating + count;
@@ -5022,7 +5226,7 @@ function renderAdvances() {
   const owned = resolvedAptitudes().aptitudes;
   const spent = xpSpent();
   const unresolved = grantAlternatives().filter((choice) => !character.grantChoices[choice.id]);
-  const liveAdvancementEditor = foundryActorSheetMode;
+  const liveAdvancementEditor = isLivePlayerSheet();
   return `
     <div class="management-shell advance-layout">
       <aside class="xp-meter">
@@ -6061,22 +6265,27 @@ function wireCompendiumEvents() {
   document.querySelector("#next-chapter-bottom")?.addEventListener("click", () => moveChapter(1));
 }
 
-function applyRuleHighlights() {
-  const content = document.querySelector("#scene-content");
-  if (!content || content.closest(".scene-identity")) return;
+const ruleHighlightMatcher = (() => {
   const aliases = creatorRuleTerms
-    .filter((entry) => entry.id !== "test")
+    .filter((entry) => entry.id !== "test" && entry.category !== "Aptitude")
     .flatMap((entry) => [entry.term, ...entry.aliases].map((alias) => ({ alias, id: entry.id })))
     .sort((a, b) => b.alias.length - a.alias.length);
   const pattern = new RegExp(`(?<![A-Za-z0-9-])(${aliases.map(({ alias }) => alias.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")).join("|")})(?![A-Za-z0-9-])`, "gi");
   const aliasMap = new Map(aliases.map(({ alias, id }) => [alias.toLowerCase(), id]));
+  return { pattern, aliasMap };
+})();
+
+function applyRuleHighlights() {
+  const content = document.querySelector("#scene-content");
+  if (!content || content.closest(".scene-identity")) return;
+  const { pattern, aliasMap } = ruleHighlightMatcher;
   const reviewPage = Boolean(content.closest(".scene-review"));
   const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
   for (const node of nodes) {
     if (!node.nodeValue?.trim()) continue;
-    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term,.review-characteristics,.review-vitals-strip,.review-meta,.xp-ledger,.loadout-panel,.validation-panel,.review-section-heading,.inventory-item-identity,.action-card,.review-sections strong,.review-sections h1,.review-sections h2,.review-sections h3")) continue;
+    if (node.parentElement?.closest("button,input,textarea,select,option,label,legend,a,.choice-source,.characteristic-abbreviation,.rule-term,.review-characteristics,.review-vitals-strip,.review-meta,.xp-ledger,.loadout-panel,.validation-panel,.review-section-heading,.inventory-item-identity,[data-open-item],.review-aptitudes-section,[data-tooltip],.action-card,.review-sections strong,.review-sections h1,.review-sections h2,.review-sections h3")) continue;
     const matches = [...node.nodeValue.matchAll(pattern)];
     if (!matches.length) continue;
     const fragment = document.createDocumentFragment();
@@ -6120,6 +6329,7 @@ function floatingRuleTooltip() {
 }
 
 function hideFloatingRuleTooltip() {
+  activeFloatingTooltipTarget?.removeAttribute("aria-describedby");
   activeFloatingTooltipTarget = null;
   const tooltip = document.querySelector("#floating-rule-tooltip");
   if (tooltip) tooltip.hidden = true;
@@ -6159,34 +6369,53 @@ function positionFloatingRuleTooltip(target) {
 }
 
 function wireFloatingMechanicsTooltips() {
-  document.querySelectorAll(".scene .lore-term[data-tooltip]").forEach((target) => {
-    target.addEventListener("pointerenter", () => positionFloatingRuleTooltip(target));
-    target.addEventListener("pointerleave", hideFloatingRuleTooltip);
-    target.addEventListener("focus", () => positionFloatingRuleTooltip(target));
-    target.addEventListener("blur", hideFloatingRuleTooltip);
-  });
   if (floatingTooltipListenersReady) return;
   floatingTooltipListenersReady = true;
-  window.addEventListener("resize", () => {
-    if (activeFloatingTooltipTarget) positionFloatingRuleTooltip(activeFloatingTooltipTarget);
+  const selector = ".scene [data-tooltip]";
+  const targetFor = (node) => node instanceof Element ? node.closest(selector) : null;
+  const show = (event) => {
+    const target = targetFor(event.target);
+    if (target && target !== activeFloatingTooltipTarget) {
+      hideFloatingRuleTooltip();
+      positionFloatingRuleTooltip(target);
+      target.setAttribute("aria-describedby", "floating-rule-tooltip");
+    }
+  };
+  const leave = (event) => {
+    if (targetFor(event.relatedTarget) !== activeFloatingTooltipTarget) hideFloatingRuleTooltip();
+  };
+  document.addEventListener("pointerover", show);
+  document.addEventListener("pointerout", leave);
+  document.addEventListener("focusin", show);
+  document.addEventListener("focusout", leave);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") hideFloatingRuleTooltip();
   });
-  document.addEventListener("scroll", () => {
-    if (!activeFloatingTooltipTarget) return;
-    requestAnimationFrame(() => positionFloatingRuleTooltip(activeFloatingTooltipTarget));
-  }, true);
+  let pendingFrame = false;
+  const schedulePosition = () => {
+    if (!activeFloatingTooltipTarget || pendingFrame) return;
+    pendingFrame = true;
+    requestAnimationFrame(() => {
+      pendingFrame = false;
+      positionFloatingRuleTooltip(activeFloatingTooltipTarget);
+    });
+  };
+  window.addEventListener("resize", schedulePosition);
+  document.addEventListener("scroll", schedulePosition, { capture: true, passive: true });
 }
 
 function switchToCharacter(recordId) {
   const record = characterLibrary.find((entry) => entry.id === recordId);
   if (!record) return;
+  pendingRemoteCharacter = null;
   activeCharacterId = record.id;
   activeRecord = record;
   character = prepareCharacter(record.character);
-  step = Math.min(scenes.length - 1, Math.max(0, Number(record.step || 0)));
+  step = character.playMode || character.completedAt ? scenes.length - 1 : Math.min(scenes.length - 1, Math.max(0, Number(record.step || 0)));
   appView = "builder";
   migrateLegacyEquipment();
   migrateLegacyTalents();
-  save();
+  localStorage.setItem(activeCharacterStorageKey, activeCharacterId);
   pendingFocusSelector = "#scene-content";
   render();
 }
@@ -6207,7 +6436,7 @@ function createRosterCharacter(seed = {}, origin = "Created locally") {
   activeCharacterId = id;
   activeRecord = record;
   character = prepareCharacter(record.character);
-  step = 0;
+  step = character.playMode || character.completedAt ? scenes.length - 1 : 0;
   appView = "builder";
   save();
   pendingFocusSelector = "#scene-content";
@@ -6522,7 +6751,7 @@ function renderRoster() {
           <div>
             <p class="eyebrow">Acolyte Archive</p>
             <h1>Your Acolytes</h1>
-            <p class="lede">Continue your Acolyte's creation, preserve another version, or import a character shared by a friend.</p>
+            <p class="lede">Create an Acolyte, or open a shared character to review it and play with changes saved across your campaign.</p>
           </div>
           <div class="roster-actions">
             <button class="primary-button" id="new-character" type="button">Create Your Acolyte <span>›</span></button>
@@ -6545,7 +6774,7 @@ function renderRoster() {
             return `
               <article class="roster-card ${record.id === activeCharacterId ? "active-record" : ""}">
                 <div class="roster-card-heading">
-                  <span>${escapeHtmlAttribute(record.origin || "Created locally")}</span>
+                  <span>${record.campaignId ? `Shared · ${escapeHtmlAttribute(record.ownerDisplayName || 'campaign')}${record.canEdit === false ? ' · view only' : ''}` : escapeHtmlAttribute(record.origin || "Created locally")}</span>
                   <strong>${safeName}</strong>
                   <small>Last opened ${Number.isNaN(updated.valueOf()) ? "recently" : updated.toLocaleDateString()}</small>
                 </div>
@@ -6560,10 +6789,12 @@ function renderRoster() {
                   <small>${escapeHtmlAttribute(progress.label)}</small>
                 </div>
                 <div class="roster-card-actions">
-                  <button class="primary-button" type="button" data-open-character="${record.id}">Open <span>›</span></button>
-                  <button class="compact-button" type="button" data-duplicate-character="${record.id}">Duplicate</button>
+                  <button class="primary-button" type="button" data-open-character="${record.id}">${record.character?.playMode || record.character?.completedAt ? 'Open Sheet' : 'Open'} <span>›</span></button>
+                  <button class="compact-button" type="button" data-play-character="${record.id}">Play</button>
+                  ${savedCampaignConnection() && !record.campaignId && record.canEdit !== false ? `<button class="compact-button" type="button" data-share-character="${record.id}">Share with campaign</button>` : ''}
+                  <button class="compact-button" type="button" data-duplicate-character="${record.id}" ${record.canEdit === false ? 'disabled title="Only the owner or GM can duplicate this shared character."' : ''}>Duplicate</button>
                   <button class="compact-button" type="button" data-export-character="${record.id}">Export</button>
-                  <button class="text-button danger-button" type="button" data-delete-character="${record.id}">Delete</button>
+                  ${record.canEdit === false ? '' : `<button class="text-button danger-button" type="button" data-delete-character="${record.id}">Delete</button>`}
                 </div>
               </article>`;
           }).join("") || `<div class="empty-roster"><h2>No Acolytes Recorded</h2><p>Create your first Acolyte or import one supplied by a friend.</p></div>`}
@@ -6662,9 +6893,6 @@ function wireRosterEvents() {
         inviteCode: values.get("inviteCode"),
         displayName: values.get("displayName"),
       }), 20000, "The shared service did not respond while creating the campaign.");
-      for (const record of characterLibrary) {
-        await withTimeout(saveCloudCharacter(record), 12000, "A character could not be synchronized in time.");
-      }
       cloudStatus = "connected";
       await initialiseCloudRepository();
       await navigator.clipboard?.writeText(result.connection.campaignId);
@@ -6686,9 +6914,6 @@ function wireRosterEvents() {
         inviteCode: values.get("inviteCode"),
         displayName: values.get("displayName"),
       }), 20000, "The shared service did not respond while joining the campaign.");
-      for (const record of characterLibrary) {
-        await withTimeout(saveCloudCharacter(record), 12000, "A character could not be synchronized in time.");
-      }
       cloudStatus = "connected";
       await initialiseCloudRepository();
       sharedDialog.close();
@@ -6735,10 +6960,7 @@ function wireRosterEvents() {
     if (!file) return;
     try {
       const payload = JSON.parse(await file.text());
-      const imported = payload?.character || payload;
-      if (!imported || typeof imported !== "object" || payload?.type === "acolyte" && payload?.system) {
-        throw new Error("This is not a builder character file.");
-      }
+      const imported = importedPlayerCharacter(payload, armoury);
       const importedName = imported.name || file.name.replace(/\.json$/i, "");
       createRosterCharacter({ ...imported, name: importedName }, `Imported from ${file.name}`);
     } catch (error) {
@@ -6749,6 +6971,25 @@ function wireRosterEvents() {
   document.querySelectorAll("[data-open-character]").forEach((button) => {
     button.addEventListener("click", () => switchToCharacter(button.dataset.openCharacter));
   });
+  document.querySelectorAll('[data-play-character]').forEach(button => button.addEventListener('click', () => {
+    const record = characterLibrary.find(entry => entry.id === button.dataset.playCharacter);
+    if (!record) return;
+    if (record.canEdit === false) { switchToCharacter(record.id); return; }
+    record.character.playMode = true;
+    record.step = scenes.length - 1;
+    record.updatedAt = new Date().toISOString();
+    switchToCharacter(record.id);
+    save();
+  }));
+  document.querySelectorAll('[data-share-character]').forEach(button => button.addEventListener('click', async () => {
+    const source = characterLibrary.find(entry => entry.id === button.dataset.shareCharacter);
+    if (!source || source.campaignId || !savedCampaignConnection()) return;
+    if (!confirm(`Share a copy of ${source.character.name || "this Acolyte"} with the connected campaign?`)) return;
+    const copy = prepareCharacter(source.character);
+    copy.name = copy.name ? `${copy.name} — Shared` : "Unnamed Acolyte — Shared";
+    copy.playMode = true;
+    createRosterCharacter(copy, `Shared copy of ${source.character.name || "Unnamed Acolyte"}`);
+  }));
   document.querySelectorAll("[data-duplicate-character]").forEach((button) => {
     button.addEventListener("click", async () => {
       const source = characterLibrary.find((entry) => entry.id === button.dataset.duplicateCharacter);
@@ -6935,19 +7176,14 @@ function renderActionIndex(actions) {
     const preview = action.test ? resolvedActionTest(action.test) : null;
     const typePresentation = actionTypePresentation(action.type);
     const groupKey = actionGroupKey(action.group);
-    return `<article class="action-card action-group-${groupKey} action-type-${typePresentation.key} ${action.usesFate ? "uses-fate" : ""} ${action.available ? "available" : "unavailable"}" data-action-card data-action-id="${escapeHtmlAttribute(action.id)}" data-action-group-value="${escapeHtmlAttribute(action.group)}" data-action-search="${escapeHtmlAttribute(search)}" data-action-available="${action.available}" data-action-uses-fate="${Boolean(action.usesFate)}" ${initiallyHidden ? "hidden" : ""}>
-        <header>
-          <div class="action-identity">
-            <span class="action-group-tag">${actionGroupGlyph(action.group)}<span>${escapeHtmlAttribute(action.group)}</span>${action.usesFate ? `<em class="action-fate-tag">${actionGroupGlyph("Fate")} Fate</em>` : ""}</span>
-            <h4>${escapeHtmlAttribute(action.test?.weaponName ? `${action.test.weaponName} — ${action.test.mode}` : action.name)}</h4>
-          </div>
-          <span class="action-type-badge" role="img" aria-label="Action type: ${escapeHtmlAttribute(action.type)}" title="${escapeHtmlAttribute(action.type)}">${actionTypeGlyph(typePresentation.key)}<span class="action-type-caption">${escapeHtmlAttribute(typePresentation.short)}</span></span>
-        </header>
-        <p>${escapeHtmlAttribute(action.summary)}</p>
-        <div class="action-context">${escapeHtmlAttribute(action.available ? action.context || "Available now" : action.unavailableReason || "Requirements are not met.")}</div>
-        ${preview ? `<div class="action-test-preview"><span>${escapeHtmlAttribute(action.test.characteristicName)}</span><strong>Target ${preview.target}</strong>${preview.actionModifier ? `<em>${preview.actionModifier > 0 ? "+" : ""}${preview.actionModifier} action modifier</em>` : ""}</div>` : ""}
-        <footer><small>${escapeHtmlAttribute(action.source || actionSource)}</small><button class="compact-button" type="button" data-open-action="${escapeHtmlAttribute(action.id)}" ${action.available ? "" : "disabled"}>${action.test ? "Roll Test" : "Details"}</button></footer>
-      </article>`;
+    const weapon = action.test?.weaponId ? equipmentItem(action.test.weaponId) : null;
+    return `<article class="action-card compact-action-row ${weapon ? "weapon-action-row" : "combat-choice-row"} action-group-${groupKey} ${action.available ? "available" : "unavailable"}" data-action-card data-action-id="${escapeHtmlAttribute(action.id)}" data-action-group-value="${escapeHtmlAttribute(action.group)}" data-action-search="${escapeHtmlAttribute(search)}" data-action-available="${action.available}" data-action-uses-fate="${Boolean(action.usesFate)}" ${initiallyHidden ? "hidden" : ""}>
+      <button type="button" class="action-name-control" ${weapon ? `data-open-item-button="${escapeHtmlAttribute(weapon.id)}"` : `data-open-action="${escapeHtmlAttribute(action.id)}"`}><strong>${escapeHtmlAttribute(weapon ? action.test.mode : action.name)}</strong><small>${escapeHtmlAttribute(action.type)}${action.usesFate ? " · Fate" : ""}</small></button>
+      ${weapon ? `<span class="action-weapon-range">${escapeHtmlAttribute(weaponIsMelee(weapon) ? "Melee" : `${weapon.profile.range}m`)}</span>` : ""}
+      ${preview ? `<button class="compact-button action-target-control" type="button" data-open-action="${escapeHtmlAttribute(action.id)}" aria-label="${escapeHtmlAttribute(`Test ${action.name}, target ${preview.target}`)}" ${action.available ? "" : "disabled"}>${preview.target}<small>Test</small></button>` : ""}
+      ${weapon ? `<button type="button" class="compact-button" data-item-damage="${escapeHtmlAttribute(weapon.id)}" ${action.available ? "" : "disabled"}>${escapeHtmlAttribute(weapon.profile.damage || "—")}${weaponIsMelee(weapon) ? " + SB" : ""}<small>Damage</small></button><span class="action-weapon-notes">${escapeHtmlAttribute(action.shortSummary || action.summary)}${specialSummary(weapon.profile.special) ? `<small>${escapeHtmlAttribute(specialSummary(weapon.profile.special))}</small>` : ""}</span>` : ""}
+      ${!action.available ? `<small class="action-unavailable-reason">${escapeHtmlAttribute(action.unavailableReason)}</small>` : ""}
+    </article>`;
   };
   const weaponIds = [character.equipment.equipped?.primary, ...character.equipment.readiedWeapons].filter(Boolean);
   const actionSectionsMarkup = groupedActionSections(actions, weaponIds).map((definition) => {
@@ -6965,13 +7201,15 @@ function renderActionIndex(actions) {
   return `<section class="review-actions-index" aria-label="Actions">
     <div class="action-index-controls">
       <label class="action-search"><span>Search actions</span><input id="action-search" type="search" value="${escapeHtmlAttribute(actionIndexState.query)}" placeholder="Attack, Dodge, Tech-Use…" autocomplete="off" /></label>
-      <div class="action-filter-list" role="group" aria-label="Filter actions">${actionGroups.map((group) => `<button class="compact-button ${actionIndexState.group === group ? "active" : ""}" type="button" data-action-group="${group}" aria-pressed="${actionIndexState.group === group}">${actionGroupGlyph(group)}<span>${group}</span></button>`).join("")}<button class="compact-button fate-action-filter ${actionIndexState.fateOnly ? "active" : ""}" type="button" data-action-fate-only aria-pressed="${actionIndexState.fateOnly}">${actionGroupGlyph("Fate")}<span>Fate</span></button></div>
+      <div class="action-filter-list" role="group" aria-label="Filter actions">${actionGroups.map((group) => `<button class="compact-button ${actionIndexState.group === group ? "active" : ""}" type="button" data-action-group="${group}" aria-pressed="${actionIndexState.group === group}">${actionGroupGlyph(group)}<span>${group}</span></button>`).join("")}<label class="show-unavailable fate-action-checkbox"><input type="checkbox" data-action-fate-only ${actionIndexState.fateOnly ? "checked" : ""} /> Fate actions only</label></div>
       <label class="show-unavailable"><input id="show-unavailable-actions" type="checkbox" ${actionIndexState.showUnavailable ? "checked" : ""} /><span>Show unavailable options</span></label>
+    <p class="action-result-count" id="action-result-count" role="status" aria-live="polite">${initialVisibleCount} actions</p>
     </div>
+    <div class="review-action-results" tabindex="0" aria-label="Action results">
     <div class="action-section-list" id="action-card-grid">${actionSectionsMarkup}</div>
     <p class="action-empty" id="action-empty" ${initialVisibleCount ? "hidden" : ""}>No available actions match these filters. Change the filter or show unavailable options to inspect unmet requirements.</p>
-    <p class="action-result-count" id="action-result-count" role="status" aria-live="polite">${initialVisibleCount} actions</p>
     ${carriedWeaponActions ? `<p class="action-index-notice">Mark weapons <strong>Equipped</strong> in Inventory to use their attacks.</p>` : ""}
+    </div>
   </section>`;
 }
 
@@ -7000,6 +7238,16 @@ function creationConsequenceWarnings() {
   return warnings;
 }
 
+function plainRuleHint(label, explanation) {
+  return `<span class="plain-rule-hint" tabindex="0" data-tooltip="${escapeHtmlAttribute(explanation)}" aria-label="${escapeHtmlAttribute(label)}">${escapeHtmlAttribute(label)}</span>`;
+}
+
+function aptitudeExplanation(aptitude) {
+  const rule = ruleTermsById[`aptitude-${aptitude.toLowerCase().replaceAll(" ", "-")}`];
+  const affinity = rule?.summary || `An affinity for advances associated with ${aptitude}.`;
+  return `${affinity} This aptitude reduces the XP cost of advances listing ${aptitude}; matching both listed aptitudes gives the lowest cost. It does not directly increase a characteristic or test target. Source: Core Rulebook, page 78.`;
+}
+
 function renderReview() {
   sheetDetailRecords.clear();
   sheetDetailCounter = 0;
@@ -7015,7 +7263,7 @@ function renderReview() {
   const lockedSpecialistSkills = lockedSpecialistSkillRecords();
   const initialTalents = Object.values(resolvedGrantedTalents());
   const purchasedTalents = paidTalentAdvanceEntries().map((entry) => talentCatalogue.find((talent) => talent.id === entry.id)).filter(Boolean);
-  const inventoryItems = character.equipment.inventory.map((id) => armoury.find((item) => item.id === id)).filter(Boolean);
+  const inventoryItems = character.equipment.inventory.map(equipmentItem).filter(Boolean);
   const ownedWeapons = inventoryItems.filter((item) => item.category === "Weapons");
   const psychicPowers = character.advances.psychicPowers.map((entry) => psychicPowerById(entry.id) || entry).filter((entry) => entry?.name);
   const eliteAdvances = activeEliteAdvances();
@@ -7084,7 +7332,7 @@ function renderReview() {
   const personalHistoryRows = `<div class="dossier-list">${Object.entries(historyLabels).map(([id, label]) => character.history?.[id]
     ? `<div><strong>${label}</strong><span>${escapeHtmlAttribute(character.history[id])}</span></div>`
     : "").join("") || "<p>No personal-history prompts recorded.</p>"}</div>`;
-  const aptitudeTags = `<div class="tag-list final">${resolvedAptitudes().aptitudes.map((aptitude) => `<span>${aptitude}</span>`).join("")}</div>`;
+  const aptitudeTags = `<div class="tag-list final">${resolvedAptitudes().aptitudes.map((aptitude) => plainRuleHint(aptitude, aptitudeExplanation(aptitude))).join("")}</div>`;
   const renderKnownSkillRow = (record, interactive = false) => {
     const { skill, grant, displayName, speciality, rank } = record;
     const rule = ruleTermsById[`skill-${skill.id}`];
@@ -7105,13 +7353,7 @@ function renderReview() {
     return `<button type="button" class="review-skill-test untrained-skill-row" data-skill-row data-skill-category="untrained" data-skill-search="${escapeHtmlAttribute(`${displayName} ${skill.characteristic} untrained`.toLowerCase())}" data-roll-review-skill="${skill.id}" aria-label="${escapeHtmlAttribute(`Roll untrained ${displayName}, target ${target}. ${tooltip}`)}" ${tooltip ? `title="${escapeHtmlAttribute(tooltip)}"` : ""}><span class="review-skill-label">${escapeHtmlAttribute(displayName)}</span><span>Untrained −20 · ${skill.characteristic} target <strong>${target}</strong></span></button>`;
   }).join("")}</div>`;
   const lockedSpecialistRows = `<div class="dossier-list review-skills-list review-locked-skills">${lockedSpecialistSkills.map(({ skill, displayName, lockedSpecialities }) => {
-    const rule = ruleTermsById[`skill-${skill.id}`];
-    const tooltip = rule ? `${rule.category}: ${rule.summary} Source: ${rule.book}, page ${rule.page}.` : "";
-    const label = rule
-      ? `<button type="button" class="review-skill-label rule-term lore-term lore-term-skill" data-rule-term="${rule.id}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${displayName}. ${tooltip}`)}">${escapeHtmlAttribute(displayName)}</button>`
-      : `<strong>${escapeHtmlAttribute(displayName)}</strong>`;
-    const examples = `${lockedSpecialities.slice(0, 3).join(", ")}${lockedSpecialities.length > 3 ? ` · +${lockedSpecialities.length - 3} more` : ""}`;
-    return `<div class="locked-skill-row" data-skill-row data-skill-category="specialist" data-skill-search="${escapeHtmlAttribute(`${displayName} ${lockedSpecialities.join(" ")} specialist training required`.toLowerCase())}">${label}<span>${escapeHtmlAttribute(examples)}</span><span class="review-skill-lock"><b aria-hidden="true">◆</b><em>Training required</em></span></div>`;
+    return `<details class="specialist-family-dropdown" data-skill-row data-skill-category="specialist" data-skill-search="${escapeHtmlAttribute(`${displayName} ${lockedSpecialities.join(" ")} specialist training required`.toLowerCase())}"><summary><span>${escapeHtmlAttribute(skill.name)}</span><small>Training required</small></summary><ul>${lockedSpecialities.map((name) => `<li>${escapeHtmlAttribute(name)}</li>`).join("")}</ul></details>`;
   }).join("")}</div>`;
   const talentRows = [
     ...initialTalents.map((talent) => renderSheetEntry({
@@ -7182,13 +7424,14 @@ function renderReview() {
     ["features", "Features & Traits"],
     ["background", "Background"],
     ["advancement", "Advancement"],
+    ...(!foundryActorSheetMode ? [["rolls", "Rolls"]] : []),
   ];
   if (!reviewTabs.some(([id]) => id === reviewTabState)) reviewTabState = "actions";
   return `
     <div class="management-shell review-layout">
       <section class="review-dossier">
         <header class="review-profile-heading">
-          <div class="review-identity-with-portrait">${renderFoundryPortrait()}<div><div class="review-name-line"><h2 id="review-character-name">${escapeHtmlAttribute(character.name || "Unnamed Acolyte")}</h2>${!foundryActorSheetMode || foundryPortrait.canEdit ? `<button type="button" id="edit-character-name" class="sheet-edit-icon" aria-label="Edit character name" title="Edit character name">✎</button>` : ""}</div><p class="review-profile-details">${homeWorldName} · ${backgroundName} · ${roleName}</p></div></div>
+          <div class="review-identity-with-portrait">${renderFoundryPortrait()}<div><div class="review-name-line"><h2 id="review-character-name">${escapeHtmlAttribute(character.name || "Unnamed Acolyte")}</h2>${!foundryActorSheetMode || foundryPortrait.canEdit ? `<button type="button" id="edit-character-name" class="sheet-edit-icon" aria-label="Edit character name" title="Edit character name">✎</button>` : ""}</div><p class="review-profile-details">${homeWorldName} · ${backgroundName} · ${roleName}</p>${!foundryActorSheetMode ? '<p id="player-save-status" role="status" aria-live="polite"></p>' : ''}</div></div>
           <span class="review-record-state">${warnings.length ? `${warnings.length} item${warnings.length === 1 ? "" : "s"} to review` : "Ready to play"}</span>
         </header>
         <div class="review-characteristics">${characteristics.map((entry) => {
@@ -7203,14 +7446,14 @@ function renderReview() {
             breakdown.exceptional ? `Mutation/Malignancy ${breakdown.exceptional > 0 ? "+" : ""}${breakdown.exceptional}` : "",
             breakdown.elite ? `Elite Advance ${breakdown.elite > 0 ? "+" : ""}${breakdown.elite}` : "",
           ].filter(Boolean);
-          const rollable = foundryActorSheetMode && breakdown.total > 0;
+          const rollable = breakdown.total > 0;
           const cellTitle = rollable
             ? `Roll ${entry.name} test · Target ${breakdown.total}${parts.length ? ` · ${parts.join(" · ")}` : ""}`
             : parts.join(" · ");
-          const label = foundryActorSheetMode
+          const label = rollable
             ? `<span class="review-characteristic-label" data-tooltip="${escapeHtmlAttribute(tooltip)}">${entry.abbreviation}</span>`
             : `<button type="button" class="review-characteristic-label rule-term lore-term lore-term-stat" data-rule-term="${characteristicRuleId}" data-tooltip="${escapeHtmlAttribute(tooltip)}" aria-label="${escapeHtmlAttribute(`${entry.name}. ${tooltip}`)}">${entry.abbreviation}</button>`;
-          return `<div class="${breakdown.divination || breakdown.exceptional || breakdown.elite ? "modified" : ""} ${rollable ? "rollable-characteristic" : ""}" title="${escapeHtmlAttribute(cellTitle)}" ${rollable ? `data-roll-review-characteristic="${entry.id}" role="button" tabindex="0" aria-label="${escapeHtmlAttribute(`Roll ${entry.name} test, target ${breakdown.total}`)}"` : ""}>
+          return `<div class="${breakdown.divination || breakdown.exceptional || breakdown.elite ? "modified" : ""} ${rollable ? "rollable-characteristic" : ""}" title="${escapeHtmlAttribute(cellTitle)}" ${rollable ? `data-tooltip="${escapeHtmlAttribute(tooltip)}" data-roll-review-characteristic="${entry.id}" role="button" tabindex="0" aria-label="${escapeHtmlAttribute(`Roll ${entry.name} test, target ${breakdown.total}`)}"` : ""}>
             ${label}
             <strong>${breakdown.total || (entry.id === "influence" ? "0" : "—")}${entry.id === "influence" ? `<button type="button" id="change-influence" class="change-influence sheet-edit-icon" aria-label="Change Influence" title="Change Influence">✎</button>` : ""}</strong>${parts.length > 1 ? `<small>${escapeHtmlAttribute(parts.slice(1).join(" · "))}</small>` : ""}
             ${rollable ? `<span class="review-characteristic-roll-hint" aria-hidden="true">Roll test</span>` : ""}
@@ -7225,30 +7468,29 @@ function renderReview() {
         <div class="review-vitals-strip">
           ${renderReviewWounds()}
           ${renderReviewArmour(equipmentState.wornArmour)}
-          ${renderReviewFate()}
-        </div>
-        <section class="review-status-strip" aria-label="Movement and character resources">
-          <article class="review-status-card">
-            <span>Fatigue</span>
-            <strong data-fatigue-current>${fatigueStatus().current}</strong><span class="status-slash">/ ${fatigueStatus().threshold}</span>
+          <article class="review-status-card review-fatigue-card">
+            <span>${plainRuleHint("Fatigue", ruleTermsById["fatigue"].summary)}</span>
+            <div class="fatigue-total"><strong data-fatigue-current>${fatigueStatus().current}</strong><span>/ ${fatigueStatus().threshold}</span></div>
             <small>Current / Threshold · TB ${toughnessBonus} + WPB ${willpowerBonus}</small>
             <div class="status-adjust-controls"><button type="button" data-adjust-fatigue="-1" aria-label="Reduce fatigue" ${fatigueStatus().current <= 0 ? "disabled" : ""}>−</button><input type="number" min="0" max="100" step="1" inputmode="numeric" data-current-fatigue aria-label="Current fatigue" value="${fatigueStatus().current}" /><button type="button" data-adjust-fatigue="1" aria-label="Increase fatigue">+</button></div>
           </article>
+        </div>
+        <div class="review-sheet-body">
+          <aside class="review-summary-rail" aria-label="Character summary">
+        <section class="review-status-strip" aria-label="Movement and character resources">
+          ${renderReviewFate()}
           <article class="review-status-card review-movement-card">
             <span>Movement · metres</span>
             <div><b>${agilityBonus}<small>Half</small></b><b>${agilityBonus * 2}<small>Full</small></b><b>${agilityBonus * 3}<small>Charge</small></b><b>${agilityBonus * 6}<small>Run</small></b></div>
           </article>
           <button class="review-status-card review-xp-card" type="button" data-open-advancement-tab>
-            <span>Available XP</span>
-            <strong>${xpAvailable}</strong>
+            <span class="review-xp-balance">Available XP <strong>${xpAvailable}</strong></span>
             <small>${spent} spent · ${character.xp.starting} earned</small>
           </button>
-          ${hasPsykerAccess() ? `<article class="review-status-card"><span>Psy Rating</span><strong>${foundryPsyRating()}</strong><small>Current rating</small></article>` : ""}
+          ${hasPsykerAccess() ? `<article class="review-status-card"><span>${plainRuleHint("Psy Rating", ruleTermsById["psy-rating"].summary)}</span><strong>${foundryPsyRating()}</strong><small>Current rating</small></article>` : ""}
           ${Number(character.conditions.insanity || 0) ? `<article class="review-status-card status-warning"><span>Insanity</span><strong>${Number(character.conditions.insanity)}</strong><small>Current points</small></article>` : ""}
           ${Number(character.conditions.corruption || 0) ? `<article class="review-status-card status-warning"><span>Corruption</span><strong>${Number(character.conditions.corruption)}</strong><small>Current points</small></article>` : ""}
         </section>
-        <div class="review-sheet-body">
-          <aside class="review-summary-rail" aria-label="Character summary">
             <section class="review-summary-card"><div class="review-summary-card-body">${identitySummaryRows}</div><h3>Identity</h3></section>
             <section class="review-summary-card review-summary-skills"><div class="review-summary-card-body">${skillSummaryRows}</div><h3>Skills</h3></section>
           </aside>
@@ -7258,18 +7500,20 @@ function renderReview() {
             </nav>
             <label class="review-tab-select"><span>Character sheet section</span><select id="review-tab-select">${reviewTabs.map(([id, label]) => `<option value="${id}" ${reviewTabState === id ? "selected" : ""}>${label}</option>`).join("")}</select></label>
             <div class="review-tab-panels review-sections">
+              ${!foundryActorSheetMode ? `<div class="review-tab-panel" id="review-panel-rolls" role="tabpanel" aria-labelledby="review-tab-rolls" data-review-panel="rolls" ${reviewTabState === 'rolls' ? '' : 'hidden'}>${renderBrowserRollHistory()}</div>` : ''}
               <div class="review-tab-panel" id="review-panel-actions" role="tabpanel" aria-labelledby="review-tab-actions" data-review-panel="actions" ${reviewTabState === "actions" ? "" : "hidden"}>${renderActionIndex(currentActions)}</div>
               <div class="review-tab-panel" id="review-panel-skills" role="tabpanel" aria-labelledby="review-tab-skills" data-review-panel="skills" ${reviewTabState === "skills" ? "" : "hidden"}><section class="review-skills-section">
                 <div class="review-skill-heading"><div><h3>Skills</h3><p>Known skills use their recorded rank. Other non-specialist skills can be tested at −20.</p></div><label><span>Search skills</span><input id="skill-search" type="search" autocomplete="off" placeholder="Operate, Awareness…" /></label></div>
+                <div class="review-skill-results" tabindex="0" aria-label="Skill results">
                 <h4 class="review-skill-group-title">Known & trained <span>${ownedSkills.length}</span></h4>
                 ${trainedSkillRows}
                 ${untrainedSkills.length ? `<details class="review-skill-disclosure" data-skill-disclosure="untrained"><summary><span>Untrained skills</span><strong>${untrainedSkills.length} · −20</strong></summary>${untrainedSkillRows}</details>` : ""}
                 ${lockedSpecialistSkills.length ? `<details class="review-skill-disclosure specialist-skill-disclosure" data-skill-disclosure="specialist"><summary><span>Specialist skills</span><strong>Training required</strong></summary><p>Each entry is a family of separate specialities, not a generic skill test. Learn the relevant speciality first. If the GM calls for a fallback, test the characteristic itself.</p>${lockedSpecialistRows}</details>` : ""}
-                <p class="skill-search-empty" id="skill-search-empty" hidden>No skills match this search.</p>
+                <p class="skill-search-empty" id="skill-search-empty" hidden>No skills match this search.</p></div>
               </section></div>
               ${hasPsychicWorkspace ? `<div class="review-tab-panel" id="review-panel-psychic" role="tabpanel" aria-labelledby="review-tab-psychic" data-review-panel="psychic" ${reviewTabState === "psychic" ? "" : "hidden"}><section><div class="review-section-heading"><div><h3>Psychic Powers</h3><p>Psy Rating ${foundryPsyRating()} · powers and Warp-active abilities available to this Acolyte.</p></div></div><div class="dossier-list">${psychicRows}</div></section></div>` : ""}
               <div class="review-tab-panel" id="review-panel-inventory" role="tabpanel" aria-labelledby="review-tab-inventory" data-review-panel="inventory" ${reviewTabState === "inventory" ? "" : "hidden"}><section class="review-inventory-section">
-                <div class="review-section-heading"><div><h3>Inventory</h3><p>All owned weapons, armour, modifications, and carried gear. Change an item's current state here at any time.</p></div><div class="inventory-totals" aria-label="Inventory totals"><span>${inventoryItems.length + unlinkedGrantedEquipment.length} items</span><strong>${equipmentState.carryingStatsRecorded ? `${equipmentState.knownWeight.toFixed(1)} / ${equipmentState.carryingCapacity} kg` : `${equipmentState.knownWeight.toFixed(1)} kg`}</strong></div></div>
+                <div class="review-section-heading"><div><h3>Inventory</h3></div><button type="button" class="compact-button" data-add-custom-item>Add custom item</button><div class="inventory-totals" aria-label="Inventory totals"><span>${inventoryItems.length + unlinkedGrantedEquipment.length} items</span><strong>${equipmentState.carryingStatsRecorded ? `${equipmentState.knownWeight.toFixed(1)} / ${equipmentState.carryingCapacity} kg` : `${equipmentState.knownWeight.toFixed(1)} kg`}</strong></div></div>
                 ${renderInventoryFilters()}<div class="dossier-list inventory-list">${inventoryRows}</div><p id="inventory-empty" hidden>No items match these filters.</p>
               </section></div>
               <div class="review-tab-panel" id="review-panel-features" role="tabpanel" aria-labelledby="review-tab-features" data-review-panel="features" ${reviewTabState === "features" ? "" : "hidden"}>
@@ -7309,6 +7553,8 @@ function renderReview() {
         </div>
       </section>
       ${foundryActorSheetMode ? "" : `<aside class="validation-panel">
+        <button class="compact-button" id="retry-player-save" type="button" hidden>Retry online save</button>
+        <button class="compact-button" id="load-shared-character" type="button" hidden>Load updated shared character</button>
         <h2>${foundryActorSheetMode ? "Save Changes" : "Save Your Acolyte"}</h2>
         ${!foundryActorSheetMode && foundryEmbeddedMode ? `<button class="primary-button save-to-foundry" type="button">Create Foundry Actor <span>›</span></button>` : ""}
         ${!foundryActorSheetMode ? `<button class="primary-button save-to-roster" type="button">Save &amp; Return to Acolytes <span>›</span></button>` : ""}
@@ -7340,6 +7586,7 @@ function renderStageBody(scene, selected) {
 }
 
 function render() {
+  hideFloatingRuleTooltip();
   if (foundryActorSheetMode && !foundryActorLoaded) {
     root.innerHTML = `<main class="scene"><section role="status" aria-live="polite"><h1>${foundryActorLoadError ? "Character unavailable" : "Loading character…"}</h1><p>${escapeHtmlAttribute(foundryActorLoadError || "Opening this Actor’s sheet.")}</p><button type="button" id="retry-foundry-actor">Retry</button></section></main>`;
     document.querySelector("#retry-foundry-actor")?.addEventListener("click", requestFoundryActor);
@@ -7364,7 +7611,7 @@ function render() {
   const scene = scenes[step];
   const isIdentity = scene.id === "identity";
   const actorSheetReview = foundryActorSheetMode && scene.id === "review";
-  const actorSheetEditor = foundryActorSheetMode && ["equipment", "advances"].includes(scene.id);
+  const actorSheetEditor = isLivePlayerSheet() && ["equipment", "advances"].includes(scene.id);
   const actorSheetEditorCopy = scene.id === "equipment"
     ? { kicker: "Live Character Inventory", title: "Manage Inventory" }
     : { kicker: "Spend Earned XP", title: "Purchase Advances" };
@@ -7385,8 +7632,8 @@ function render() {
       <header class="topbar">
         ${portalEmblem}
         <div class="brand">
-          <strong>${foundryActorSheetMode ? "Dark Heresy Acolyte Sheet" : "Dark Heresy Character Creation"}</strong>
-          <span>${foundryActorSheetMode ? "Live Foundry Record" : "Create Your Acolyte"}</span>
+          <strong>${foundryActorSheetMode || scene.id === "review" || actorSheetEditor ? "Dark Heresy Acolyte Sheet" : "Dark Heresy Character Creation"}</strong>
+          <span>${foundryActorSheetMode ? "Live Foundry Record" : scene.id === "review" || actorSheetEditor ? "Player Character" : "Create Your Acolyte"}</span>
         </div>
         ${renderPortalSectionNav("")}
         <div class="audio-controls">
@@ -7437,9 +7684,9 @@ function render() {
           ${scenes.map((entry, index) => `<i class="${index === step ? "active" : index < step ? "done" : ""}" ${index === step ? 'aria-current="step"' : ""}><span class="sr-only">${entry.title}${index === step ? ", current step" : index < step ? ", completed" : ""}</span></i>`).join("")}
         </div>`}
         <div class="actions">
-          ${actorSheetReview ? `<span class="foundry-save-status" id="export-status" role="status" aria-live="polite">${foundrySaveMessage}</span>` : ""}
+          ${actorSheetReview ? `<span class="foundry-save-status sr-only" id="export-status" role="status" aria-live="polite">${foundrySaveMessage}</span>` : ""}
           ${actorSheetEditor ? `<button class="primary-button return-to-sheet" id="return-to-sheet" type="button">Return to Sheet <span>›</span></button>` : `
-            ${isIdentity ? "" : `<button class="text-button" id="details">Rules</button>`}
+            ${isIdentity || scene.id === "review" ? "" : `<button class="text-button" id="details">Rules</button>`}
             <button class="primary-button ${actorSheetReview ? "foundry-dirty-save" : ""}" id="continue" ${unresolvedStageGrants.length ? `disabled title="Resolve ${unresolvedStageGrants.length} granted choice${unresolvedStageGrants.length === 1 ? "" : "s"} first"` : ""} ${actorSheetReview && foundrySaveState === "saved" ? "hidden" : ""} ${actorSheetReview && foundrySaveState === "saving" ? "disabled" : ""}>${unresolvedStageGrants.length ? `Resolve ${unresolvedStageGrants.length} Choice${unresolvedStageGrants.length === 1 ? "" : "s"}` : actorSheetReview ? foundrySaveState === "saving" ? "Saving…" : foundrySaveState === "error" ? "Retry Save" : "Save Now" : scene.id === "review" ? "Save Acolyte & Return" : scene.action}<span>›</span></button>`}
         </div>
       </footer>
@@ -7492,12 +7739,23 @@ function render() {
       </form>
     </dialog>
 
+    <dialog id="custom-item-dialog" class="sheet-detail-dialog" aria-labelledby="custom-item-title">
+      <form id="custom-item-form">
+        <h2 id="custom-item-title">Add custom item</h2>
+        <label>Item name<input name="name" required maxlength="120" autocomplete="off" /></label>
+        <label>Description (optional)<textarea name="description" maxlength="4000" rows="4"></textarea></label>
+        <div class="custom-item-buttons"><button type="button" class="compact-button" data-cancel-custom-item>Cancel</button><button type="submit" class="compact-button">Add item</button></div>
+      </form>
+    </dialog>
     <dialog id="sheet-detail-dialog" class="sheet-detail-dialog" aria-labelledby="sheet-detail-title">
       <button class="dialog-close" aria-label="Close character capability details">×</button>
       <p class="eyebrow" id="sheet-detail-kind">Character Record</p>
       <h2 id="sheet-detail-title">Record details</h2>
+      <div id="sheet-detail-actions"></div><div id="item-damage-result" aria-live="polite"></div>
       <p id="sheet-detail-summary"></p>
       <dl class="sheet-detail-profile" id="sheet-detail-profile"></dl>
+      <div id="sheet-detail-qualities"></div>
+      <div id="sheet-detail-removal"></div>
       <p class="source-note" id="sheet-detail-source"></p>
       ${foundryActorSheetMode ? chatShareControl('sheet-detail') : ''}
     </dialog>
@@ -7511,7 +7769,7 @@ function render() {
       </div>
       <div class="action-dialog-tags" id="action-dialog-tags"></div>
       <p id="action-dialog-summary"></p>
-      <p class="action-dialog-context" id="action-dialog-context"></p>
+      <p class="action-dialog-context" id="action-dialog-context"></p><details id="action-weapon-qualities" hidden><summary>Weapon qualities</summary><div></div></details>
       <div class="action-fate-control" id="action-fate-control" hidden>
         <div class="action-fate-control-copy">${actionGroupGlyph("Fate")}<span><small>Fate-linked capability</small><strong id="action-fate-status">Fate — / —</strong></span></div>
         <button class="compact-button" id="spend-action-fate" type="button">Spend 1 Fate Point</button>
@@ -7588,6 +7846,7 @@ function filterReviewSkillRows() {
     const matches = !query || String(row.dataset.skillSearch || "").includes(query);
     row.hidden = !matches;
     if (matches) visible += 1;
+    if (query && matches && row.matches(".specialist-family-dropdown")) row.open = true;
   });
   document.querySelectorAll("[data-skill-disclosure]").forEach((details) => {
     const hasMatch = Boolean(details.querySelector("[data-skill-row]:not([hidden])"));
@@ -7602,6 +7861,7 @@ function activateReviewTab(tabId, { focus = false } = {}) {
   const button = document.querySelector(`[data-review-tab="${tabId}"]`);
   const panel = document.querySelector(`[data-review-panel="${tabId}"]`);
   if (!button || !panel) return;
+  if (tabId === 'rolls') panel.innerHTML = renderBrowserRollHistory();
   reviewTabState = tabId;
   localStorage.setItem(reviewTabStorageKey, reviewTabState);
   document.querySelectorAll("[data-review-tab]").forEach((entry) => {
@@ -7748,6 +8008,12 @@ function openActionDialog(actionId) {
   const dialog = document.querySelector("#action-dialog");
   if (!action || !dialog) return;
   dialog.dataset.actionId = action.id;
+  const weaponQualities = dialog.querySelector("#action-weapon-qualities");
+  const actionItem = equipmentItem(action.test?.weaponId || action.equipmentId);
+  const qualityMarkup = actionItem ? renderItemQualities(actionItem) : "";
+  weaponQualities.hidden = !qualityMarkup;
+  weaponQualities.open = false;
+  weaponQualities.querySelector("div").innerHTML = qualityMarkup;
   dialog.querySelector("#action-dialog-kind").textContent = action.group;
   dialog.querySelector("#action-dialog-title").textContent = action.name;
   dialog.querySelector("#action-dialog-summary").textContent = action.summary;
@@ -7785,7 +8051,7 @@ function openActionDialog(actionId) {
   dialog.querySelector("#action-roll-result").replaceChildren();
   const rollButton = dialog.querySelector("#execute-action-roll");
   delete rollButton.dataset.rollSubmitted;
-  rollButton.disabled = false;
+  rollButton.disabled = !action.available;
   rollButton.innerHTML = "Roll d100 <span>›</span>";
   actionRollSession = action.test ? { actionId: action.id, plusTenSpent: false, rerolled: false, addedDegree: false, roll: null, originalRoll: null, outcome: null, resolved: null } : null;
   if (action.test) {
@@ -7879,7 +8145,7 @@ async function rollWeaponDamage(action, targetElement) {
 async function executeCurrentActionRoll() {
   const dialog = document.querySelector("#action-dialog");
   const action = currentActionRecords.get(dialog?.dataset.actionId || "");
-  if (!action?.test) return;
+  if (!action?.test || !action.available) return;
   const button = document.querySelector("#execute-action-roll");
   button.disabled = true;
   try {
@@ -7894,7 +8160,7 @@ async function executeCurrentActionRoll() {
       : null;
     const test = psychic ? { ...action.test, actionModifier: Number(action.test.actionModifier || 0) + psychic.modifier } : action.test;
     const resolved = resolvedActionTest(test, situation, plusTen ? 10 : 0);
-    const ammo = action.test.weaponId && weaponIsRanged(equipmentItem(action.test.weaponId)) ? {name:action.test.weaponName,mode:action.test.calledShot?'called':action.test.hitMode==='single'?'standard':action.test.hitMode} : null;
+    const ammo = action.test.weaponId && weaponIsRanged(equipmentItem(action.test.weaponId)) ? {builderId:action.test.weaponId,name:action.test.weaponName,mode:action.test.calledShot?'called':action.test.hitMode==='single'?'standard':action.test.hitMode} : null;
     const [roll] = await rollPlayableDice(1, 100, action.name, resolved.target, null, ammo);
     const outcome = testOutcome(roll, resolved.target);
     actionRollSession = { ...actionRollSession, actionId: action.id, resolved, psychic, roll, originalRoll: roll, outcome };
@@ -7933,6 +8199,21 @@ function addDegreeToCurrentActionWithFate() {
 }
 
 function wireEvents() {
+  updatePlayerSaveStatus();
+  applySharedViewMode();
+  document.querySelector('#retry-player-save')?.addEventListener('click', () => {
+    const record = characterLibrary.find(entry => entry.id === activeCharacterId);
+    if (record) void persistCloudRecord(record);
+  });
+  document.querySelector('#load-shared-character')?.addEventListener('click', () => {
+    if (!pendingRemoteCharacter) return;
+    const local = characterLibrary.find(entry => entry.id === activeCharacterId);
+    if (local?.cloudPending && !confirm('Replace this browser copy with the shared version? Export your local character first if you want to retain its unsent changes.')) return;
+    const remote = pendingRemoteCharacter;
+    characterLibrary = characterLibrary.map(entry => entry.id === remote.id ? remote : entry);
+    localStorage.setItem(libraryStorageKey, JSON.stringify(characterLibrary));
+    switchToCharacter(remote.id);
+  });
   document.querySelectorAll("[data-roll-review-skill]").forEach((button) => button.addEventListener("click", () => {
     openSkillTest(button.dataset.rollReviewSkill, button.dataset.skillSpeciality || "");
   }));
@@ -7951,10 +8232,32 @@ function wireEvents() {
   });
   document.querySelectorAll('[data-manage-ammo]').forEach(button => button.addEventListener('click',async()=>{
     button.disabled=true;
-    try { await requestFoundrySheet('sheet-ammunition',{name:button.dataset.manageAmmo}); }
+    try {
+      if (foundryActorSheetMode) await requestFoundrySheet('sheet-ammunition',{name:button.dataset.manageAmmo});
+      else openBrowserAmmunition(button.dataset.ammoItem);
+    }
     catch(error) { window.alert(error.message); }
     finally { button.disabled=false; }
   }));
+  document.querySelector("[data-add-custom-item]")?.addEventListener("click", () => {
+    const dialog = document.querySelector("#custom-item-dialog");
+    dialog.querySelector("form").reset();
+    dialog.showModal();
+    dialog.querySelector("input").focus();
+  });
+  document.querySelector("[data-cancel-custom-item]")?.addEventListener("click", () => document.querySelector("#custom-item-dialog").close());
+  document.querySelector("#custom-item-form")?.addEventListener("submit", event => {
+    event.preventDefault();
+    const fields = new FormData(event.currentTarget);
+    const item = addCustomInventoryItem(fields.get("name"), fields.get("description"));
+    if (!item) return;
+    document.querySelector("#custom-item-dialog").close();
+    inventoryIndexState.query = "";
+    inventoryIndexState.group = "All";
+    save();
+    rerenderEquipmentStatePreservingScroll("#inventory-search");
+    openItemDetails(item.id);
+  });
   applyInventoryFilters();
   document.querySelector("#inventory-search")?.addEventListener("input", (event) => {
     inventoryIndexState.query = event.target.value; applyInventoryFilters();
@@ -8058,6 +8361,7 @@ function wireEvents() {
     render();
   });
   document.querySelector("[data-manage-advances]")?.addEventListener("click", () => {
+    character.playMode = true;
     playMechanicalLock();
     step = scenes.findIndex((entry) => entry.id === "advances");
     pendingFocusSelector = "#scene-content";
@@ -8065,6 +8369,7 @@ function wireEvents() {
     render();
   });
   document.querySelector("[data-manage-inventory]")?.addEventListener("click", () => {
+    character.playMode = true;
     playMechanicalLock();
     armouryBrowserState.query = "";
     armouryBrowserState.category = "All";
@@ -8138,10 +8443,9 @@ function wireEvents() {
       entry.setAttribute("aria-pressed", String(active));
     });
     const fateButton = document.querySelector("[data-action-fate-only]");
-    fateButton?.classList.add("active");
-    fateButton?.setAttribute("aria-pressed", "true");
+    if (fateButton) fateButton.checked = true;
     filterReviewActionCards();
-    document.querySelector('[data-review-panel="actions"]')?.scrollTo({ top: 0, behavior: "smooth" });
+    document.querySelector(".review-action-results")?.scrollTo({ top: 0, behavior: "smooth" });
   });
 
   document.querySelector("#action-search")?.addEventListener("input", (event) => {
@@ -8161,11 +8465,9 @@ function wireEvents() {
       filterReviewActionCards();
     });
   });
-  document.querySelector("[data-action-fate-only]")?.addEventListener("click", (event) => {
-    actionIndexState.fateOnly = !actionIndexState.fateOnly;
+  document.querySelector("[data-action-fate-only]")?.addEventListener("change", (event) => {
+    actionIndexState.fateOnly = event.currentTarget.checked;
     localStorage.setItem("dh2-action-fate-only", String(actionIndexState.fateOnly));
-    event.currentTarget.classList.toggle("active", actionIndexState.fateOnly);
-    event.currentTarget.setAttribute("aria-pressed", String(actionIndexState.fateOnly));
     filterReviewActionCards();
   });
   document.querySelector("#show-unavailable-actions")?.addEventListener("change", (event) => {
@@ -8183,7 +8485,11 @@ function wireEvents() {
     if (event.target === actionDialog) actionDialog.close();
   });
   actionDialog?.addEventListener("close", () => {
-    if (actionDialog.dataset.resourceChanged === "true") rerenderEquipmentStatePreservingScroll();
+    if (actionDialog.dataset.resourceChanged === "true") {
+      const itemId = document.querySelector("#sheet-detail-dialog[open]")?.dataset.itemId;
+      rerenderEquipmentStatePreservingScroll();
+      if (itemId) openItemDetails(itemId);
+    }
   });
   document.querySelector("#spend-action-fate")?.addEventListener("click", (event) => {
     const action = currentActionRecords.get(actionDialog?.dataset.actionId || "");
@@ -8701,6 +9007,7 @@ function wireEvents() {
       character.equipment.inventory = character.equipment.inventory.filter((entry) => entry !== id);
       removeEquipmentState(id);
     } else if (!character.equipment.inventory.includes(id)) {
+      character.equipment.removedCreationGrants = (character.equipment.removedCreationGrants || []).filter(entry => entry !== id);
       character.equipment.inventory.push(id);
       character.equipment.noCostGrants.push(id);
     }
@@ -9162,7 +9469,7 @@ function keyboardNavigation(event) {
     document.addEventListener("keydown", keyboardNavigation, { once: true });
     return;
   }
-  const actorSheetEditor = foundryActorSheetMode && ["equipment", "advances"].includes(scenes[step]?.id);
+  const actorSheetEditor = isLivePlayerSheet() && ["equipment", "advances"].includes(scenes[step]?.id);
   if (actorSheetEditor && event.key === "ArrowLeft") {
     navigateCreationBack();
   } else if (actorSheetEditor) {
@@ -9182,12 +9489,9 @@ function keyboardNavigation(event) {
   }
 }
 
-root.addEventListener("click", (event) => {
-  const sheetDetailButton = event.target.closest("[data-sheet-detail]");
-  if (sheetDetailButton) {
-    const record = sheetDetailRecords.get(sheetDetailButton.dataset.sheetDetail);
-    const dialog = document.querySelector("#sheet-detail-dialog");
-    if (!record || !dialog) return;
+function openSheetDetailRecord(record) {
+  const dialog = document.querySelector("#sheet-detail-dialog");
+  if (!dialog || !record) return;
     dialog.querySelector("#sheet-detail-kind").textContent = record.kind;
     dialog.querySelector("#sheet-detail-title").textContent = record.name;
     dialog.querySelector("#sheet-detail-summary").textContent = record.summary;
@@ -9206,7 +9510,79 @@ root.addEventListener("click", (event) => {
     const source = dialog.querySelector("#sheet-detail-source");
     source.textContent = record.source ? `Source: ${record.source}` : "";
     source.hidden = !record.source;
-    dialog.showModal();
+    dialog.querySelector("#item-damage-result").replaceChildren();
+    dialog.dataset.itemId = record.itemId || "";
+    const item = record.itemId ? equipmentItem(record.itemId) : null;
+    dialog.querySelector("#sheet-detail-actions").innerHTML = item ? renderItemActions(item) : "";
+    dialog.querySelector("#sheet-detail-qualities").innerHTML = item ? renderItemQualities(item) : "";
+    dialog.querySelector("#sheet-detail-removal").innerHTML = item ? renderItemRemoval(item) : "";
+    const wasItem = dialog.classList.contains("item-side-panel");
+    if (dialog.open && wasItem !== Boolean(item)) dialog.close();
+    dialog.classList.toggle("item-side-panel", Boolean(item));
+    if (!dialog.open) { if (item) dialog.show(); else dialog.showModal(); }
+
+}
+
+root.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !document.querySelector("#action-dialog[open]")) document.querySelector("#sheet-detail-dialog.item-side-panel[open]")?.close();
+  const row = event.target.closest("[data-open-item]");
+  if (row && event.target === row && ["Enter", " "].includes(event.key)) {
+    event.preventDefault();
+    openItemDetails(row.dataset.openItem);
+  }
+});
+
+root.addEventListener("click", async (event) => {
+  const cancelRemoval = event.target.closest("[data-cancel-item-removal]");
+  if (cancelRemoval) {
+    const details = cancelRemoval.closest("details");
+    details.open = false;
+    details.querySelector("summary").focus();
+    return;
+  }
+  const confirmRemoval = event.target.closest("[data-confirm-item-removal]");
+  if (confirmRemoval) {
+    if (!confirmRemoval.closest("details")?.open) return;
+    if (removeInventoryItem(confirmRemoval.dataset.confirmItemRemoval)) {
+      document.querySelector("#sheet-detail-dialog")?.close();
+      save();
+      rerenderEquipmentStatePreservingScroll("#inventory-search");
+    }
+    return;
+  }
+
+  const itemButton = event.target.closest("[data-open-item-button]");
+  if (itemButton) { openItemDetails(itemButton.dataset.openItemButton); return; }
+  const damageButton = event.target.closest("[data-item-damage]");
+  if (damageButton && !damageButton.disabled) {
+    const itemId = damageButton.dataset.itemDamage;
+    if (!character.equipment.inventory.includes(itemId)) return;
+    openItemDetails(itemId);
+    damageButton.disabled = true;
+    try { await rollWeaponDamage({test:{weaponId:itemId}}, document.querySelector("#item-damage-result")); }
+    catch (error) { window.alert(error.message); }
+    finally { damageButton.disabled = false; }
+    return;
+  }
+  const itemAction = event.target.closest("[data-item-action]");
+  if (itemAction && !itemAction.disabled) {
+    const action = actionsForItem(derivedCharacterActions(), itemAction.dataset.actionItem).find(entry => entry.id === itemAction.dataset.itemAction);
+    if (!action?.available) return;
+    currentActionRecords.set(action.id, action);
+    openActionDialog(action.id);
+    return;
+  }
+  const itemRow = event.target.closest("[data-open-item]");
+  if (itemRow && !event.target.closest("button,input,select,label,a")) {
+    openItemDetails(itemRow.dataset.openItem);
+    return;
+  }
+  const sheetDetailButton = event.target.closest("[data-sheet-detail]");
+  if (sheetDetailButton) {
+    const record = sheetDetailRecords.get(sheetDetailButton.dataset.sheetDetail);
+    const dialog = document.querySelector("#sheet-detail-dialog");
+    if (!record || !dialog) return;
+    openSheetDetailRecord(record);
     return;
   }
   const termButton = event.target.closest("[data-rule-term]");
@@ -9245,6 +9621,15 @@ function requestFoundryActor() {
   window.parent.postMessage({ source: "dh2-portal-frame", type: "actor-sheet-ready", requestId: crypto.randomUUID() }, foundryParentOrigin());
 }
 
+document.addEventListener('click', event => {
+  if (appView !== 'builder' || !isReadOnlyCharacter()) return;
+  const control = event.target.closest('button,input,select,textarea');
+  if (control && !control.matches(sharedViewControls)) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}, true);
+
 if (foundryActorSheetMode) {
   render();
   requestFoundryActor();
@@ -9254,4 +9639,16 @@ if (foundryActorSheetMode) {
   void initialiseCloudRepository().finally(() => {
     if (appView === "roster") renderRoster();
   });
+}
+
+if (!foundryActorSheetMode) {
+  const reconnect = async () => {
+    if (!savedCampaignConnection()) return;
+    await refreshCloudRepository();
+    for (const record of characterLibrary.filter(entry => entry.cloudPending && !entry.cloudConflict && entry.canEdit !== false)) void persistCloudRecord(record);
+  };
+  window.addEventListener('online', reconnect);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) void reconnect(); });
+  // Realtime is best-effort; polling also recovers after a mobile tab sleeps.
+  window.setInterval(() => { if (!document.hidden) void reconnect(); }, 15000);
 }
