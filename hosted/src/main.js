@@ -32,6 +32,7 @@ import {
   savedCampaignConnection,
   subscribeToCloudCharacters,
 } from "./cloud-storage.js?v=0.3.0";
+import { campaignInviteFromUrl, campaignInviteUrl, renderCampaignQr } from "./campaign-qr.js?v=0.1.0";
 import {
   aptitudeChoices,
   aptitudeMatches,
@@ -323,6 +324,12 @@ let step = Math.min(scenes.length - 1, Math.max(0, Number(activeRecord?.step || 
 let character = prepareCharacter(activeRecord?.character);
 syncCreationConsequences();
 let appView = foundryActorSheetMode ? "builder" : "roster";
+let pendingCampaignInvite = foundryActorSheetMode ? null : campaignInviteFromUrl();
+let campaignQrInviteCodeDraft = pendingCampaignInvite?.inviteCode || "";
+if (pendingCampaignInvite && !foundryActorSheetMode) {
+  appView = "roster";
+  history.replaceState(history.state, "", `${location.pathname}${location.search}`);
+}
 let foundryActorLoaded = false;
 let foundryActorLoadError = "";
 let activeFloatingTooltipTarget = null;
@@ -6829,6 +6836,11 @@ function renderRoster() {
         <p>This device is connected as <strong>${escapeHtmlAttribute(savedCampaignConnection().displayName)}</strong>.</p>
         <p class="credit-small">Sync status: <strong>${cloudStatus === "connected" ? "online" : cloudStatus === "connecting" ? "connecting" : "offline"}</strong>. Browser recovery copies remain available at all times.</p>
         <label>Campaign ID<input id="connected-campaign-id" value="${escapeHtmlAttribute(savedCampaignConnection().campaignId)}" readonly /></label>
+        <form id="campaign-qr-form" class="campaign-qr-form">
+          <label>Private invite code<input id="campaign-qr-invite-code" name="inviteCode" type="password" minlength="8" autocomplete="off" value="${escapeHtmlAttribute(campaignQrInviteCodeDraft)}" placeholder="Enter the campaign invite code" required /></label>
+          <button class="compact-button" type="submit">Show player join QR</button>
+          <p class="credit-small">The QR is generated in this browser. Anyone with it can request to join, so share it privately.</p>
+        </form>
         <div class="dialog-actions">
           <button class="compact-button" id="copy-campaign-id" type="button">Copy Campaign ID</button>
           ${cloudStatus !== "connected" ? `<button class="compact-button" id="retry-campaign" type="button">Retry Sync</button>` : ""}
@@ -6845,8 +6857,8 @@ function renderRoster() {
           <form id="join-campaign-form">
             <h3>Join as Player</h3>
             <label>Your display name<input name="displayName" required maxlength="60" autocomplete="nickname" /></label>
-            <label>Campaign ID<input name="campaignId" required /></label>
-            <label>Invite code<input name="inviteCode" required minlength="8" autocomplete="current-password" /></label>
+            <label>Campaign ID<input name="campaignId" value="${escapeHtmlAttribute(pendingCampaignInvite?.campaignId || "")}" required /></label>
+            <label>Invite code<input name="inviteCode" type="password" value="${escapeHtmlAttribute(pendingCampaignInvite?.inviteCode || "")}" required minlength="8" autocomplete="current-password" /></label>
             <button class="primary-button" type="submit">Join Shared Campaign</button>
           </form>
         </div>
@@ -6855,7 +6867,31 @@ function renderRoster() {
       <p id="shared-dialog-status" class="credit-small" role="status" aria-live="polite"></p>
     </dialog>`;
 
+  root.insertAdjacentHTML("beforeend", `
+    <dialog id="campaign-qr-dialog" aria-labelledby="campaign-qr-title">
+      <button class="dialog-close" type="button" aria-label="Close campaign QR">×</button>
+      <p class="eyebrow">Private campaign invitation</p>
+      <h2 id="campaign-qr-title">Scan to join</h2>
+      <div id="campaign-qr-image" class="campaign-qr-image" aria-live="polite"></div>
+      <p class="credit-small">Scan with a phone or tablet camera. The link opens this portal with the campaign ID and invite code filled in; players still enter their own display name and confirm.</p>
+      <label>Join link<input id="campaign-qr-link" readonly /></label>
+      <div class="dialog-actions">
+        <button class="compact-button" id="copy-campaign-join-link" type="button">Copy join link</button>
+        <button class="compact-button" id="download-campaign-qr" type="button">Download QR</button>
+      </div>
+    </dialog>`);
+
   wireRosterEvents();
+  const qrInviteInput = document.querySelector("#campaign-qr-invite-code");
+  if (qrInviteInput && campaignQrInviteCodeDraft) qrInviteInput.value = campaignQrInviteCodeDraft;
+  if (pendingCampaignInvite && !savedCampaignConnection()) {
+    const joinDialog = document.querySelector("#shared-dialog");
+    if (joinDialog && !joinDialog.open) joinDialog.showModal();
+    const inviteInput = document.querySelector("#join-campaign-form input[name='inviteCode']");
+    if (inviteInput) inviteInput.value = pendingCampaignInvite.inviteCode;
+    const status = document.querySelector("#shared-dialog-status");
+    if (status) status.textContent = "Campaign invitation loaded. Enter your display name, then confirm to join.";
+  }
   requestAnimationFrame(applyTextScale);
 }
 
@@ -6883,6 +6919,50 @@ function wireRosterEvents() {
   sharedDialog?.addEventListener("click", (event) => {
     if (event.target === sharedDialog) sharedDialog.close();
   });
+  document.querySelector("#campaign-qr-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const status = document.querySelector("#shared-dialog-status");
+    const inviteCode = new FormData(event.currentTarget).get("inviteCode");
+    const connection = savedCampaignConnection();
+    if (!connection) return;
+    campaignQrInviteCodeDraft = String(inviteCode || "");
+    status.textContent = "Generating the invitation QR in this browser…";
+    try {
+      const inviteUrl = campaignInviteUrl(connection.campaignId, campaignQrInviteCodeDraft, location.href);
+      const qrDialog = document.querySelector("#campaign-qr-dialog");
+      const qrTarget = document.querySelector("#campaign-qr-image");
+      await renderCampaignQr(qrTarget, inviteUrl);
+      document.querySelector("#campaign-qr-link").value = inviteUrl;
+      if (!qrDialog.open) qrDialog.showModal();
+      status.textContent = "Invitation QR ready. Share it only with players you want to join.";
+    } catch (error) {
+      status.textContent = `Could not generate the QR: ${error.message}`;
+    }
+  });
+  const qrDialog = document.querySelector("#campaign-qr-dialog");
+  qrDialog?.querySelector(".dialog-close")?.addEventListener("click", () => qrDialog.close());
+  qrDialog?.addEventListener("click", (event) => { if (event.target === qrDialog) qrDialog.close(); });
+  document.querySelector("#copy-campaign-join-link")?.addEventListener("click", async () => {
+    const link = document.querySelector("#campaign-qr-link")?.value || "";
+    try {
+      await navigator.clipboard.writeText(link);
+      document.querySelector("#shared-dialog-status").textContent = "Private join link copied.";
+    } catch {
+      document.querySelector("#campaign-qr-link")?.select();
+      document.querySelector("#shared-dialog-status").textContent = "Select and copy the private join link.";
+    }
+  });
+  document.querySelector("#download-campaign-qr")?.addEventListener("click", () => {
+    const svg = document.querySelector("#campaign-qr-image svg");
+    if (!svg) return;
+    const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "dark-heresy-campaign-invite.svg";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  });
   document.querySelector("#create-campaign-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const status = document.querySelector("#shared-dialog-status");
@@ -6894,12 +6974,13 @@ function wireRosterEvents() {
         inviteCode: values.get("inviteCode"),
         displayName: values.get("displayName"),
       }), 20000, "The shared service did not respond while creating the campaign.");
+      campaignQrInviteCodeDraft = String(values.get("inviteCode") || "");
       cloudStatus = "connected";
       await initialiseCloudRepository();
-      await navigator.clipboard?.writeText(result.connection.campaignId);
       sharedDialog.close();
       renderRoster();
-      alert(`Campaign created. Give your players this ID and the private invite code:\n${result.connection.campaignId}`);
+      document.querySelector("#shared-dialog").showModal();
+      document.querySelector("#shared-dialog-status").textContent = "Campaign created. Enter or confirm the invite code above, then show a QR or copy its private join link.";
     } catch (error) {
       status.textContent = `Could not create the campaign: ${error.message}`;
     }
@@ -6908,6 +6989,7 @@ function wireRosterEvents() {
     event.preventDefault();
     const status = document.querySelector("#shared-dialog-status");
     const values = new FormData(event.currentTarget);
+    campaignQrInviteCodeDraft = String(values.get("inviteCode") || "");
     status.textContent = "Joining the shared campaign…";
     try {
       await withTimeout(connectToCampaign({
@@ -6917,6 +6999,7 @@ function wireRosterEvents() {
       }), 20000, "The shared service did not respond while joining the campaign.");
       cloudStatus = "connected";
       await initialiseCloudRepository();
+      pendingCampaignInvite = null;
       sharedDialog.close();
       renderRoster();
     } catch (error) {
