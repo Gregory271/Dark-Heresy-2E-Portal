@@ -7617,7 +7617,7 @@ function renderReview() {
                 <div class="advancement-manager">
                   <form class="xp-award-form" id="xp-award-form">
                     <div><h4>Award XP</h4><p>Add experience granted by the GM. The new total is saved immediately.</p></div>
-                    <label><span>Amount</span><input id="xp-award-amount" name="amount" type="number" min="1" step="50" inputmode="numeric" placeholder="100" required /></label>
+                    <label><span>Amount</span><input id="xp-award-amount" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="500" required /></label>
                     <label class="xp-award-note"><span>Reason · optional</span><input id="xp-award-note" name="note" type="text" maxlength="80" placeholder="Investigation completed" /></label>
                     <button class="primary-button" type="submit">Add XP <span>›</span></button>
                   </form>
